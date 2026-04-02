@@ -16,6 +16,9 @@
 
 Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code for anti-patterns, and build entire features — all context-aware with your schema, routes, and specs. Powered by Claude Opus 4.6, running on your existing Claude subscription.
 
+<img width="1230" height="280" alt="image" src="https://github.com/user-attachments/assets/14e07ce8-def0-4a8f-ac89-46661361a4eb" />
+
+
 > **Rubyn is going open source.** The original [Rubyn gem](https://github.com/Rubyn-AI/rubyn) provided AI-assisted refactoring, spec generation, and code review through the Rubyn API. **Rubyn Code** is the next evolution — a complete agentic coding assistant that runs locally, thinks for itself, and learns from every session. No API keys. No separate billing. Just `gem install rubyn-code` and go.
 
 ## Why Rubyn?
