@@ -1,0 +1,41 @@
+# Gem build artifacts
+*.gem
+/pkg/
+
+# Bundle
+/.bundle/
+Gemfile.lock
+
+# Test & coverage
+/coverage/
+/spec/reports/
+/spec/examples.txt
+
+# Documentation
+/.yardoc/
+/_yardoc/
+/doc/
+
+# Temp files
+/tmp/
+*.rbc
+.byebug_history
+
+# Environment & secrets
+.env
+.env.*
+tokens.yml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Rubyn Code local data (user-specific)
+.rubyn-code/
+rubyn_code.db
+rubyn_code.db-wal
+rubyn_code.db-shm
