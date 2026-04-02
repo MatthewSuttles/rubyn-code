@@ -1,10 +1,18 @@
-# Rubyn Code
+<p align="center">
+  <img src="docs/RubynLogo.png" alt="Rubyn Code" width="200">
+</p>
 
-[![Gem Version](https://badge.fury.io/rb/rubyn-code.svg)](https://rubygems.org/gems/rubyn-code)
-[![Ruby Style Guide](https://img.shields.io/badge/code_style-rubocop-brightgreen.svg)](https://github.com/rubocop/rubocop)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<h1 align="center">Rubyn Code</h1>
 
-**AI Code Assistant for Ruby & Rails — now fully open source.**
+<p align="center">
+  <strong>AI Code Assistant for Ruby & Rails — Open Source</strong>
+</p>
+
+<p align="center">
+  <a href="https://rubygems.org/gems/rubyn-code"><img src="https://badge.fury.io/rb/rubyn-code.svg" alt="Gem Version"></a>
+  <a href="https://github.com/rubocop/rubocop"><img src="https://img.shields.io/badge/code_style-rubocop-brightgreen.svg" alt="Ruby Style Guide"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
 
 Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code for anti-patterns, and build entire features — all context-aware with your schema, routes, and specs. Powered by Claude Opus 4.6, running on your existing Claude subscription.
 
