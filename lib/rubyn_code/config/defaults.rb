@@ -21,8 +21,10 @@ module RubynCode
       MAX_OUTPUT_TOKENS_RECOVERY_LIMIT = 3   # Multi-turn recovery attempts after escalation
 
       MAX_OUTPUT_CHARS = 10_000
+      MAX_TOOL_RESULT_CHARS = 10_000          # Per-tool result cap
+      MAX_MESSAGE_TOOL_RESULTS_CHARS = 50_000 # Aggregate cap for all tool results in one message
       CONTEXT_THRESHOLD_TOKENS = 30_000
-      MICRO_COMPACT_KEEP_RECENT = 3
+      MICRO_COMPACT_KEEP_RECENT = 2
 
       POLL_INTERVAL = 5
       IDLE_TIMEOUT = 60
