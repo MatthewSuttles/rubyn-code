@@ -95,7 +95,7 @@ module RubynCode
         callback.call(:done, "Teammate '#{teammate.name}' reached iteration limit.")
       rescue StandardError => e
         callback.call(:done, "Teammate '#{teammate.name}' error: #{e.message}")
-        $stderr.puts "[Teammate #{teammate.name}] Error: #{e.class}: #{e.message}" if ENV["RUBYN_DEBUG"]
+        Debug.agent("Teammate #{teammate.name} error: #{e.class}: #{e.message}")
       end
 
       def poll_inbox(teammate, conversation, tools, system_prompt, mailbox, callback)
@@ -123,7 +123,7 @@ module RubynCode
           end
         end
       rescue StandardError => e
-        $stderr.puts "[Teammate #{teammate.name}] Poll error: #{e.message}" if ENV["RUBYN_DEBUG"]
+        Debug.agent("Teammate #{teammate.name} poll error: #{e.message}")
       end
 
       def execute_tool_calls(tool_calls, conversation, callback)
@@ -159,7 +159,7 @@ module RubynCode
       end
 
       def default_status(_type, message)
-        $stderr.puts "[spawn_teammate] #{message}" if ENV["RUBYN_DEBUG"]
+        Debug.agent("spawn_teammate: #{message}")
       end
     end
 

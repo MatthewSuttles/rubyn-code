@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "rubyn_code/version"
+require_relative "rubyn_code/debug"
 
 module RubynCode
   class Error < StandardError; end

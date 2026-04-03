@@ -61,11 +61,17 @@ module RubynCode
         @output_recovery_count = 0
 
         MAX_ITERATIONS.times do |iteration|
+          Debug.loop_tick("iteration=#{iteration} messages=#{@conversation.length} max_tokens_override=#{@max_tokens_override || 'default'}")
+
           response = call_llm
           tool_calls = extract_tool_calls(response)
+          stop_reason = response.respond_to?(:stop_reason) ? response.stop_reason : nil
+
+          Debug.llm("stop_reason=#{stop_reason} tool_calls=#{tool_calls.size} content_blocks=#{get_content(response).size}")
 
           if tool_calls.empty?
             if truncated?(response)
+              Debug.recovery("Text response truncated, entering recovery")
               response = recover_truncated_response(response)
             end
 
@@ -76,6 +82,7 @@ module RubynCode
           # Tier 1: If a tool-use response was truncated, silently escalate and retry
           if truncated?(response)
             unless @max_tokens_override
+              Debug.recovery("Tier 1: Escalating max_tokens from #{Config::Defaults::CAPPED_MAX_OUTPUT_TOKENS} to #{Config::Defaults::ESCALATED_MAX_OUTPUT_TOKENS}")
               @max_tokens_override = Config::Defaults::ESCALATED_MAX_OUTPUT_TOKENS
               next
             end
@@ -87,6 +94,7 @@ module RubynCode
           run_maintenance(iteration)
         end
 
+        Debug.warn("Hit MAX_ITERATIONS (#{MAX_ITERATIONS})")
         max_iterations_warning
       end
 
@@ -477,8 +485,11 @@ module RubynCode
 
         @conversation.add_assistant_message(response_content(response))
 
-        Config::Defaults::MAX_OUTPUT_TOKENS_RECOVERY_LIMIT.times do
+        max_retries = Config::Defaults::MAX_OUTPUT_TOKENS_RECOVERY_LIMIT
+
+        max_retries.times do |attempt|
           @output_recovery_count += 1
+          Debug.recovery("Tier 2: Recovery attempt #{attempt + 1}/#{max_retries}")
 
           @conversation.add_user_message(
             "Output token limit hit. Resume directly — no apology, no recap, " \
@@ -487,9 +498,17 @@ module RubynCode
 
           response = call_llm
 
-          break unless truncated?(response)
+          unless truncated?(response)
+            Debug.recovery("Recovery successful on attempt #{attempt + 1}")
+            break
+          end
 
+          Debug.recovery("Still truncated after attempt #{attempt + 1}")
           @conversation.add_assistant_message(response_content(response))
+        end
+
+        if truncated?(response)
+          Debug.recovery("Tier 3: Exhausted #{max_retries} recovery attempts, returning partial response")
         end
 
         response
@@ -538,7 +557,10 @@ module RubynCode
                   response[:usage] || response["usage"]
                 end
         return unless usage
-        return unless usage
+
+        input_tokens = usage.respond_to?(:input_tokens) ? usage.input_tokens : usage[:input_tokens]
+        output_tokens = usage.respond_to?(:output_tokens) ? usage.output_tokens : usage[:output_tokens]
+        Debug.token("in=#{input_tokens} out=#{output_tokens}")
 
         @context_manager.track_usage(usage)
       rescue NoMethodError

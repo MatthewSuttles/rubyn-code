@@ -13,6 +13,8 @@ module RubynCode
       end
 
       def run
+        RubynCode::Debug.enable! if @options[:debug]
+
         case @options[:command]
         when :version
           puts "rubyn-code #{RubynCode::VERSION}"
@@ -50,6 +52,8 @@ module RubynCode
             i += 1
           when "--yolo"
             options[:yolo] = true
+          when "--debug"
+            options[:debug] = true
           end
           i += 1
         end
@@ -95,6 +99,7 @@ module RubynCode
             rubyn-code                    Start interactive REPL
             rubyn-code -p "prompt"        Run a single prompt and exit
             rubyn-code --resume [ID]      Resume a previous session
+            rubyn-code --debug            Enable debug output
             rubyn-code --auth             Authenticate with Claude
             rubyn-code --version          Show version
             rubyn-code --help             Show this help
