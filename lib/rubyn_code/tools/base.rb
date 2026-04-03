@@ -63,7 +63,7 @@ module RubynCode
         expanded
       end
 
-      def truncate(output, max: 50_000)
+      def truncate(output, max: 10_000)
         return output if output.nil? || output.length <= max
 
         half = max / 2

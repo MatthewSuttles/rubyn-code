@@ -56,10 +56,19 @@ module RubynCode
       def check_compaction!(conversation)
         messages = conversation.messages
 
+        # Step 1: Zero-cost micro-compact (replace old tool results with placeholders)
         MicroCompact.call(messages)
 
         return unless needs_compaction?(messages)
 
+        # Step 2: Try context collapse (snip old messages, no LLM call)
+        collapsed = ContextCollapse.call(messages, threshold: @threshold)
+        if collapsed
+          apply_compacted_messages(conversation, collapsed)
+          return
+        end
+
+        # Step 3: Full LLM-driven auto-compact (expensive, last resort)
         compactor = Compactor.new(
           llm_client: conversation.respond_to?(:llm_client) ? conversation.llm_client : nil,
           threshold: @threshold

@@ -20,8 +20,8 @@ module RubynCode
       ESCALATED_MAX_OUTPUT_TOKENS = 32_000   # Silent escalation on first max_tokens hit
       MAX_OUTPUT_TOKENS_RECOVERY_LIMIT = 3   # Multi-turn recovery attempts after escalation
 
-      MAX_OUTPUT_CHARS = 50_000
-      CONTEXT_THRESHOLD_TOKENS = 50_000
+      MAX_OUTPUT_CHARS = 10_000
+      CONTEXT_THRESHOLD_TOKENS = 30_000
       MICRO_COMPACT_KEEP_RECENT = 3
 
       POLL_INTERVAL = 5

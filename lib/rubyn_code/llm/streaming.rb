@@ -168,6 +168,7 @@ module RubynCode
       end
 
       def handle_message_stop
+        flush_pending_block
         emit(:message_stop, {})
       end
 
@@ -185,6 +186,27 @@ module RubynCode
 
       def emit(type, data)
         @callback&.call(Event.new(type: type, data: data))
+      end
+
+      def flush_pending_block
+        return unless @current_block_index
+
+        if @current_tool_id
+          input = parse_json(@current_tool_input_json) || {}
+          @content_blocks[@current_block_index] = ToolUseBlock.new(
+            id: @current_tool_id,
+            name: @current_tool_name,
+            input: input
+          )
+          @current_tool_id = nil
+          @current_tool_name = nil
+          @current_tool_input_json = +""
+        elsif !@current_text.empty?
+          @content_blocks[@current_block_index] = TextBlock.new(text: @current_text.dup)
+          @current_text = +""
+        end
+
+        @current_block_index = nil
       end
 
       def build_content_blocks

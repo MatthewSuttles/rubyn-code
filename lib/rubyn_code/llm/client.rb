@@ -137,19 +137,31 @@ module RubynCode
       def build_request_body(messages:, tools:, system:, model:, max_tokens:, stream:)
         body = { model: model, max_tokens: max_tokens, messages: messages }
 
-        # OAuth tokens require a specific first system block for model access
+        # OAuth tokens require a specific first system block for model access.
+        # Use cache_control breakpoints so the static system prompt and tool
+        # definitions are cached across turns (~90% input token savings on hits).
         if access_token.include?("sk-ant-oat")
           blocks = [{ type: "text", text: OAUTH_GATE }]
-          blocks << { type: "text", text: system } if system
+          if system
+            blocks << { type: "text", text: system, cache_control: { type: "ephemeral" } }
+          end
           body[:system] = blocks
         elsif system
-          body[:system] = system
+          body[:system] = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }]
         end
 
-        body[:tools] = tools if tools && !tools.empty?
+        if tools && !tools.empty?
+          # Mark the last tool with cache_control so the entire tool block is cached
+          cached_tools = tools.map(&:dup)
+          cached_tools.last[:cache_control] = { type: "ephemeral" }
+          body[:tools] = cached_tools
+        end
+
         body[:stream] = true if stream
         body
       end
+
+      PromptTooLongError = Class.new(RequestError)
 
       def handle_api_response(response)
         unless response.success?
@@ -164,6 +176,7 @@ module RubynCode
           end
 
           raise AuthExpiredError, "Authentication expired: #{error_msg}" if response.status == 401
+          raise PromptTooLongError, "Prompt too long: #{error_msg}" if response.status == 413
           raise RequestError, "API request failed (#{response.status} #{error_type}): #{error_msg}"
         end
 
