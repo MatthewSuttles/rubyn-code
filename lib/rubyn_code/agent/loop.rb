@@ -57,14 +57,28 @@ module RubynCode
       def send_message(user_input)
         check_user_feedback(user_input)
         @conversation.add_user_message(user_input)
+        @max_tokens_override = nil
+        @output_recovery_count = 0
 
         MAX_ITERATIONS.times do |iteration|
           response = call_llm
           tool_calls = extract_tool_calls(response)
 
           if tool_calls.empty?
+            if truncated?(response)
+              response = recover_truncated_response(response)
+            end
+
             @conversation.add_assistant_message(response_content(response))
             return extract_response_text(response)
+          end
+
+          # Tier 1: If a tool-use response was truncated, silently escalate and retry
+          if truncated?(response)
+            unless @max_tokens_override
+              @max_tokens_override = Config::Defaults::ESCALATED_MAX_OUTPUT_TOKENS
+              next
+            end
           end
 
           @conversation.add_assistant_message(get_content(response))
@@ -85,12 +99,15 @@ module RubynCode
 
         drain_background_notifications
 
-        response = @llm_client.chat(
+        opts = {
           messages: @conversation.to_api_format,
           tools: tool_definitions,
           system: build_system_prompt,
           on_text: @on_text
-        )
+        }
+        opts[:max_tokens] = @max_tokens_override if @max_tokens_override
+
+        response = @llm_client.chat(**opts)
 
         @hook_runner.fire(:post_llm_call, response: response, conversation: @conversation)
         track_usage(response)
@@ -438,6 +455,44 @@ module RubynCode
         @conversation.add_user_message("[Background notifications]\n#{summary}")
       rescue NoMethodError
         # background_manager does not support drain_notifications yet
+      end
+
+      # ── Output token recovery (3-tier, matches Claude Code) ──────────
+      #
+      # Tier 1: Silent escalation (8K → 32K) — handled in send_message
+      # Tier 2: Multi-turn recovery — inject continuation message, retry up to 3x
+      # Tier 3: Surface what we have — return partial response after exhausting retries
+
+      def truncated?(response)
+        reason = if response.respond_to?(:stop_reason)
+                   response.stop_reason
+                 elsif response.is_a?(Hash)
+                   response[:stop_reason] || response["stop_reason"]
+                 end
+        reason == "max_tokens"
+      end
+
+      def recover_truncated_response(response)
+        @max_tokens_override ||= Config::Defaults::ESCALATED_MAX_OUTPUT_TOKENS
+
+        @conversation.add_assistant_message(response_content(response))
+
+        Config::Defaults::MAX_OUTPUT_TOKENS_RECOVERY_LIMIT.times do
+          @output_recovery_count += 1
+
+          @conversation.add_user_message(
+            "Output token limit hit. Resume directly — no apology, no recap, " \
+            "just continue exactly where you left off."
+          )
+
+          response = call_llm
+
+          break unless truncated?(response)
+
+          @conversation.add_assistant_message(response_content(response))
+        end
+
+        response
       end
 
       # ── Response helpers ─────────────────────────────────────────────

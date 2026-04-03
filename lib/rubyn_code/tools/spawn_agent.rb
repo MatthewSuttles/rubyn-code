@@ -37,25 +37,51 @@ module RubynCode
 
         tools = tools_for_type(type)
 
-        result = run_sub_agent(prompt: prompt, tools: tools, type: type, callback: callback)
+        result, hit_limit = run_sub_agent(prompt: prompt, tools: tools, type: type, callback: callback)
 
         callback.call(:done, "Agent finished (#{@tool_count} tool calls).")
 
         summary = RubynCode::SubAgents::Summarizer.call(result, max_length: 3000)
-        "## Sub-Agent Result (#{type})\n\n#{summary}"
+
+        if hit_limit
+          "## Sub-Agent Result (#{type}) — INCOMPLETE (reached #{@tool_count} tool calls)\n\n" \
+            "The sub-agent ran out of turns before finishing. Here is what it accomplished so far:\n\n#{summary}"
+        else
+          "## Sub-Agent Result (#{type})\n\n#{summary}"
+        end
       end
 
       private
 
+      # Returns [result_text, hit_limit] tuple
       def run_sub_agent(prompt:, tools:, type:, callback:)
         conversation = RubynCode::Agent::Conversation.new
         conversation.add_user_message(prompt)
 
-        max_iterations = type == :explore ? 20 : 30
+        max_iterations = type == :explore ?
+          Config::Defaults::MAX_EXPLORE_AGENT_ITERATIONS :
+          Config::Defaults::MAX_SUB_AGENT_ITERATIONS
         iteration = 0
+        last_text = nil
 
         loop do
-          break if iteration >= max_iterations
+          if iteration >= max_iterations
+            # Ask the LLM for a final summary of what it accomplished so far
+            conversation.add_user_message(
+              "You have reached your turn limit. Summarize everything you found or accomplished so far. " \
+              "Be thorough — this is your last chance to report back."
+            )
+            response = @llm_client.chat(
+              messages: conversation.to_api_format,
+              tools: [],
+              system: sub_agent_system_prompt(type)
+            )
+            content = response.respond_to?(:content) ? Array(response.content) : []
+            text_blocks = content.select { |b| b.respond_to?(:type) && b.type == "text" }
+            summary = text_blocks.map(&:text).join("\n")
+
+            return [summary.empty? ? (last_text || '') : summary, true]
+          end
 
           response = @llm_client.chat(
             messages: conversation.to_api_format,
@@ -66,12 +92,13 @@ module RubynCode
           content = response.respond_to?(:content) ? Array(response.content) : []
           tool_calls = content.select { |b| b.respond_to?(:type) && b.type == "tool_use" }
 
+          # Track the latest text output for partial results
+          text_blocks = content.select { |b| b.respond_to?(:type) && b.type == "text" }
+          last_text = text_blocks.map(&:text).join("\n") unless text_blocks.empty?
+
           if tool_calls.empty?
-            # Final text response
-            text = content.select { |b| b.respond_to?(:type) && b.type == "text" }
-                          .map(&:text).join("\n")
             conversation.add_assistant_message(content)
-            return text
+            return [last_text || '', false]
           end
 
           # Add assistant message with tool calls
@@ -113,8 +140,6 @@ module RubynCode
 
           iteration += 1
         end
-
-        "Sub-agent reached iteration limit (#{max_iterations})."
       end
 
       def tools_for_type(type)
