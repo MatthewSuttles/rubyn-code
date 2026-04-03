@@ -12,15 +12,7 @@ module RubynCode
             ctx.renderer.info('Plan mode OFF — back to full execution. 🚀')
             { action: :set_plan_mode, enabled: false }
           else
-            ctx.renderer.info('Plan mode ON — read-only tools only. I can explore but won
-            { action: :set_plan_mode, enabled: true }
-          end
-        end
-      end
-    end
-  end
-end
-t change anything. 🧠')
+            ctx.renderer.info("Plan mode ON — read-only tools only. I can explore but won't change anything. 🧠")
             { action: :set_plan_mode, enabled: true }
           end
         end
