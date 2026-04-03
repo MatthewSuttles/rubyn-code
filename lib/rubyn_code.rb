@@ -193,6 +193,7 @@ module RubynCode
     autoload :Renderer, "rubyn_code/cli/renderer"
     autoload :Spinner, "rubyn_code/cli/spinner"
     autoload :StreamFormatter, "rubyn_code/cli/stream_formatter"
+    autoload :Setup, "rubyn_code/cli/setup"
   end
 
   # Output

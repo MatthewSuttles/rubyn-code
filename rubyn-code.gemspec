@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
                        "featuring a 16-layer agentic architecture, local SQLite persistence, and Claude OAuth."
   spec.homepage      = "https://rubyn.dev"
   spec.license       = "MIT"
-  spec.required_ruby_version = ">= 3.3"
+  spec.required_ruby_version = ">= 4.0"
 
   spec.files         = Dir["lib/**/*", "exe/*", "skills/**/*", "db/**/*", "LICENSE", "README.md"]
   spec.bindir        = "exe"
@@ -31,4 +31,12 @@ Gem::Specification.new do |spec|
 
   # Auth
   spec.add_dependency "webrick", "~> 1.8"
+
+  spec.post_install_message = <<~MSG
+    Rubyn Code installed! Run `rubyn-code --setup` to pin it to this Ruby
+    so it works in any project regardless of .ruby-version.
+
+    Tip: Install with your latest Ruby for best performance:
+      RBENV_VERSION=4.0.2 gem install rubyn-code && rubyn-code --setup
+  MSG
 end

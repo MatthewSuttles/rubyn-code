@@ -18,6 +18,8 @@ module RubynCode
           puts "rubyn-code #{RubynCode::VERSION}"
         when :auth
           run_auth
+        when :setup
+          run_setup
         when :help
           display_help
         when :run
@@ -50,6 +52,8 @@ module RubynCode
             i += 1
           when "--yolo"
             options[:yolo] = true
+          when "--setup"
+            options[:command] = :setup
           end
           i += 1
         end
@@ -68,6 +72,10 @@ module RubynCode
           renderer.error("Authentication failed: #{e.message}")
           exit(1)
         end
+      end
+
+      def run_setup
+        Setup.run
       end
 
       def run_single_prompt(prompt)
@@ -95,6 +103,7 @@ module RubynCode
             rubyn-code                    Start interactive REPL
             rubyn-code -p "prompt"        Run a single prompt and exit
             rubyn-code --resume [ID]      Resume a previous session
+            rubyn-code --setup            Pin rubyn-code to bypass rbenv/rvm
             rubyn-code --auth             Authenticate with Claude
             rubyn-code --version          Show version
             rubyn-code --help             Show this help
