@@ -13,16 +13,17 @@ RSpec.describe RubynCode::SubAgents::Runner do
 
   describe ".call" do
     it "returns a summarized string when LLM responds with text only" do
-      allow(llm_client).to receive(:chat).and_return("Here is the answer.")
+      allow(llm_client).to receive(:chat).and_return('Here is the answer.')
 
       result = described_class.call(
-        prompt: "Explain the code",
+        prompt: 'Explain the code',
         llm_client: llm_client,
         project_root: project_root,
         max_iterations: 5
       )
 
       expect(result).to be_a(String)
+      expect(result).to include('Here is the answer')
     end
 
     it "respects the max_iterations hard limit" do
@@ -39,20 +40,21 @@ RSpec.describe RubynCode::SubAgents::Runner do
 
     it "prevents sub-agents from spawning other sub-agents" do
       tool_call_response = [
-        { type: "tool_use", id: "t1", name: "sub_agent", input: { prompt: "hi" } }
+        { type: 'tool_use', id: 't1', name: 'sub_agent', input: { prompt: 'hi' } }
       ]
-      text_response = "Done"
+      text_response = 'Done'
 
       allow(llm_client).to receive(:chat).and_return(tool_call_response, text_response)
 
       result = described_class.call(
-        prompt: "Do something",
+        prompt: 'Do something',
         llm_client: llm_client,
         project_root: project_root,
         max_iterations: 5
       )
 
       expect(result).to be_a(String)
+      expect(result).to include('Done')
     end
   end
 end

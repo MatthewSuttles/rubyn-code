@@ -25,7 +25,7 @@ RSpec.describe RubynCode::CLI::Commands::Doctor do
   end
 
   describe '.description' do
-    it { expect(described_class.description).to be_a(String) }
+    it { expect(described_class.description).to eq('Environment health check') }
   end
 
   describe '#execute' do

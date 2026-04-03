@@ -6,8 +6,13 @@ RSpec.describe RubynCode::Agent::LoopDetector do
   subject(:detector) { described_class.new(window: 5, threshold: 3) }
 
   describe "#record" do
-    it "records a tool invocation without error" do
-      expect { detector.record("read_file", { path: "x.rb" }) }.not_to raise_error
+    it "records a tool invocation into the history" do
+      detector.record('read_file', { path: 'x.rb' })
+      # One call is below threshold — detector should not be stalled
+      expect(detector).not_to be_stalled
+      # But recording the same call up to threshold should detect the loop
+      2.times { detector.record('read_file', { path: 'x.rb' }) }
+      expect(detector).to be_stalled
     end
 
     it "keeps history within the sliding window" do
