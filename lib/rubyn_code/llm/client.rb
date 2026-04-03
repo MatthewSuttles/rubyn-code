@@ -49,7 +49,7 @@ module RubynCode
 
           if response.status == 429 && retries < MAX_RETRIES
             delay = RETRY_DELAYS[retries] || 10
-            $stderr.puts "[RubynCode] Rate limited, retrying in #{delay}s (#{retries + 1}/#{MAX_RETRIES})..." if ENV["RUBYN_DEBUG"]
+            RubynCode::Debug.llm("Rate limited, retrying in #{delay}s (#{retries + 1}/#{MAX_RETRIES})...")
             sleep delay
             retries += 1
             next
@@ -169,10 +169,9 @@ module RubynCode
           error_msg = body&.dig("error", "message") || response.body[0..500]
           error_type = body&.dig("error", "type") || "api_error"
 
-          if ENV["RUBYN_DEBUG"]
-            $stderr.puts "[RubynCode] API error #{response.status}: #{response.body[0..500]}"
-            $stderr.puts "[RubynCode] Response headers:"
-            response.headers.each { |k, v| $stderr.puts "  #{k}: #{v}" if k.match?(/rate|retry|limit|anthropic/i) }
+          RubynCode::Debug.llm("API error #{response.status}: #{response.body[0..500]}")
+          if RubynCode::Debug.enabled?
+            response.headers.each { |k, v| RubynCode::Debug.llm("  #{k}: #{v}") if k.match?(/rate|retry|limit|anthropic/i) }
           end
 
           raise AuthExpiredError, "Authentication expired: #{error_msg}" if response.status == 401
