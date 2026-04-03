@@ -90,6 +90,24 @@ module RubynCode
         end
       end
 
+      # Returns unread messages for the given agent WITHOUT marking them as read.
+      # Used by IdlePoller to check for pending work without consuming messages.
+      #
+      # @param name [String] the recipient agent name
+      # @return [Array<Hash>] parsed message hashes
+      def pending_for(name)
+        rows = @db.query(
+          <<~SQL,
+            SELECT payload FROM mailbox_messages
+            WHERE recipient = ? AND read = 0
+            ORDER BY created_at ASC
+          SQL
+          [name]
+        ).to_a
+
+        rows.map { |r| JSON.parse(r["payload"], symbolize_names: true) }
+      end
+
       # Returns the count of unread messages for the given agent.
       #
       # @param name [String] the recipient agent name

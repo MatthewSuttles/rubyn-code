@@ -39,3 +39,4 @@ tokens.yml
 rubyn_code.db
 rubyn_code.db-wal
 rubyn_code.db-shm
+.ruby-version

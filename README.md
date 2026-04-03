@@ -352,7 +352,7 @@ Works with Claude Pro, Max, Team, and Enterprise. Default model: **Claude Opus 4
 │  Layer 14: Hooks & Events (user-configurable pre/post hooks) │
 │  Layer 13: Observability (cost tracking, budget enforcement)  │
 │  Layer 12: Memory (persistent knowledge across sessions)      │
-│  Layer 11: Autonomous Operation (KAIROS daemon, task claiming)│
+│  Layer 11: Autonomous Operation (GOLEM daemon, task claiming) │
 │  Layer 10: Protocols (shutdown handshake, plan approval)      │
 │  Layer 9:  Teams (persistent teammates, mailbox messaging)    │
 │  Layer 8:  Background Execution (async tasks, notifications)  │

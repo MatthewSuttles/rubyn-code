@@ -6,7 +6,7 @@ RSpec.describe RubynCode::Agent::Loop, "413 recovery" do
   let(:llm_client)      { instance_double(RubynCode::LLM::Client) }
   let(:tool_executor)   { instance_double(RubynCode::Tools::Executor, tool_definitions: []) }
   let(:context_manager) { RubynCode::Context::Manager.new(threshold: 999_999) }
-  let(:hook_runner)     { double("HookRunner", fire: nil) }
+  let(:hook_runner)     { instance_double(RubynCode::Hooks::Runner, fire: nil) }
   let(:conversation)    { RubynCode::Agent::Conversation.new }
   let(:stall_detector)  { RubynCode::Agent::LoopDetector.new }
 
