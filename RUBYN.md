@@ -33,7 +33,7 @@ appends results, and loops until Claude responds with plain text or the budget i
 exe/rubyn-code           → Entry point: RubynCode::CLI::App.start(ARGV)
 lib/rubyn_code.rb        → Root module, autoloads everything
 lib/rubyn_code/          → 16 layers + infrastructure (see RUBYN.md in each dir)
-db/migrations/           → Numbered .sql files (000_ through 010_)
+db/migrations/           → Numbered .sql and .rb files (000_ through 011_)
 skills/                  → 112 curated markdown skill documents
 spec/                    → RSpec tests mirroring lib/ structure
 ```
@@ -61,10 +61,14 @@ RubynCode::Error                 # Base — all custom errors descend from this
 
 ## Database
 
-SQLite at `~/.rubyn-code/rubyn_code.db`. Migrations are sequential `.sql` files in `db/migrations/`.
+SQLite at `~/.rubyn-code/rubyn_code.db`. Migrations are sequential files in `db/migrations/`.
+
+**Migration formats:**
+- `.sql` — executed statement-by-statement inside a transaction
+- `.rb` — Ruby module with `module_function def up(db)` for conditional/complex migrations
 
 **Tables:** schema_migrations, sessions, messages, tasks, task_dependencies, memories,
-cost_records, hooks, skills_cache, teams, instincts
+cost_records, hooks, skills_cache, teammates, mailbox_messages, instincts
 
 ## Conventions
 
@@ -73,7 +77,7 @@ cost_records, hooks, skills_cache, teams, instincts
 - RSpec for tests, RuboCop enforced (120 char lines, 25-line methods, 200-line classes)
 - Single quotes unless interpolating
 - Tools: inherit `Base`, define `schema`, implement `execute`
-- Migrations: numbered sequentially (`000_`, `001_`), not timestamped
+- Migrations: numbered sequentially (`000_`, `001_`), not timestamped. Use `.sql` for simple DDL, `.rb` when you need conditional logic
 - No OpenStruct. Ever.
 
 ## Adding a New Tool
