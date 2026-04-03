@@ -14,18 +14,26 @@ Ships as a gem with an executable at `exe/rubyn-code`. Talks to Claude via OAuth
 ## How a Prompt Flows
 
 ```
-User input → CLI::REPL → Agent::Loop → LLM::Client (Claude)
-                              ↕
-                        Tools::Executor → Tool#execute
-                              ↕
-                     Context::Manager (compaction if needed)
-                              ↕
-                  Observability::BudgetEnforcer (cost check)
+User input → CLI::REPL
+                ├── /command → Commands::Registry → Command#execute
+                │                                      ↓
+                │                              (optional action hash → REPL state change)
+                │
+                └── message → Agent::Loop → LLM::Client (Claude)
+                                   ↕
+                             Tools::Executor → Tool#execute
+                                   ↕
+                          Context::Manager (compaction if needed)
+                                   ↕
+                       Observability::BudgetEnforcer (cost check)
 ```
 
 The `Agent::Loop` is the heartbeat. It sends messages to Claude, receives tool_use blocks,
 dispatches them through `Tools::Executor` (which checks `Permissions::Policy` first),
 appends results, and loops until Claude responds with plain text or the budget is exhausted.
+
+Slash commands (`/help`, `/plan`, `/doctor`, etc.) are handled locally by the
+`Commands::Registry` — they never hit the LLM. See `cli/commands/RUBYN.md`.
 
 ## Project Layout
 
@@ -79,6 +87,45 @@ cost_records, hooks, skills_cache, teammates, mailbox_messages, instincts
 - Tools: inherit `Base`, define `schema`, implement `execute`
 - Migrations: numbered sequentially (`000_`, `001_`), not timestamped. Use `.sql` for simple DDL, `.rb` when you need conditional logic
 - No OpenStruct. Ever.
+
+## Slash Commands
+
+19 commands, each in its own file under `lib/rubyn_code/cli/commands/`. Registry-based
+dispatch with tab-completion. Infrastructure: `Base` (abstract), `Registry` (dispatch),
+`Context` (Data.define with all deps).
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/doctor` | Environment health check (Ruby, gems, DB, API, skills) |
+| `/tokens` | Token estimation for current context |
+| `/plan` | Toggle plan mode (reason without executing) |
+| `/context` | Visual context window usage bar |
+| `/diff` | Quick git diff |
+| `/model` | Show/switch Claude model |
+| `/review` | PR review against best practices |
+| `/skill` | Load/list skills |
+| `/tasks` | List active tasks |
+| `/spawn` | Spawn a teammate agent |
+| `/resume` | Restore a previous session |
+| `/compact` | Manual context compaction |
+| `/budget` | Show/set spending limit |
+| `/cost` | Session cost summary |
+| `/clear` | Clear terminal |
+| `/undo` | Remove last exchange |
+| `/version` | Show version |
+| `/quit` | Exit (aliases: `/exit`, `/q`) |
+
+Commands return optional **action hashes** for state changes the REPL processes
+(e.g., `{ action: :set_plan_mode, enabled: true }`).
+
+## Adding a New Command
+
+1. Create `lib/rubyn_code/cli/commands/my_command.rb` inheriting `Commands::Base`
+2. Define `self.command_name` (with `/` prefix), `self.description`, `execute(args, ctx)`
+3. Add autoload entry in `lib/rubyn_code.rb` under `module Commands`
+4. Register in `REPL#setup_command_registry!`
+5. Add spec in `spec/rubyn_code/cli/commands/my_command_spec.rb`
 
 ## Adding a New Tool
 
