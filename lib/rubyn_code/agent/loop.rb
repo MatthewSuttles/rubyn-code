@@ -47,7 +47,11 @@ module RubynCode
         @on_text            = on_text
         @skill_loader       = skill_loader
         @project_root       = project_root
+        @plan_mode          = false
       end
+
+      # @return [Boolean]
+      attr_accessor :plan_mode
 
       # Send a user message and run the agent loop until a final text response
       # is produced or the iteration limit is reached.
@@ -125,7 +129,7 @@ module RubynCode
 
         opts = {
           messages: @conversation.to_api_format,
-          tools: tool_definitions,
+          tools: @plan_mode ? read_only_tool_definitions : tool_definitions,
           system: build_system_prompt,
           on_text: @on_text
         }
@@ -224,9 +228,29 @@ module RubynCode
         Categories: user_preference, project_convention, error_resolution, decision, code_pattern
       PROMPT
 
+      PLAN_MODE_PROMPT = <<~PLAN.freeze
+        ## 🧠 Plan Mode Active
+
+        You are in PLAN MODE. This means:
+        - Reason through the problem step by step
+        - You have READ-ONLY tools available — use them to explore the codebase
+        - Read files, grep, glob, check git status/log/diff — gather context
+        - Do NOT write, edit, execute, or modify anything
+        - Outline your plan with numbered steps
+        - Identify files you'd need to read or modify
+        - Call out risks, edge cases, and trade-offs
+        - Ask clarifying questions if the request is ambiguous
+        - When the user is satisfied with the plan, they'll toggle plan mode off with /plan
+
+        You CAN use read-only tools. You MUST NOT use any tool that writes, edits, or executes.
+      PLAN
+
+      PLAN_MODE_RISK_LEVELS = %i[read].freeze
+
       def build_system_prompt
         parts = [SYSTEM_PROMPT]
 
+        parts << PLAN_MODE_PROMPT if @plan_mode
         parts << "Working directory: #{@project_root}" if @project_root
 
         # Inject memories from previous sessions
@@ -367,6 +391,12 @@ module RubynCode
 
       def tool_definitions
         @tool_executor.tool_definitions
+      end
+
+      def read_only_tool_definitions
+        Tools::Registry.all
+                        .select { |t| PLAN_MODE_RISK_LEVELS.include?(t::RISK_LEVEL) }
+                        .map(&:to_schema)
       end
 
       # ── Tool processing ──────────────────────────────────────────────
