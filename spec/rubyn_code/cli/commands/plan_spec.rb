@@ -27,7 +27,7 @@ RSpec.describe RubynCode::CLI::Commands::Plan do
 
       it 'shows enabled message' do
         command.execute([], ctx)
-        expect(renderer).to have_received(:info).with(/ON/)
+        expect(renderer).to have_received(:info).with(/read-only/)
       end
     end
 

@@ -129,7 +129,7 @@ module RubynCode
 
         opts = {
           messages: @conversation.to_api_format,
-          tools: @plan_mode ? [] : tool_definitions,
+          tools: @plan_mode ? read_only_tool_definitions : tool_definitions,
           system: build_system_prompt,
           on_text: @on_text
         }
@@ -233,15 +233,19 @@ module RubynCode
 
         You are in PLAN MODE. This means:
         - Reason through the problem step by step
-        - Describe what you WOULD do, but do NOT call any tools
+        - You have READ-ONLY tools available — use them to explore the codebase
+        - Read files, grep, glob, check git status/log/diff — gather context
+        - Do NOT write, edit, execute, or modify anything
         - Outline your plan with numbered steps
         - Identify files you'd need to read or modify
         - Call out risks, edge cases, and trade-offs
         - Ask clarifying questions if the request is ambiguous
         - When the user is satisfied with the plan, they'll toggle plan mode off with /plan
 
-        Do NOT use any tools. Think and respond with text only.
+        You CAN use read-only tools. You MUST NOT use any tool that writes, edits, or executes.
       PLAN
+
+      PLAN_MODE_RISK_LEVELS = %i[read].freeze
 
       def build_system_prompt
         parts = [SYSTEM_PROMPT]
@@ -387,6 +391,12 @@ module RubynCode
 
       def tool_definitions
         @tool_executor.tool_definitions
+      end
+
+      def read_only_tool_definitions
+        Tools::Registry.all
+                        .select { |t| PLAN_MODE_RISK_LEVELS.include?(t::RISK_LEVEL) }
+                        .map(&:to_schema)
       end
 
       # ── Tool processing ──────────────────────────────────────────────

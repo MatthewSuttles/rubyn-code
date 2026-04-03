@@ -122,7 +122,12 @@ end
 
 `/plan` toggles plan mode via an action hash. When enabled:
 
-- `Agent::Loop` sends **no tools** to Claude
-- A plan-mode system prompt is injected: "Reason and plan, don't execute"
-- Claude responds with analysis and proposed steps without taking action
+- `Agent::Loop` sends only **read-only tools** (risk level `:read`) to Claude
+- Claude can read files, grep, glob, check git status/log/diff — full exploration
+- Claude **cannot** write, edit, execute, or modify anything
+- A plan-mode system prompt is injected reinforcing these boundaries
+- Claude responds with analysis, proposed steps, and gathered context
 - Toggle off with `/plan` again to resume normal execution
+
+Read-only tools in plan mode: `read_file`, `grep`, `glob`, `git_diff`, `git_log`,
+`git_status`, `review_pr`, `memory_search`, `web_search`, `web_fetch`
