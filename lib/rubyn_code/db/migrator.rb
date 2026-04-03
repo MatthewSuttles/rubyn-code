@@ -2,8 +2,12 @@
 
 module RubynCode
   module DB
-    # Reads SQL migration files from db/migrations/, tracks applied versions
+    # Reads migration files from db/migrations/, tracks applied versions
     # in a schema_migrations table, and applies new migrations in order.
+    #
+    # Supports two migration formats:
+    # - `.sql` files: executed statement-by-statement inside a transaction
+    # - `.rb` files: loaded and called via `ModuleName.up(connection)`
     class Migrator
       # @return [String] absolute path to the migrations directory
       MIGRATIONS_DIR = File.expand_path("../../../db/migrations", __dir__).freeze
@@ -61,8 +65,8 @@ module RubynCode
       #
       # @return [Array<Array(Integer, String)>] pairs of [version, file_path]
       def available_migrations
-        pattern = File.join(MIGRATIONS_DIR, "*.sql")
-        Dir.glob(pattern)
+        Dir.glob(File.join(MIGRATIONS_DIR, "*"))
+           .select { |path| path.end_with?('.sql', '.rb') }
            .map { |path| parse_migration_file(path) }
            .compact
            .sort_by(&:first)
@@ -80,16 +84,40 @@ module RubynCode
       end
 
       def apply_migration(version, path)
-        sql = File.read(path)
         @connection.transaction do
-          # Execute each statement separately (SQLite doesn't support multi-statement execute)
-          split_statements(sql).each do |statement|
-            @connection.execute(statement)
+          if path.end_with?('.rb')
+            apply_ruby_migration(path)
+          else
+            apply_sql_migration(path)
           end
+
           @connection.execute(
             "INSERT INTO schema_migrations (version) VALUES (?)", [version]
           )
         end
+      end
+
+      def apply_sql_migration(path)
+        sql = File.read(path)
+        split_statements(sql).each do |statement|
+          @connection.execute(statement)
+        end
+      end
+
+      # Loads a Ruby migration file and calls its `.up` method.
+      # The migration module must define `module_function def up(db)`.
+      def apply_ruby_migration(path)
+        require path
+        module_name = extract_module_name(path)
+        mod = Object.const_get(module_name)
+        mod.up(@connection)
+      end
+
+      # Derives the module name from a migration filename.
+      # e.g. "011_fix_mailbox_messages_columns.rb" -> "Migration011FixMailboxMessagesColumns"
+      def extract_module_name(path)
+        basename = File.basename(path, '.rb')
+        'Migration' + basename.split('_').map(&:capitalize).join
       end
 
       # Splits a SQL file into individual statements, handling semicolons
@@ -134,7 +162,8 @@ module RubynCode
       # @param path [String]
       # @return [Array(Integer, String), nil]
       def parse_migration_file(path)
-        basename = File.basename(path, ".sql")
+        ext = File.extname(path)
+        basename = File.basename(path, ext)
         match = basename.match(/\A(\d+)_/)
         return nil unless match
 
