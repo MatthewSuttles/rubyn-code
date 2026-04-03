@@ -64,6 +64,7 @@ module RubynCode
         @conversation.add_user_message(user_input)
         @max_tokens_override = nil
         @output_recovery_count = 0
+        @task_budget_remaining = nil
 
         MAX_ITERATIONS.times do |iteration|
           RubynCode::Debug.loop_tick("iteration=#{iteration} messages=#{@conversation.length} max_tokens_override=#{@max_tokens_override || 'default'}")
@@ -120,6 +121,8 @@ module RubynCode
 
       # ── LLM interaction ──────────────────────────────────────────────
 
+      TASK_BUDGET_TOTAL = 100_000 # tokens per user message
+
       def call_llm
         @hook_runner.fire(:pre_llm_call, conversation: @conversation)
 
@@ -131,10 +134,16 @@ module RubynCode
         }
         opts[:max_tokens] = @max_tokens_override if @max_tokens_override
 
+        # Task budget: tell the model how many tokens remain for this task
+        if @task_budget_remaining
+          opts[:task_budget] = { total: TASK_BUDGET_TOTAL, remaining: @task_budget_remaining }
+        end
+
         response = @llm_client.chat(**opts)
 
         @hook_runner.fire(:post_llm_call, response: response, conversation: @conversation)
         track_usage(response)
+        update_task_budget(response)
 
         response
       rescue LLM::Client::PromptTooLongError
@@ -250,7 +259,21 @@ module RubynCode
           end
         end
 
+        # List deferred tools so the LLM knows they exist
+        deferred = deferred_tool_names
+        unless deferred.empty?
+          parts << "\n## Additional Tools Available"
+          parts << "These tools are available but not loaded yet. Just call them by name and they will work:"
+          parts << deferred.map { |n| "- #{n}" }.join("\n")
+        end
+
         parts.join("\n")
+      end
+
+      def deferred_tool_names
+        all_names = @tool_executor.tool_definitions.map { |t| t[:name] || t["name"] }
+        active_names = tool_definitions.map { |t| t[:name] || t["name"] }
+        all_names - active_names
       end
 
       def load_memories
@@ -365,13 +388,35 @@ module RubynCode
         found << "# From #{path}\n#{content}"
       end
 
+      # Core tools always included. Others load on first use.
+      CORE_TOOLS = %w[
+        read_file write_file edit_file glob grep bash
+        spawn_agent background_run
+      ].freeze
+
       def tool_definitions
-        @tool_executor.tool_definitions
+        all_tools = @tool_executor.tool_definitions
+        return all_tools if all_tools.size <= CORE_TOOLS.size
+
+        @discovered_tools ||= Set.new
+
+        all_tools.select { |t|
+          name = t[:name] || t["name"]
+          CORE_TOOLS.include?(name) || @discovered_tools.include?(name)
+        }
+      end
+
+      def discover_tool(name)
+        @discovered_tools ||= Set.new
+        @discovered_tools.add(name)
       end
 
       # ── Tool processing ──────────────────────────────────────────────
 
       def process_tool_calls(tool_calls)
+        aggregate_chars = 0
+        budget = Config::Defaults::MAX_MESSAGE_TOOL_RESULTS_CHARS
+
         tool_calls.each do |tool_call|
           tool_name  = field(tool_call, :name)
           tool_input = field(tool_call, :input) || {}
@@ -387,6 +432,14 @@ module RubynCode
           @on_tool_call&.call(tool_name, tool_input)
 
           result, is_error = execute_with_permission(decision, tool_name, tool_input, tool_id)
+
+          # Enforce per-message aggregate tool result budget
+          aggregate_chars += result.to_s.length
+          if aggregate_chars > budget
+            remaining = [budget - (aggregate_chars - result.to_s.length), 500].max
+            result = "#{result.to_s[0, remaining]}\n\n[truncated — tool result budget exceeded (#{budget} chars/message)]"
+            RubynCode::Debug.token("Tool result budget exceeded: #{aggregate_chars}/#{budget} chars")
+          end
 
           @on_tool_result&.call(tool_name, result, is_error)
 
@@ -413,6 +466,9 @@ module RubynCode
       end
 
       def execute_tool(tool_name, tool_input)
+        # Auto-discover tools on first use so they appear in future calls
+        discover_tool(tool_name)
+
         @hook_runner.fire(:pre_tool_use, tool_name: tool_name, tool_input: tool_input)
 
         result = @tool_executor.execute(tool_name, **symbolize_keys(tool_input))
@@ -450,10 +506,15 @@ module RubynCode
 
       def run_compaction
         before = @conversation.length
+        est = @context_manager.estimated_tokens(@conversation.messages)
+        RubynCode::Debug.token("context=#{est} tokens (~#{before} messages, threshold=#{Config::Defaults::CONTEXT_THRESHOLD_TOKENS})")
+
         @context_manager.check_compaction!(@conversation)
+
         after = @conversation.length
         if after < before
-          RubynCode::Debug.loop_tick("Compacted: #{before} -> #{after} messages")
+          new_est = @context_manager.estimated_tokens(@conversation.messages)
+          RubynCode::Debug.loop_tick("Compacted: #{before} -> #{after} messages (#{est} -> #{new_est} tokens)")
         end
       rescue NoMethodError
         # context_manager does not implement check_compaction! yet
@@ -610,6 +671,20 @@ module RubynCode
         @context_manager.track_usage(usage)
       rescue NoMethodError
         # context_manager does not implement track_usage yet
+      end
+
+      def update_task_budget(response)
+        usage = response.respond_to?(:usage) ? response.usage : nil
+        return unless usage
+
+        output = usage.respond_to?(:output_tokens) ? usage.output_tokens.to_i : 0
+        input = usage.respond_to?(:input_tokens) ? usage.input_tokens.to_i : 0
+
+        # Initialize on first response, then decrement
+        @task_budget_remaining ||= TASK_BUDGET_TOTAL
+        @task_budget_remaining = [@task_budget_remaining - input - output, 0].max
+
+        RubynCode::Debug.token("task_budget_remaining=#{@task_budget_remaining}/#{TASK_BUDGET_TOTAL}")
       end
 
       def max_iterations_warning

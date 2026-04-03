@@ -26,14 +26,15 @@ module RubynCode
       MAX_RETRIES = 3
       RETRY_DELAYS = [2, 5, 10].freeze
 
-      def chat(messages:, tools: nil, system: nil, model: nil, max_tokens: Config::Defaults::CAPPED_MAX_OUTPUT_TOKENS, on_text: nil)
+      def chat(messages:, tools: nil, system: nil, model: nil, max_tokens: Config::Defaults::CAPPED_MAX_OUTPUT_TOKENS, on_text: nil, task_budget: nil)
         ensure_valid_token!
 
         use_streaming = on_text && access_token.include?("sk-ant-oat")
 
         body = build_request_body(
           messages:, tools:, system:,
-          model: model || @model, max_tokens:, stream: use_streaming
+          model: model || @model, max_tokens:, stream: use_streaming,
+          task_budget: task_budget
         )
 
         retries = 0
@@ -119,7 +120,7 @@ module RubynCode
         if token.include?("sk-ant-oat")
           # OAuth subscriber — same headers as Claude Code CLI
           req.headers["Authorization"] = "Bearer #{token}"
-          req.headers["anthropic-beta"] = "oauth-2025-04-20"
+          req.headers["anthropic-beta"] = "oauth-2025-04-20,task-budgets-2026-03-13"
           req.headers["x-app"] = "cli"
           req.headers["User-Agent"] = "claude-code/2.1.79"
           req.headers["X-Claude-Code-Session-Id"] = session_id
@@ -134,8 +135,15 @@ module RubynCode
         @session_id ||= SecureRandom.uuid
       end
 
-      def build_request_body(messages:, tools:, system:, model:, max_tokens:, stream:)
+      def build_request_body(messages:, tools:, system:, model:, max_tokens:, stream:, task_budget: nil)
         body = { model: model, max_tokens: max_tokens, messages: messages }
+
+        # Task budget tells the model to pace its output within a token budget
+        if task_budget
+          body[:output_config] = {
+            task_budget: { type: "tokens", total: task_budget[:total], remaining: task_budget[:remaining] }
+          }
+        end
 
         # OAuth tokens require a specific first system block for model access.
         # Use cache_control breakpoints so the static system prompt and tool

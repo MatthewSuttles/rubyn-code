@@ -13,7 +13,7 @@ module RubynCode
       attr_reader :total_input_tokens, :total_output_tokens
 
       # @param threshold [Integer] estimated token count that triggers auto-compaction
-      def initialize(threshold: 50_000)
+      def initialize(threshold: Config::Defaults::CONTEXT_THRESHOLD_TOKENS)
         @threshold = threshold
         @total_input_tokens = 0
         @total_output_tokens = 0
