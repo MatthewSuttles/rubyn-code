@@ -56,6 +56,11 @@ module RubynCode
       # @return [String] the final assistant text response
       def send_message(user_input)
         check_user_feedback(user_input)
+
+        # Drain any completed background jobs BEFORE adding the user message,
+        # so the LLM sees the results in the right order
+        drain_background_notifications
+
         @conversation.add_user_message(user_input)
         @max_tokens_override = nil
         @output_recovery_count = 0
@@ -67,6 +72,16 @@ module RubynCode
           if tool_calls.empty?
             if truncated?(response)
               response = recover_truncated_response(response)
+            end
+
+            # Before returning, check if background jobs finished while we were thinking
+            drain_background_notifications
+            if has_pending_background_jobs?
+              @conversation.add_assistant_message(response_content(response))
+              @conversation.add_user_message(
+                "[system] Background jobs are still running. You may continue or wait for results."
+              )
+              next
             end
 
             @conversation.add_assistant_message(response_content(response))
@@ -84,6 +99,9 @@ module RubynCode
           @conversation.add_assistant_message(get_content(response))
           process_tool_calls(tool_calls)
 
+          # Drain notifications after tool execution — jobs may have finished
+          drain_background_notifications
+
           run_maintenance(iteration)
         end
 
@@ -96,8 +114,6 @@ module RubynCode
 
       def call_llm
         @hook_runner.fire(:pre_llm_call, conversation: @conversation)
-
-        drain_background_notifications
 
         opts = {
           messages: @conversation.to_api_format,
@@ -451,10 +467,31 @@ module RubynCode
         notifications = @background_manager.drain_notifications
         return if notifications.nil? || notifications.empty?
 
-        summary = notifications.map(&:to_s).join("\n")
-        @conversation.add_user_message("[Background notifications]\n#{summary}")
+        summary = notifications.map { |n| format_background_notification(n) }.join("\n\n")
+        @conversation.add_user_message("[Background job results]\n#{summary}")
       rescue NoMethodError
         # background_manager does not support drain_notifications yet
+      end
+
+      def has_pending_background_jobs?
+        return false unless @background_manager
+
+        @background_manager.active_count > 0
+      rescue NoMethodError
+        false
+      end
+
+      def format_background_notification(notification)
+        case notification
+        when Hash
+          status = notification[:status] || 'unknown'
+          job_id = notification[:job_id]&.[](0..7) || 'unknown'
+          duration = notification[:duration] ? "#{'%.1f' % notification[:duration]}s" : 'unknown'
+          result = notification[:result] || '(no output)'
+          "Job #{job_id} [#{status}] (#{duration}):\n#{result}"
+        else
+          notification.to_s
+        end
       end
 
       # ── Output token recovery (3-tier, matches Claude Code) ──────────
