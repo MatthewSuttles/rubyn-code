@@ -12,7 +12,14 @@ module RubynCode
 
       DEFAULT_MODEL = "claude-opus-4-6"
       MAX_ITERATIONS = 200
-      MAX_SUB_AGENT_ITERATIONS = 30
+      MAX_SUB_AGENT_ITERATIONS = 200
+      MAX_EXPLORE_AGENT_ITERATIONS = 200
+
+      # Output token management (3-tier recovery, matches Claude Code)
+      CAPPED_MAX_OUTPUT_TOKENS = 8_000      # Default cap — keeps prompt cache efficient
+      ESCALATED_MAX_OUTPUT_TOKENS = 32_000   # Silent escalation on first max_tokens hit
+      MAX_OUTPUT_TOKENS_RECOVERY_LIMIT = 3   # Multi-turn recovery attempts after escalation
+
       MAX_OUTPUT_CHARS = 50_000
       CONTEXT_THRESHOLD_TOKENS = 50_000
       MICRO_COMPACT_KEEP_RECENT = 3

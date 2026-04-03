@@ -26,7 +26,7 @@ module RubynCode
       MAX_RETRIES = 3
       RETRY_DELAYS = [2, 5, 10].freeze
 
-      def chat(messages:, tools: nil, system: nil, model: nil, max_tokens: 8000, on_text: nil)
+      def chat(messages:, tools: nil, system: nil, model: nil, max_tokens: Config::Defaults::CAPPED_MAX_OUTPUT_TOKENS, on_text: nil)
         ensure_valid_token!
 
         use_streaming = on_text && access_token.include?("sk-ant-oat")
@@ -68,7 +68,7 @@ module RubynCode
         end
       end
 
-      def stream(messages:, tools: nil, system: nil, model: nil, max_tokens: 8000, &block)
+      def stream(messages:, tools: nil, system: nil, model: nil, max_tokens: Config::Defaults::CAPPED_MAX_OUTPUT_TOKENS, &block)
         chat(messages:, tools:, system:, model:, max_tokens:, on_text: block)
       end
 
