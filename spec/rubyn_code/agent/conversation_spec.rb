@@ -21,7 +21,7 @@ RSpec.describe RubynCode::Agent::Conversation do
     end
 
     it "includes tool_use blocks when provided" do
-      tc = { id: "t1", name: "read_file", input: { path: "x.rb" } }
+      tc = { type: "tool_use", id: "t1", name: "read_file", input: { path: "x.rb" } }
       conversation.add_assistant_message("thinking", tool_calls: [tc])
       blocks = conversation.messages.last[:content]
       expect(blocks.length).to eq(2)

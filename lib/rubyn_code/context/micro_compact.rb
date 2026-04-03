@@ -16,7 +16,7 @@ module RubynCode
       # @param keep_recent [Integer] number of most-recent tool results to preserve
       # @param preserve_tools [Array<String>] tool names whose results are never compacted
       # @return [Integer] count of compacted tool results
-      def self.call(messages, keep_recent: 3, preserve_tools: ["read_file"])
+      def self.call(messages, keep_recent: 2, preserve_tools: [])
         tool_result_refs = collect_tool_results(messages)
         return 0 if tool_result_refs.size <= keep_recent
 

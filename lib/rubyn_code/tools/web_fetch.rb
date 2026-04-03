@@ -42,16 +42,27 @@ module RubynCode
         end
       end
 
-      def fetch_page(url)
+      MAX_REDIRECTS = 5
+
+      def fetch_page(url, redirects: 0)
         conn = Faraday.new do |f|
           f.options.timeout = 30
           f.options.open_timeout = 10
           f.headers["User-Agent"] = "Mozilla/5.0 (compatible; RubynCode/1.0)"
           f.headers["Accept"] = "text/html,application/xhtml+xml,text/plain,*/*"
-          f.response :follow_redirects, limit: 5
         end
 
         response = conn.get(url)
+
+        if [301, 302, 303, 307, 308].include?(response.status)
+          raise Error, "Too many redirects fetching #{url}" if redirects >= MAX_REDIRECTS
+
+          location = response.headers["location"]
+          raise Error, "Redirect with no Location header from #{url}" unless location
+
+          location = URI.join(url, location).to_s unless location.start_with?("http")
+          return fetch_page(location, redirects: redirects + 1)
+        end
 
         unless response.success?
           raise Error, "HTTP #{response.status} fetching #{url}"

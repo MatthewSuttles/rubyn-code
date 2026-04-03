@@ -20,7 +20,11 @@ module RubynCode
       end
 
       def run
+        @version_check = VersionCheck.new(renderer: @renderer)
+        @version_check.start
+
         @renderer.welcome
+        @version_check.notify
 
         at_exit { shutdown! }
 

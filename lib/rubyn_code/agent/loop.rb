@@ -129,6 +129,16 @@ module RubynCode
         track_usage(response)
 
         response
+      rescue LLM::Client::PromptTooLongError
+        # 413: context too large — compact and retry once
+        RubynCode::Debug.recovery("413 prompt too long — running emergency compaction")
+        @context_manager.check_compaction!(@conversation)
+
+        response = @llm_client.chat(**opts.merge(messages: @conversation.to_api_format))
+        @hook_runner.fire(:post_llm_call, response: response, conversation: @conversation)
+        track_usage(response)
+
+        response
       end
 
       SYSTEM_PROMPT = <<~PROMPT.freeze

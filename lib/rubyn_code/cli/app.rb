@@ -13,6 +13,8 @@ module RubynCode
       end
 
       def run
+        RubynCode::Debug.enable! if @options[:debug]
+
         case @options[:command]
         when :version
           puts "rubyn-code #{RubynCode::VERSION}"
@@ -52,6 +54,8 @@ module RubynCode
             i += 1
           when "--yolo"
             options[:yolo] = true
+          when "--debug"
+            options[:debug] = true
           when "--setup"
             options[:command] = :setup
           end

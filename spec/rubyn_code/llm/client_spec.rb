@@ -8,15 +8,20 @@ RSpec.describe RubynCode::LLM::Client do
   before do
     allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(true)
     allow(RubynCode::Auth::TokenStore).to receive(:load).and_return({
-      access_token: "test-token", expires_at: Time.now + 3600
+      access_token: "sk-ant-oat-test-token", expires_at: Time.now + 3600, source: :keychain
     })
   end
 
   describe "#chat" do
-    it "sends a proper request and parses the response" do
+    it "sends a proper OAuth request and parses the response" do
       stub_request(:post, "https://api.anthropic.com/v1/messages")
         .with(
-          headers: { "Authorization" => "Bearer test-token", "anthropic-version" => "2023-06-01" }
+          headers: {
+            "Authorization" => "Bearer sk-ant-oat-test-token",
+            "anthropic-version" => "2023-06-01",
+            "anthropic-beta" => "oauth-2025-04-20",
+            "x-app" => "cli"
+          }
         )
         .to_return(
           status: 200,
@@ -36,6 +41,28 @@ RSpec.describe RubynCode::LLM::Client do
       expect(response.usage.input_tokens).to eq(10)
     end
 
+    it "includes the OAuth gate in the system prompt" do
+      stub_request(:post, "https://api.anthropic.com/v1/messages")
+        .with { |req|
+          body = JSON.parse(req.body)
+          system_blocks = body["system"]
+          system_blocks.is_a?(Array) &&
+            system_blocks.first["text"].include?("Claude Code") &&
+            system_blocks.last["cache_control"] == { "type" => "ephemeral" }
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+            "id" => "msg_test",
+            "content" => [{ "type" => "text", "text" => "OK" }],
+            "stop_reason" => "end_turn",
+            "usage" => { "input_tokens" => 10, "output_tokens" => 5 }
+          })
+        )
+
+      client.chat(messages: [{ role: "user", content: "Hi" }], system: "Be helpful.")
+    end
+
     it "raises RequestError on non-success status" do
       stub_request(:post, "https://api.anthropic.com/v1/messages")
         .to_return(status: 500, body: '{"error":{"type":"server_error","message":"boom"}}')
@@ -50,6 +77,14 @@ RSpec.describe RubynCode::LLM::Client do
 
       expect { client.chat(messages: [{ role: "user", content: "Hi" }]) }
         .to raise_error(RubynCode::LLM::Client::AuthExpiredError)
+    end
+
+    it "raises PromptTooLongError on 413" do
+      stub_request(:post, "https://api.anthropic.com/v1/messages")
+        .to_return(status: 413, body: '{"error":{"type":"invalid_request_error","message":"prompt is too long"}}')
+
+      expect { client.chat(messages: [{ role: "user", content: "Hi" }]) }
+        .to raise_error(RubynCode::LLM::Client::PromptTooLongError)
     end
   end
 end

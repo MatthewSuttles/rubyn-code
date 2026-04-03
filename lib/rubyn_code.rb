@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "rubyn_code/version"
+require_relative "rubyn_code/debug"
 
 module RubynCode
   class Error < StandardError; end
@@ -93,6 +94,7 @@ module RubynCode
     autoload :MicroCompact, "rubyn_code/context/micro_compact"
     autoload :AutoCompact, "rubyn_code/context/auto_compact"
     autoload :ManualCompact, "rubyn_code/context/manual_compact"
+    autoload :ContextCollapse, "rubyn_code/context/context_collapse"
   end
 
   # Layer 5: Skills
@@ -194,6 +196,7 @@ module RubynCode
     autoload :Spinner, "rubyn_code/cli/spinner"
     autoload :StreamFormatter, "rubyn_code/cli/stream_formatter"
     autoload :Setup, "rubyn_code/cli/setup"
+    autoload :VersionCheck, "rubyn_code/cli/version_check"
   end
 
   # Output
