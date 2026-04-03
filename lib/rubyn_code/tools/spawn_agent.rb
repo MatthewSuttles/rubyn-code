@@ -170,7 +170,7 @@ module RubynCode
       end
 
       def default_status(type, message)
-        $stderr.puts "[sub-agent] #{message}" if ENV["RUBYN_DEBUG"]
+        Debug.agent("sub-agent: #{message}")
       end
     end
 
