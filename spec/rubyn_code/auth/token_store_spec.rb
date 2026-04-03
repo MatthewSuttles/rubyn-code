@@ -9,6 +9,9 @@ RSpec.describe RubynCode::Auth::TokenStore do
 
   before do
     stub_const("RubynCode::Config::Defaults::TOKENS_FILE", tokens_file)
+    # Bypass macOS Keychain — without this, .load finds real Claude tokens
+    # and the TOKENS_FILE stub becomes meaningless
+    allow(described_class).to receive(:load_from_keychain).and_return(nil)
   end
 
   after do

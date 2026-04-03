@@ -160,10 +160,25 @@ module RubynCode
       private
 
       def ensure_table
-        # Add messages column if it doesn't exist (migration schema didn't include it)
+        @db.execute(<<~SQL)
+          CREATE TABLE IF NOT EXISTS sessions (
+            id TEXT PRIMARY KEY,
+            project_path TEXT NOT NULL,
+            title TEXT,
+            model TEXT,
+            messages TEXT NOT NULL DEFAULT '[]',
+            status TEXT NOT NULL DEFAULT 'active',
+            metadata TEXT DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        SQL
+
+        # Add messages column for databases created by the original migration
+        # (001_create_sessions.sql) which omitted it
         @db.execute("ALTER TABLE sessions ADD COLUMN messages TEXT NOT NULL DEFAULT '[]'")
       rescue StandardError
-        # Column already exists or table doesn't exist yet — either way, safe to continue
+        # Column already exists — safe to continue
       end
 
       # @param raw [String, Array, nil]
