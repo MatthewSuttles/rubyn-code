@@ -47,7 +47,11 @@ module RubynCode
         @on_text            = on_text
         @skill_loader       = skill_loader
         @project_root       = project_root
+        @plan_mode          = false
       end
+
+      # @return [Boolean]
+      attr_accessor :plan_mode
 
       # Send a user message and run the agent loop until a final text response
       # is produced or the iteration limit is reached.
@@ -125,7 +129,7 @@ module RubynCode
 
         opts = {
           messages: @conversation.to_api_format,
-          tools: tool_definitions,
+          tools: @plan_mode ? [] : tool_definitions,
           system: build_system_prompt,
           on_text: @on_text
         }
@@ -224,9 +228,25 @@ module RubynCode
         Categories: user_preference, project_convention, error_resolution, decision, code_pattern
       PROMPT
 
+      PLAN_MODE_PROMPT = <<~PLAN.freeze
+        ## 🧠 Plan Mode Active
+
+        You are in PLAN MODE. This means:
+        - Reason through the problem step by step
+        - Describe what you WOULD do, but do NOT call any tools
+        - Outline your plan with numbered steps
+        - Identify files you'd need to read or modify
+        - Call out risks, edge cases, and trade-offs
+        - Ask clarifying questions if the request is ambiguous
+        - When the user is satisfied with the plan, they'll toggle plan mode off with /plan
+
+        Do NOT use any tools. Think and respond with text only.
+      PLAN
+
       def build_system_prompt
         parts = [SYSTEM_PROMPT]
 
+        parts << PLAN_MODE_PROMPT if @plan_mode
         parts << "Working directory: #{@project_root}" if @project_root
 
         # Inject memories from previous sessions

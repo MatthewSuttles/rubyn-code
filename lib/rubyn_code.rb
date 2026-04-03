@@ -198,6 +198,32 @@ module RubynCode
     autoload :Setup, "rubyn_code/cli/setup"
     autoload :DaemonRunner, "rubyn_code/cli/daemon_runner"
     autoload :VersionCheck, "rubyn_code/cli/version_check"
+
+    # Slash Command System
+    module Commands
+      autoload :Base, "rubyn_code/cli/commands/base"
+      autoload :Context, "rubyn_code/cli/commands/context"
+      autoload :Registry, "rubyn_code/cli/commands/registry"
+      autoload :Help, "rubyn_code/cli/commands/help"
+      autoload :Quit, "rubyn_code/cli/commands/quit"
+      autoload :Compact, "rubyn_code/cli/commands/compact"
+      autoload :Cost, "rubyn_code/cli/commands/cost"
+      autoload :Clear, "rubyn_code/cli/commands/clear"
+      autoload :Undo, "rubyn_code/cli/commands/undo"
+      autoload :Tasks, "rubyn_code/cli/commands/tasks"
+      autoload :Budget, "rubyn_code/cli/commands/budget"
+      autoload :Skill, "rubyn_code/cli/commands/skill"
+      autoload :Version, "rubyn_code/cli/commands/version"
+      autoload :Review, "rubyn_code/cli/commands/review"
+      autoload :Resume, "rubyn_code/cli/commands/resume"
+      autoload :Spawn, "rubyn_code/cli/commands/spawn"
+      autoload :Doctor, "rubyn_code/cli/commands/doctor"
+      autoload :Tokens, "rubyn_code/cli/commands/tokens"
+      autoload :Plan, "rubyn_code/cli/commands/plan"
+      autoload :ContextInfo, "rubyn_code/cli/commands/context_info"
+      autoload :Diff, "rubyn_code/cli/commands/diff"
+      autoload :Model, "rubyn_code/cli/commands/model"
+    end
   end
 
   # Output
