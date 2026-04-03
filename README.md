@@ -28,11 +28,62 @@ Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code f
 - **Best practices built in** — ships with 112 curated Ruby and Rails guidelines that load on demand
 - **Agentic** — doesn't just answer questions. Reads files, writes code, runs specs, commits, reviews PRs, spawns sub-agents, and remembers what it learns
 
+## Install
+
+Requires **Ruby 4.0+**. Install with your latest Ruby, then pin it so it works in every project:
+
+```bash
+# Install the gem
+gem install rubyn-code
+
+# Pin to this Ruby — bypasses rbenv/rvm version switching
+rubyn-code --setup
+```
+
+That's it. `rubyn-code` now works in any project regardless of `.ruby-version`.
+
+<details>
+<summary>Using rbenv?</summary>
+
+If you manage multiple Rubies with rbenv, install on your latest:
+
+```bash
+RBENV_VERSION=4.0.2 gem install rubyn-code
+RBENV_VERSION=4.0.2 rubyn-code --setup
+```
+
+The `--setup` command creates a launcher in `~/.local/bin` that calls the gem wrapper directly, skipping rbenv's shim. As long as `~/.local/bin` is in your PATH before `~/.rbenv/shims`, you're good.
+
+</details>
+
+<details>
+<summary>Using rvm?</summary>
+
+```bash
+rvm use 4.0.2
+gem install rubyn-code
+rubyn-code --setup
+```
+
+</details>
+
+<details>
+<summary>From source</summary>
+
+```bash
+git clone https://github.com/MatthewSuttles/rubyn-code.git
+cd rubyn-code
+bundle install
+bundle exec ruby -Ilib exe/rubyn-code
+```
+
+</details>
+
+**Authentication:** Rubyn Code reads your Claude Code OAuth token from the macOS Keychain automatically. Just make sure you've logged into Claude Code once (`claude` in your terminal). Also supports `ANTHROPIC_API_KEY` env var.
+
 ## Quick Start
 
 ```bash
-gem install rubyn-code
-
 # Interactive REPL
 rubyn-code
 
@@ -42,8 +93,6 @@ rubyn-code --yolo
 # Single prompt
 rubyn-code -p "Refactor app/controllers/orders_controller.rb into service objects"
 ```
-
-**Authentication:** Rubyn Code reads your Claude Code OAuth token from the macOS Keychain automatically. Just make sure you've logged into Claude Code once (`claude` in your terminal). Also supports `ANTHROPIC_API_KEY` env var.
 
 ## What Can Rubyn Do?
 
@@ -260,6 +309,9 @@ rubyn-code                    # Interactive REPL
 rubyn-code --yolo             # Auto-approve all tools
 rubyn-code -p "prompt"        # Single prompt, exit when done
 rubyn-code --resume [ID]      # Resume previous session
+rubyn-code --setup            # Pin to this Ruby (run once after install)
+rubyn-code --debug            # Enable debug output
+rubyn-code --auth             # Authenticate with Claude
 rubyn-code --version          # Show version
 rubyn-code --help             # Show help
 ```
@@ -330,11 +382,13 @@ permission_mode: autonomous
 
 ## Development
 
+Requires Ruby 4.0+.
+
 ```bash
 git clone https://github.com/MatthewSuttles/rubyn-code.git
 cd rubyn-code
 bundle install
-bundle exec rspec  # 314 examples, 0 failures
+bundle exec rspec
 ```
 
 ## From Rubyn to Rubyn Code
