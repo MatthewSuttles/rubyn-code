@@ -354,7 +354,7 @@ module RubynCode
           sleep 5
         end
       rescue StandardError => e
-        $stderr.puts "[Teammate #{teammate.name}] Error: #{e.message}" if ENV["RUBYN_DEBUG"]
+        RubynCode::Debug.agent("Teammate #{teammate.name} error: #{e.message}")
       end
 
       def display_commands
@@ -503,7 +503,7 @@ module RubynCode
             )
             @renderer.success("Instincts saved.")
           rescue StandardError => e
-            @renderer.warning("Instinct extraction skipped: #{e.message}") if ENV["RUBYN_DEBUG"]
+            RubynCode::Debug.warn("Instinct extraction skipped: #{e.message}")
           end
         end
 
