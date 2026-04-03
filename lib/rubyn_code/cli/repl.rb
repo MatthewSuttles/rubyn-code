@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "readline"
+require "reline"
 
 module RubynCode
   module CLI
@@ -389,14 +389,14 @@ module RubynCode
       def setup_readline!
         slash_commands = CLI::InputHandler::SLASH_COMMANDS.keys
 
-        Readline.completion_proc = proc do |input|
+        Reline.completion_proc = proc do |input|
           if input.start_with?("/")
             slash_commands.select { |c| c.start_with?(input) }
           else
             []
           end
         end
-        Readline.completion_append_character = " "
+        Reline.completion_append_character = " "
       end
 
       def read_input
@@ -404,7 +404,7 @@ module RubynCode
         prompt_str = lines.empty? ? @renderer.prompt : "  ... "
 
         loop do
-          line = Readline.readline(prompt_str, true)
+          line = Reline.readline(prompt_str, true)
           return nil if line.nil?
 
           if @input_handler.multiline?(line)

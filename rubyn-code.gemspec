@@ -29,6 +29,9 @@ Gem::Specification.new do |spec|
   spec.add_dependency "tty-spinner", "~> 0.9"
   spec.add_dependency "tty-markdown", "~> 0.7"
 
+  # CLI input (removed from Ruby 4.0 stdlib)
+  spec.add_dependency "reline", ">= 0.5"
+
   # Auth
   spec.add_dependency "webrick", "~> 1.8"
 

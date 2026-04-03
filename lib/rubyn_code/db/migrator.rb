@@ -65,11 +65,21 @@ module RubynCode
       #
       # @return [Array<Array(Integer, String)>] pairs of [version, file_path]
       def available_migrations
-        Dir.glob(File.join(MIGRATIONS_DIR, "*"))
-           .select { |path| path.end_with?('.sql', '.rb') }
-           .map { |path| parse_migration_file(path) }
-           .compact
-           .sort_by(&:first)
+        all = Dir.glob(File.join(MIGRATIONS_DIR, "*"))
+                 .select { |path| path.end_with?('.sql', '.rb') }
+                 .map { |path| parse_migration_file(path) }
+                 .compact
+
+        # Deduplicate: if both .rb and .sql exist for the same version, prefer .rb
+        by_version = {}
+        all.each do |version, path|
+          existing = by_version[version]
+          if existing.nil? || path.end_with?('.rb')
+            by_version[version] = [version, path]
+          end
+        end
+
+        by_version.values.sort_by(&:first)
       end
 
       private
@@ -154,7 +164,8 @@ module RubynCode
         remainder = current.strip.chomp(";").strip
         statements << remainder unless remainder.empty?
 
-        statements
+        # Filter out comment-only statements
+        statements.reject { |s| s.lines.all? { |l| l.strip.empty? || l.strip.start_with?('--') } }
       end
 
       # Extracts the version number and name from a migration filename.
