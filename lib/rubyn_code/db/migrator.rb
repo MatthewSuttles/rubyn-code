@@ -162,7 +162,8 @@ module RubynCode
       # @param path [String]
       # @return [Array(Integer, String), nil]
       def parse_migration_file(path)
-        basename = File.basename(path, ".sql")
+        ext = File.extname(path)
+        basename = File.basename(path, ext)
         match = basename.match(/\A(\d+)_/)
         return nil unless match
 
