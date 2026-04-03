@@ -443,22 +443,20 @@ module RubynCode
       # ── Maintenance ──────────────────────────────────────────────────
 
       def run_maintenance(iteration)
-        run_micro_compact
-        check_auto_compact
+        run_compaction
         check_budget
         check_stall_detection
       end
 
-      def run_micro_compact
-        @context_manager.micro_compact(@conversation)
+      def run_compaction
+        before = @conversation.length
+        @context_manager.check_compaction!(@conversation)
+        after = @conversation.length
+        if after < before
+          RubynCode::Debug.loop_tick("Compacted: #{before} -> #{after} messages")
+        end
       rescue NoMethodError
-        # micro_compact not yet implemented on context_manager
-      end
-
-      def check_auto_compact
-        @context_manager.auto_compact(@conversation)
-      rescue NoMethodError
-        # auto_compact not yet implemented on context_manager
+        # context_manager does not implement check_compaction! yet
       end
 
       def check_budget
