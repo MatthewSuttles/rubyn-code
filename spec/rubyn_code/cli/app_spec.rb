@@ -24,11 +24,11 @@ RSpec.describe RubynCode::CLI::App do
       expect { app.run }.to output(/Usage/).to_stdout
     end
 
-    it "handles --auth" do
-      app = described_class.new(["--auth"])
-      # Stub the auth flow to avoid real OAuth
-      allow_any_instance_of(described_class).to receive(:run_auth)
-      expect { app.run }.not_to raise_error
+    it 'handles --auth by triggering the auth flow' do
+      app = described_class.new(['--auth'])
+      allow(app).to receive(:run_auth)
+      app.run
+      expect(app).to have_received(:run_auth).once
     end
 
     it "handles -p with a prompt" do

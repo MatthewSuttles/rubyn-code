@@ -39,12 +39,27 @@ RSpec.describe RubynCode::MCP::StdioTransport do
     end
   end
 
-  describe "#stop!" do
-    it "closes streams and joins the thread" do
+  describe '#stop!' do
+    it 'closes streams and joins the wait thread' do
       transport.start!
       allow(wait_thread).to receive(:alive?).and_return(true, true, false)
       allow(stdin).to receive(:write)
       allow(stdin).to receive(:flush)
+
+      transport.stop!
+
+      expect(stdin).to have_received(:close).at_least(:once)
+      expect(stdout).to have_received(:close).at_least(:once)
+      expect(stderr).to have_received(:close).at_least(:once)
+      expect(wait_thread).to have_received(:join)
+    end
+
+    it 'is safe to call when already stopped' do
+      transport.start!
+      allow(wait_thread).to receive(:alive?).and_return(false)
+      allow(stdin).to receive(:closed?).and_return(true)
+      allow(stdout).to receive(:closed?).and_return(true)
+      allow(stderr).to receive(:closed?).and_return(true)
 
       expect { transport.stop! }.not_to raise_error
     end

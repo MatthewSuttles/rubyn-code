@@ -74,8 +74,9 @@ RSpec.describe RubynCode::Agent::Conversation do
       expect(conversation.length).to eq(0)
     end
 
-    it "does nothing on an empty conversation" do
-      expect { conversation.undo_last! }.not_to raise_error
+    it 'does nothing on an empty conversation' do
+      conversation.undo_last!
+      expect(conversation.length).to eq(0)
     end
   end
 

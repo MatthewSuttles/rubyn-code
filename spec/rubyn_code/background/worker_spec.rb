@@ -11,11 +11,13 @@ RSpec.describe RubynCode::Background::Worker do
 
   describe "#run" do
     it "returns a job ID and completes the job" do
-      job_id = worker.run("echo hello", timeout: 5)
+      job_id = worker.run('echo hello', timeout: 5)
       expect(job_id).to be_a(String)
+      expect(job_id).not_to be_empty
       worker.shutdown!(timeout: 5)
       job = worker.status(job_id)
       expect(job.status).to eq(:completed)
+      expect(job.result).to include('hello')
     end
   end
 
