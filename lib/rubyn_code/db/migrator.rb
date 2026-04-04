@@ -38,7 +38,7 @@ module RubynCode
       # @return [Array<Array(Integer, String)>] pairs of [version, file_path]
       def pending_migrations
         applied = applied_versions
-        available_migrations.except(*applied)
+        available_migrations.reject { |version, _| applied.include?(version) }
       end
 
       # Returns the set of already-applied migration versions.
