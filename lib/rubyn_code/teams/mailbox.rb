@@ -131,7 +131,7 @@ module RubynCode
             sender TEXT NOT NULL,
             recipient TEXT NOT NULL,
             message_type TEXT NOT NULL DEFAULT 'message'
-              CHECK(message_type IN ('message','task','result','error','broadcast')),
+              CHECK(message_type IN ('message','task','result','error','broadcast','shutdown_request','shutdown_response','status_change')),
             payload TEXT NOT NULL,
             read INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
