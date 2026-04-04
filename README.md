@@ -12,6 +12,7 @@
   <a href="https://rubygems.org/gems/rubyn-code"><img src="https://badge.fury.io/rb/rubyn-code.svg" alt="Gem Version"></a>
   <a href="https://github.com/rubocop/rubocop"><img src="https://img.shields.io/badge/code_style-rubocop-brightgreen.svg" alt="Ruby Style Guide"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://github.com/MatthewSuttles/rubyn-code/actions/workflows/ci.yml"><img src="https://github.com/MatthewSuttles/rubyn-code/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
 Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code for anti-patterns, and build entire features — all context-aware with your schema, routes, and specs. Powered by Claude Opus 4.6, running on your existing Claude subscription.
