@@ -17,19 +17,19 @@ module Migration011FixMailboxMessagesColumns
 
     if column_names.include?('from_agent')
       # Old schema from 009 migration — rename columns
-      db.execute("ALTER TABLE mailbox_messages RENAME COLUMN from_agent TO sender")
-      db.execute("ALTER TABLE mailbox_messages RENAME COLUMN to_agent TO recipient")
-      db.execute("ALTER TABLE mailbox_messages RENAME COLUMN content TO payload")
+      db.execute('ALTER TABLE mailbox_messages RENAME COLUMN from_agent TO sender')
+      db.execute('ALTER TABLE mailbox_messages RENAME COLUMN to_agent TO recipient')
+      db.execute('ALTER TABLE mailbox_messages RENAME COLUMN content TO payload')
 
       # Remap 'text' message_type to 'message' to match Mailbox default
       db.execute("UPDATE mailbox_messages SET message_type = 'message' WHERE message_type = 'text'")
     end
 
     # Ensure indexes match regardless of which schema path we took
-    db.execute("DROP INDEX IF EXISTS idx_mailbox_to")
-    db.execute("DROP INDEX IF EXISTS idx_mailbox_from")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_mailbox_recipient_read ON mailbox_messages(recipient, read)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_mailbox_sender ON mailbox_messages(sender)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_mailbox_created ON mailbox_messages(created_at)")
+    db.execute('DROP INDEX IF EXISTS idx_mailbox_to')
+    db.execute('DROP INDEX IF EXISTS idx_mailbox_from')
+    db.execute('CREATE INDEX IF NOT EXISTS idx_mailbox_recipient_read ON mailbox_messages(recipient, read)')
+    db.execute('CREATE INDEX IF NOT EXISTS idx_mailbox_sender ON mailbox_messages(sender)')
+    db.execute('CREATE INDEX IF NOT EXISTS idx_mailbox_created ON mailbox_messages(created_at)')
   end
 end

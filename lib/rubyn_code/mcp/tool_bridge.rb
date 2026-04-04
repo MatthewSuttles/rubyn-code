@@ -34,10 +34,10 @@ module RubynCode
         # @param tool_def [Hash] tool definition with "name", "description", "inputSchema"
         # @return [Class] the newly created and registered tool class
         def build_tool_class(mcp_client, tool_def)
-          remote_name = tool_def["name"]
+          remote_name = tool_def['name']
           tool_name = "mcp_#{sanitize_name(remote_name)}"
-          description = tool_def["description"] || "MCP tool: #{remote_name}"
-          input_schema = tool_def["inputSchema"] || {}
+          description = tool_def['description'] || "MCP tool: #{remote_name}"
+          input_schema = tool_def['inputSchema'] || {}
           parameters = build_parameters_from_schema(input_schema)
 
           klass = Class.new(Tools::Base) do
@@ -60,8 +60,8 @@ module RubynCode
             define_method(:format_result) do |result|
               case result
               when Hash
-                if result.key?("content")
-                  extract_content(result["content"])
+                if result.key?('content')
+                  extract_content(result['content'])
                 else
                   JSON.generate(result)
                 end
@@ -74,13 +74,13 @@ module RubynCode
 
             define_method(:extract_content) do |content|
               Array(content).map do |block|
-                case block["type"]
-                when "text"
-                  block["text"]
-                when "image"
+                case block['type']
+                when 'text'
+                  block['text']
+                when 'image'
                   "[image: #{block['mimeType']}]"
-                when "resource"
-                  block.dig("resource", "text") || "[resource: #{block.dig('resource', 'uri')}]"
+                when 'resource'
+                  block.dig('resource', 'text') || "[resource: #{block.dig('resource', 'uri')}]"
                 else
                   block.to_s
                 end
@@ -90,13 +90,13 @@ module RubynCode
 
           # Build parameter definitions from JSON Schema
           klass.define_singleton_method(:build_parameters) do |schema|
-            properties = schema["properties"] || {}
-            required = schema["required"] || []
+            properties = schema['properties'] || {}
+            required = schema['required'] || []
 
             properties.each_with_object({}) do |(name, prop), params|
               params[name.to_sym] = {
-                type: map_json_type(prop["type"]),
-                description: prop["description"] || "",
+                type: map_json_type(prop['type']),
+                description: prop['description'] || '',
                 required: required.include?(name)
               }
             end
@@ -104,12 +104,12 @@ module RubynCode
 
           klass.define_singleton_method(:map_json_type) do |json_type|
             case json_type
-            when "string"  then :string
-            when "integer" then :integer
-            when "number"  then :number
-            when "boolean" then :boolean
-            when "array"   then :array
-            when "object"  then :object
+            when 'string'  then :string
+            when 'integer' then :integer
+            when 'number'  then :number
+            when 'boolean' then :boolean
+            when 'array'   then :array
+            when 'object'  then :object
             else :string
             end
           end
@@ -123,13 +123,13 @@ module RubynCode
         # @param schema [Hash] JSON Schema with "properties" and "required"
         # @return [Hash]
         def build_parameters_from_schema(schema)
-          properties = schema["properties"] || {}
-          required = schema["required"] || []
+          properties = schema['properties'] || {}
+          required = schema['required'] || []
 
           properties.each_with_object({}) do |(name, prop), params|
             params[name.to_sym] = {
-              type: map_json_type(prop["type"]),
-              description: prop["description"] || "",
+              type: map_json_type(prop['type']),
+              description: prop['description'] || '',
               required: required.include?(name)
             }
           end
@@ -141,12 +141,12 @@ module RubynCode
         # @return [Symbol]
         def map_json_type(json_type)
           case json_type
-          when "string"  then :string
-          when "integer" then :integer
-          when "number"  then :number
-          when "boolean" then :boolean
-          when "array"   then :array
-          when "object"  then :object
+          when 'string'  then :string
+          when 'integer' then :integer
+          when 'number'  then :number
+          when 'boolean' then :boolean
+          when 'array'   then :array
+          when 'object'  then :object
           else :string
           end
         end
@@ -156,7 +156,7 @@ module RubynCode
         # @param name [String] the original tool name
         # @return [String] sanitized name
         def sanitize_name(name)
-          name.to_s.gsub(/[^a-zA-Z0-9_]/, "_").gsub(/_+/, "_").downcase
+          name.to_s.gsub(/[^a-zA-Z0-9_]/, '_').gsub(/_+/, '_').downcase
         end
       end
     end

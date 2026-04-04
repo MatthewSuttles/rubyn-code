@@ -34,9 +34,9 @@ module RubynCode
         end
 
         def load_all!
-          tool_files = Dir[File.join(__dir__, "*.rb")]
+          tool_files = Dir[File.join(__dir__, '*.rb')]
           tool_files.each do |file|
-            basename = File.basename(file, ".rb")
+            basename = File.basename(file, '.rb')
             next if %w[base registry schema executor].include?(basename)
 
             require_relative basename

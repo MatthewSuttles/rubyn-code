@@ -88,7 +88,7 @@ module RubynCode
         @tool_executor.db = @db
         @sub_agent_tool_count = 0
         @in_sub_agent = false
-        @tool_executor.on_agent_status = ->(type, msg) {
+        @tool_executor.on_agent_status = lambda { |type, msg|
           case type
           when :started
             @spinner.stop
@@ -121,7 +121,7 @@ module RubynCode
           budget_enforcer: @budget_enforcer,
           background_manager: @background_worker,
           stall_detector: @stall_detector,
-          on_tool_call: ->(name, params) {
+          on_tool_call: lambda { |name, params|
             @spinner.stop
             unless @streaming_first_chunk
               @stream_formatter&.flush
@@ -131,11 +131,11 @@ module RubynCode
             end
             @renderer.tool_call(name, params)
           },
-          on_tool_result: ->(name, result, _is_error = false) {
+          on_tool_result: lambda { |name, result, _is_error = false|
             @renderer.tool_result(name, result)
             @spinner.start
           },
-          on_text: ->(text) {
+          on_text: lambda { |text|
             @spinner.stop
             if @streaming_first_chunk
               @stream_formatter = StreamFormatter.new
@@ -384,7 +384,7 @@ module RubynCode
 
       def ensure_home_dir!
         dir = Config::Defaults::HOME_DIR
-        FileUtils.mkdir_p(dir) unless Dir.exist?(dir)
+        FileUtils.mkdir_p(dir)
       end
 
       def ensure_auth!
@@ -397,7 +397,7 @@ module RubynCode
 
         @renderer.error('No valid authentication found.')
         @renderer.info('Options:')
-        @renderer.info("  1. Run Claude Code once to authenticate (Rubyn Code reads the keychain token)")
+        @renderer.info('  1. Run Claude Code once to authenticate (Rubyn Code reads the keychain token)')
         @renderer.info('  2. Set ANTHROPIC_API_KEY environment variable')
         @renderer.info("  3. Run 'rubyn-code --auth' to enter an API key")
         exit(1)
@@ -413,7 +413,7 @@ module RubynCode
       end
 
       def current_session_id
-        @session_id ||= SecureRandom.hex(16)
+        @current_session_id ||= SecureRandom.hex(16)
       end
 
       def save_session!

@@ -10,7 +10,7 @@ module RubynCode
     # - `.rb` files: loaded and called via `ModuleName.up(connection)`
     class Migrator
       # @return [String] absolute path to the migrations directory
-      MIGRATIONS_DIR = File.expand_path("../../../db/migrations", __dir__).freeze
+      MIGRATIONS_DIR = File.expand_path('../../../db/migrations', __dir__).freeze
 
       # @param connection [Connection] the database connection to migrate
       def initialize(connection)
@@ -38,7 +38,7 @@ module RubynCode
       # @return [Array<Array(Integer, String)>] pairs of [version, file_path]
       def pending_migrations
         applied = applied_versions
-        available_migrations.reject { |version, _| applied.include?(version) }
+        available_migrations.except(*applied)
       end
 
       # Returns the set of already-applied migration versions.
@@ -46,9 +46,9 @@ module RubynCode
       # @return [Set<Integer>]
       def applied_versions
         rows = @connection.query(
-          "SELECT version FROM schema_migrations ORDER BY version"
+          'SELECT version FROM schema_migrations ORDER BY version'
         ).to_a
-        rows.map { |row| row["version"] }.to_set
+        rows.to_set { |row| row['version'] }
       end
 
       # Returns the current schema version (highest applied migration).
@@ -56,16 +56,16 @@ module RubynCode
       # @return [Integer, nil]
       def current_version
         row = @connection.query(
-          "SELECT MAX(version) AS max_version FROM schema_migrations"
+          'SELECT MAX(version) AS max_version FROM schema_migrations'
         ).to_a.first
-        row && row["max_version"]
+        row && row['max_version']
       end
 
       # Lists all available migration files sorted by version.
       #
       # @return [Array<Array(Integer, String)>] pairs of [version, file_path]
       def available_migrations
-        all = Dir.glob(File.join(MIGRATIONS_DIR, "*"))
+        all = Dir.glob(File.join(MIGRATIONS_DIR, '*'))
                  .select { |path| path.end_with?('.sql', '.rb') }
                  .map { |path| parse_migration_file(path) }
                  .compact
@@ -74,9 +74,7 @@ module RubynCode
         by_version = {}
         all.each do |version, path|
           existing = by_version[version]
-          if existing.nil? || path.end_with?('.rb')
-            by_version[version] = [version, path]
-          end
+          by_version[version] = [version, path] if existing.nil? || path.end_with?('.rb')
         end
 
         by_version.values.sort_by(&:first)
@@ -102,7 +100,7 @@ module RubynCode
           end
 
           @connection.execute(
-            "INSERT INTO schema_migrations (version) VALUES (?)", [version]
+            'INSERT INTO schema_migrations (version) VALUES (?)', [version]
           )
         end
       end
@@ -127,7 +125,7 @@ module RubynCode
       # e.g. "011_fix_mailbox_messages_columns.rb" -> "Migration011FixMailboxMessagesColumns"
       def extract_module_name(path)
         basename = File.basename(path, '.rb')
-        'Migration' + basename.split('_').map(&:capitalize).join
+        "Migration#{basename.split('_').map(&:capitalize).join}"
       end
 
       # Splits a SQL file into individual statements, handling semicolons
@@ -137,31 +135,33 @@ module RubynCode
       # @return [Array<String>]
       def split_statements(sql)
         statements = []
-        current = +""
+        current = +''
         in_block = false
 
         sql.each_line do |line|
           stripped = line.strip
 
           # Track BEGIN/END blocks (e.g., triggers)
-          in_block = true if stripped.match?(/\bBEGIN\b/i) && !stripped.match?(/\ABEGIN\s+(IMMEDIATE|DEFERRED|EXCLUSIVE)/i)
+          if stripped.match?(/\bBEGIN\b/i) && !stripped.match?(/\ABEGIN\s+(IMMEDIATE|DEFERRED|EXCLUSIVE)/i)
+            in_block = true
+          end
           current << line
 
           if in_block
             if stripped.match?(/\bEND\b\s*;?\s*$/i)
               in_block = false
-              statements << current.strip.chomp(";")
-              current = +""
+              statements << current.strip.chomp(';')
+              current = +''
             end
-          elsif stripped.end_with?(";")
-            stmt = current.strip.chomp(";").strip
+          elsif stripped.end_with?(';')
+            stmt = current.strip.chomp(';').strip
             statements << stmt unless stmt.empty? || (stmt.match?(/\A\s*--/) && !stmt.include?("\n"))
-            current = +""
+            current = +''
           end
         end
 
         # Handle any remaining content
-        remainder = current.strip.chomp(";").strip
+        remainder = current.strip.chomp(';').strip
         statements << remainder unless remainder.empty?
 
         # Filter out comment-only statements

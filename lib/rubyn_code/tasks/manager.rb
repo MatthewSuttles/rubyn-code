@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "securerandom"
-require_relative "models"
-require_relative "dag"
+require 'securerandom'
+require_relative 'models'
+require_relative 'dag'
 
 module RubynCode
   module Tasks
@@ -27,8 +27,8 @@ module RubynCode
       # @return [Task]
       def create(title:, description: nil, session_id: nil, blocked_by: [], priority: 0)
         id = SecureRandom.uuid
-        now = Time.now.utc.strftime("%Y-%m-%d %H:%M:%S")
-        status = blocked_by.empty? ? "pending" : "blocked"
+        now = Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
+        status = blocked_by.empty? ? 'pending' : 'blocked'
 
         @db.transaction do
           @db.execute(<<~SQL, [id, session_id, title, description, status, priority, now, now])
@@ -51,7 +51,7 @@ module RubynCode
       # @return [Task]
       def update(id, **attrs)
         allowed = %i[status priority owner result description title metadata]
-        filtered = attrs.select { |k, _| allowed.include?(k) }
+        filtered = attrs.slice(*allowed)
         return get(id) if filtered.empty?
 
         sets = filtered.map { |k, _| "#{k} = ?" }
@@ -77,7 +77,7 @@ module RubynCode
         values = []
 
         if result
-          sets << "result = ?"
+          sets << 'result = ?'
           values << result
         end
 
@@ -112,7 +112,7 @@ module RubynCode
       # @param id [String]
       # @return [Task, nil]
       def get(id)
-        rows = @db.query("SELECT * FROM tasks WHERE id = ?", [id]).to_a
+        rows = @db.query('SELECT * FROM tasks WHERE id = ?', [id]).to_a
         row_to_task(rows.first)
       end
 
@@ -126,18 +126,18 @@ module RubynCode
         params = []
 
         if status
-          conditions << "status = ?"
+          conditions << 'status = ?'
           params << status
         end
 
         if session_id
-          conditions << "session_id = ?"
+          conditions << 'session_id = ?'
           params << session_id
         end
 
-        sql = "SELECT * FROM tasks"
+        sql = 'SELECT * FROM tasks'
         sql += " WHERE #{conditions.join(' AND ')}" unless conditions.empty?
-        sql += " ORDER BY priority DESC, created_at ASC"
+        sql += ' ORDER BY priority DESC, created_at ASC'
 
         @db.query(sql, params).to_a.filter_map { |row| row_to_task(row) }
       end
@@ -159,7 +159,7 @@ module RubynCode
       # @param id [String]
       # @return [void]
       def delete(id)
-        @db.execute("DELETE FROM tasks WHERE id = ?", [id])
+        @db.execute('DELETE FROM tasks WHERE id = ?', [id])
       end
 
       private
@@ -194,17 +194,17 @@ module RubynCode
         return nil if row.nil?
 
         Task.new(
-          id:          row["id"],
-          session_id:  row["session_id"],
-          title:       row["title"],
-          description: row["description"],
-          status:      row["status"],
-          priority:    row["priority"],
-          owner:       row["owner"],
-          result:      row["result"],
-          metadata:    row["metadata"],
-          created_at:  row["created_at"],
-          updated_at:  row["updated_at"]
+          id: row['id'],
+          session_id: row['session_id'],
+          title: row['title'],
+          description: row['description'],
+          status: row['status'],
+          priority: row['priority'],
+          owner: row['owner'],
+          result: row['result'],
+          metadata: row['metadata'],
+          created_at: row['created_at'],
+          updated_at: row['updated_at']
         )
       end
     end

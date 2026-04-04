@@ -6,10 +6,10 @@ module RubynCode
       :id, :session_id, :title, :description, :status,
       :priority, :owner, :result, :metadata, :created_at, :updated_at
     ) do
-      def pending? = status == "pending"
-      def in_progress? = status == "in_progress"
-      def completed? = status == "completed"
-      def blocked? = status == "blocked"
+      def pending? = status == 'pending'
+      def in_progress? = status == 'in_progress'
+      def completed? = status == 'completed'
+      def blocked? = status == 'blocked'
 
       def to_h
         {

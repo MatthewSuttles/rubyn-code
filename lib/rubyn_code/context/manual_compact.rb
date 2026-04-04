@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "json"
-require "fileutils"
+require 'json'
+require 'fileutils'
 
 module RubynCode
   module Context
@@ -35,7 +35,7 @@ module RubynCode
         instruction = build_instruction(focus)
         summary = request_summary(transcript_text, instruction, llm_client)
 
-        [{ role: "user", content: "[Context compacted — manual]\n\n#{summary}" }]
+        [{ role: 'user', content: "[Context compacted — manual]\n\n#{summary}" }]
       end
 
       def self.build_instruction(focus)
@@ -46,7 +46,7 @@ module RubynCode
 
       def self.save_transcript(messages, dir)
         FileUtils.mkdir_p(dir)
-        timestamp = Time.now.strftime("%Y%m%d_%H%M%S")
+        timestamp = Time.now.strftime('%Y%m%d_%H%M%S')
         path = File.join(dir, "transcript_manual_#{timestamp}.json")
         File.write(path, JSON.pretty_generate(messages))
         path
@@ -62,19 +62,19 @@ module RubynCode
       def self.request_summary(transcript_text, instruction, llm_client)
         summary_messages = [
           {
-            role: "user",
+            role: 'user',
             content: "#{instruction}\n\n---\n\n#{transcript_text}"
           }
         ]
 
         options = {}
-        options[:model] = "claude-sonnet-4-20250514" if llm_client.respond_to?(:chat)
+        options[:model] = 'claude-sonnet-4-20250514' if llm_client.respond_to?(:chat)
 
         response = llm_client.chat(messages: summary_messages, **options)
 
         case response
         when String then response
-        when Hash then response[:content] || response["content"] || response.to_s
+        when Hash then response[:content] || response['content'] || response.to_s
         else
           response.respond_to?(:text) ? response.text : response.to_s
         end

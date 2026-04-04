@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "pastel"
+require 'pastel'
 
 module RubynCode
   module Output
@@ -30,17 +30,17 @@ module RubynCode
       # @param new_text [String] the modified text
       # @param filename [String] the filename to display in the diff header
       # @return [String] the rendered, colorized diff output
-      def render(old_text, new_text, filename: "file")
+      def render(old_text, new_text, filename: 'file')
         old_lines = old_text.lines.map(&:chomp)
         new_lines = new_text.lines.map(&:chomp)
 
         hunks = compute_hunks(old_lines, new_lines)
-        return pastel.dim("No differences found.") if hunks.empty?
+        return pastel.dim('No differences found.') if hunks.empty?
 
         parts = []
         parts << render_header(filename)
         hunks.each { |hunk| parts << render_hunk(hunk) }
-        parts << ""
+        parts << ''
 
         result = parts.join("\n")
         $stdout.puts(result)
@@ -128,7 +128,7 @@ module RubynCode
       # Groups raw diff operations into hunks with surrounding context lines.
       def group_into_hunks(raw_diff, old_lines, new_lines)
         # Identify change indices (non-equal operations)
-        change_indices = raw_diff.each_index.select { |idx| raw_diff[idx][0] != :equal }
+        change_indices = raw_diff.each_index.reject { |idx| raw_diff[idx][0] == :equal }
         return [] if change_indices.empty?
 
         # Group changes that are within context_lines of each other
@@ -136,7 +136,7 @@ module RubynCode
         current_group = [change_indices.first]
 
         change_indices.drop(1).each do |idx|
-          if idx - current_group.last <= @context_lines * 2 + 1
+          if idx - current_group.last <= (@context_lines * 2) + 1
             current_group << idx
           else
             groups << current_group

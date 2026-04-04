@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "monitor"
+require 'monitor'
 
 module RubynCode
   module Hooks
@@ -24,7 +24,7 @@ module RubynCode
       include MonitorMixin
 
       def initialize
-        super() # MonitorMixin
+        super # MonitorMixin
         @hooks = {}
         VALID_EVENTS.each { |event| @hooks[event] = [] }
       end
@@ -41,8 +41,8 @@ module RubynCode
         validate_event!(event)
 
         handler = callable || block
-        raise ArgumentError, "A callable or block is required" unless handler
-        raise ArgumentError, "Hook must respond to #call" unless handler.respond_to?(:call)
+        raise ArgumentError, 'A callable or block is required' unless handler
+        raise ArgumentError, 'Hook must respond to #call' unless handler.respond_to?(:call)
 
         synchronize do
           @hooks[event] << Hook.new(callable: handler, priority: priority)
@@ -92,7 +92,7 @@ module RubynCode
         return if VALID_EVENTS.include?(event)
 
         raise ArgumentError,
-              "Unknown event #{event.inspect}. Valid events: #{VALID_EVENTS.join(", ")}"
+              "Unknown event #{event.inspect}. Valid events: #{VALID_EVENTS.join(', ')}"
       end
     end
   end

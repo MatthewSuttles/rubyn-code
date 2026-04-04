@@ -35,13 +35,9 @@ module RubynCode
           return :shutdown if monotonic_now >= deadline
 
           # Messages always take priority over tasks.
-          if has_pending_messages?
-            return :resume
-          end
+          return :resume if has_pending_messages?
 
-          if has_claimable_task?
-            return :resume
-          end
+          return :resume if has_claimable_task?
 
           remaining = deadline - monotonic_now
           return :shutdown if remaining <= 0
@@ -71,10 +67,10 @@ module RubynCode
 
         # Only re-inject if the identity is not already present as the
         # first user message.
-        first_user = messages.find { |m| m[:role] == "user" }
+        first_user = messages.find { |m| m[:role] == 'user' }
         return if first_user && first_user[:content].to_s.include?(identity[0, 100])
 
-        messages.unshift({ role: "user", content: identity })
+        messages.unshift({ role: 'user', content: identity })
       end
 
       private

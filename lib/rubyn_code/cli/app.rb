@@ -35,7 +35,7 @@ module RubynCode
 
       private
 
-      def parse_options(argv) # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+      def parse_options(argv) # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
         options = { command: :repl }
 
         i = 0

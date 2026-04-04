@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "securerandom"
-require "json"
-require_relative "models"
+require 'securerandom'
+require 'json'
+require_relative 'models'
 
 module RubynCode
   module Memory
@@ -26,12 +26,12 @@ module RubynCode
       # @param metadata [Hash] arbitrary metadata
       # @param expires_at [String, nil] ISO 8601 expiration timestamp
       # @return [MemoryRecord] the created record
-      def write(content:, tier: "medium", category: nil, metadata: {}, expires_at: nil)
+      def write(content:, tier: 'medium', category: nil, metadata: {}, expires_at: nil)
         validate_tier!(tier)
         validate_category!(category) if category
 
         id = SecureRandom.uuid
-        now = Time.now.utc.strftime("%Y-%m-%d %H:%M:%S")
+        now = Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
         meta_json = JSON.generate(metadata)
 
         @db.execute(<<~SQL, [id, @project_path, tier, category, content, 1.0, 0, now, expires_at, meta_json, now])
@@ -63,24 +63,24 @@ module RubynCode
         attrs.each do |key, value|
           case key
           when :content
-            sets << "content = ?"
+            sets << 'content = ?'
             params << value
           when :tier
             validate_tier!(value)
-            sets << "tier = ?"
+            sets << 'tier = ?'
             params << value
           when :category
             validate_category!(value) if value
-            sets << "category = ?"
+            sets << 'category = ?'
             params << value
           when :metadata
-            sets << "metadata = ?"
+            sets << 'metadata = ?'
             params << JSON.generate(value)
           when :expires_at
-            sets << "expires_at = ?"
+            sets << 'expires_at = ?'
             params << value
           when :relevance_score
-            sets << "relevance_score = ?"
+            sets << 'relevance_score = ?'
             params << value.to_f
           end
         end
@@ -101,23 +101,23 @@ module RubynCode
       # @param id [String]
       # @return [void]
       def delete(id)
-        @db.execute("DELETE FROM memories WHERE id = ? AND project_path = ?", [id, @project_path])
+        @db.execute('DELETE FROM memories WHERE id = ? AND project_path = ?', [id, @project_path])
       end
 
       # Removes all memories whose expires_at is in the past.
       #
       # @return [Integer] number of expired memories deleted
       def expire_old!
-        now = Time.now.utc.strftime("%Y-%m-%d %H:%M:%S")
+        now = Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
 
         expired_ids = @db.query(
-          "SELECT id FROM memories WHERE project_path = ? AND expires_at IS NOT NULL AND expires_at < ?",
+          'SELECT id FROM memories WHERE project_path = ? AND expires_at IS NOT NULL AND expires_at < ?',
           [@project_path, now]
-        ).to_a.map { |row| row["id"] }
+        ).to_a.map { |row| row['id'] }
 
         return 0 if expired_ids.empty?
 
-        placeholders = (["?"] * expired_ids.size).join(", ")
+        placeholders = (['?'] * expired_ids.size).join(', ')
         @db.execute(
           "DELETE FROM memories WHERE id IN (#{placeholders}) AND project_path = ?",
           expired_ids + [@project_path]
@@ -132,7 +132,7 @@ module RubynCode
       # @param decay_rate [Float] amount to subtract from relevance_score (default 0.01)
       # @return [void]
       def decay!(decay_rate: 0.01)
-        cutoff = (Time.now.utc - 86_400).strftime("%Y-%m-%d %H:%M:%S") # 24 hours ago
+        cutoff = (Time.now.utc - 86_400).strftime('%Y-%m-%d %H:%M:%S') # 24 hours ago
 
         @db.execute(<<~SQL, [decay_rate, @project_path, cutoff])
           UPDATE memories

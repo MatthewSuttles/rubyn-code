@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "pastel"
-require "rouge"
+require 'pastel'
+require 'rouge'
 
 module RubynCode
   module Output
@@ -39,7 +39,7 @@ module RubynCode
         output pastel.bold(message)
       end
 
-      def code_block(code, language: "ruby")
+      def code_block(code, language: 'ruby')
         lexer = find_lexer(language)
         formatter = Rouge::Formatters::Terminal256.new(theme: Rouge::Themes::Monokai.new)
 
@@ -107,7 +107,7 @@ module RubynCode
       def truncate(text, max_length)
         return text if text.length <= max_length
 
-        "#{text[0, max_length]}#{pastel.dim("... (truncated)")}"
+        "#{text[0, max_length]}#{pastel.dim('... (truncated)')}"
       end
 
       def find_lexer(language)

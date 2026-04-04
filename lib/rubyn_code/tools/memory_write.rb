@@ -1,21 +1,23 @@
 # frozen_string_literal: true
 
-require_relative "base"
-require_relative "registry"
+require_relative 'base'
+require_relative 'registry'
 
 module RubynCode
   module Tools
     class MemoryWrite < Base
-      TOOL_NAME = "memory_write"
-      DESCRIPTION = "Writes a new memory to the project memory store. " \
-                    "Use this to persist code patterns, user preferences, project conventions, " \
-                    "error resolutions, or architectural decisions for future reference."
+      TOOL_NAME = 'memory_write'
+      DESCRIPTION = 'Writes a new memory to the project memory store. ' \
+                    'Use this to persist code patterns, user preferences, project conventions, ' \
+                    'error resolutions, or architectural decisions for future reference.'
       PARAMETERS = {
-        content: { type: :string, required: true, description: "The memory content to store" },
-        tier: { type: :string, required: false, description: "Memory retention tier: short, medium (default), or long" },
-        category: { type: :string, required: false, description: "Category: code_pattern, user_preference, project_convention, error_resolution, or decision" }
+        content: { type: :string, required: true, description: 'The memory content to store' },
+        tier: { type: :string, required: false,
+                description: 'Memory retention tier: short, medium (default), or long' },
+        category: { type: :string, required: false,
+                    description: 'Category: code_pattern, user_preference, project_convention, error_resolution, or decision' }
       }.freeze
-      RISK_LEVEL = :read  # Memory is internal — no user approval needed
+      RISK_LEVEL = :read # Memory is internal — no user approval needed
 
       # @param project_root [String]
       # @param memory_store [Memory::Store] injected store instance
@@ -28,12 +30,12 @@ module RubynCode
       # @param tier [String] defaults to "medium"
       # @param category [String, nil]
       # @return [String] confirmation message
-      def execute(content:, tier: "medium", category: nil)
+      def execute(content:, tier: 'medium', category: nil)
         store = @memory_store || resolve_memory_store
         record = store.write(content: content, tier: tier, category: category)
 
         "Memory saved (ID: #{record.id}, tier: #{record.tier}" \
-          "#{record.category ? ", category: #{record.category}" : ''})."
+          "#{", category: #{record.category}" if record.category})."
       end
 
       private

@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-require "securerandom"
-require "time"
-require_relative "models"
-require_relative "cost_calculator"
+require 'securerandom'
+require 'time'
+require_relative 'models'
+require_relative 'cost_calculator'
 
 module RubynCode
   module Observability
@@ -13,7 +13,7 @@ module RubynCode
       DEFAULT_SESSION_LIMIT = 5.00
       DEFAULT_DAILY_LIMIT   = 10.00
 
-      TABLE_NAME = "cost_records"
+      TABLE_NAME = 'cost_records'
 
       # @param db [DB::Connection] database connection
       # @param session_id [String] current session identifier
@@ -37,7 +37,8 @@ module RubynCode
       # @param cache_write_tokens [Integer] cache-write token count
       # @param request_type [String] the type of request (e.g., "chat", "compact")
       # @return [CostRecord] the persisted cost record
-      def record!(model:, input_tokens:, output_tokens:, cache_read_tokens: 0, cache_write_tokens: 0, request_type: "chat")
+      def record!(model:, input_tokens:, output_tokens:, cache_read_tokens: 0, cache_write_tokens: 0,
+                  request_type: 'chat')
         cost = CostCalculator.calculate(
           model: model,
           input_tokens: input_tokens,
@@ -51,8 +52,8 @@ module RubynCode
 
         @db.execute(
           "INSERT INTO #{TABLE_NAME} (id, session_id, model, input_tokens, output_tokens, " \
-          "cache_read_tokens, cache_write_tokens, cost_usd, request_type, created_at) " \
-          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          'cache_read_tokens, cache_write_tokens, cost_usd, request_type, created_at) ' \
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [id, @session_id, model, input_tokens, output_tokens,
            cache_read_tokens, cache_write_tokens, cost, request_type, now]
         )
@@ -79,14 +80,14 @@ module RubynCode
         sc = session_cost
         if sc >= @session_limit
           raise BudgetExceededError,
-                "Session budget exceeded: $#{"%.4f" % sc} >= $#{"%.2f" % @session_limit} limit"
+                "Session budget exceeded: $#{'%.4f' % sc} >= $#{format('%.2f', @session_limit)} limit"
         end
 
         dc = daily_cost
-        if dc >= @daily_limit
-          raise BudgetExceededError,
-                "Daily budget exceeded: $#{"%.4f" % dc} >= $#{"%.2f" % @daily_limit} limit"
-        end
+        return unless dc >= @daily_limit
+
+        raise BudgetExceededError,
+              "Daily budget exceeded: $#{'%.4f' % dc} >= $#{format('%.2f', @daily_limit)} limit"
       end
 
       # Returns the total cost accumulated in the current session.
@@ -104,7 +105,7 @@ module RubynCode
       #
       # @return [Float] total daily cost in USD
       def daily_cost
-        today = Time.now.utc.strftime("%Y-%m-%d")
+        today = Time.now.utc.strftime('%Y-%m-%d')
         rows = @db.query(
           "SELECT COALESCE(SUM(cost_usd), 0.0) AS total FROM #{TABLE_NAME} WHERE created_at >= ?",
           ["#{today}T00:00:00Z"]
@@ -152,7 +153,7 @@ module RubynCode
         return 0.0 if rows.nil? || rows.empty?
 
         row = rows.first
-        (row["total"] || row[:total] || 0.0).to_f
+        (row['total'] || row[:total] || 0.0).to_f
       end
     end
   end

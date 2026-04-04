@@ -37,7 +37,7 @@ module RubynCode
         tool_defs = build_tool_definitions
 
         iteration = 0
-        final_text = ""
+        final_text = ''
 
         loop do
           break if iteration >= @max_iterations
@@ -53,10 +53,10 @@ module RubynCode
             break
           end
 
-          conversation << { role: "assistant", content: response }
+          conversation << { role: 'assistant', content: response }
 
           tool_results = execute_tools(executor, tool_calls)
-          conversation << { role: "user", content: tool_results }
+          conversation << { role: 'user', content: tool_results }
 
           final_text = text_content unless text_content.empty?
         end
@@ -68,7 +68,7 @@ module RubynCode
 
       def build_conversation
         [
-          { role: "user", content: @prompt }
+          { role: 'user', content: @prompt }
         ]
       end
 
@@ -108,7 +108,7 @@ module RubynCode
         when String
           response
         when Hash
-          content = response[:content] || response["content"]
+          content = response[:content] || response['content']
           extract_text_from_content(content)
         when Array
           extract_text_from_content(response)
@@ -121,43 +121,43 @@ module RubynCode
         return content.to_s unless content.is_a?(Array)
 
         content
-          .select { |block| block_type(block) == "text" }
-          .map { |block| block[:text] || block["text"] }
+          .select { |block| block_type(block) == 'text' }
+          .map { |block| block[:text] || block['text'] }
           .compact
           .join("\n")
       end
 
       def extract_tool_calls(response)
         content = case response
-                  when Hash then response[:content] || response["content"]
+                  when Hash then response[:content] || response['content']
                   when Array then response
                   else return []
                   end
 
         return [] unless content.is_a?(Array)
 
-        content.select { |block| block_type(block) == "tool_use" }
+        content.select { |block| block_type(block) == 'tool_use' }
       end
 
       def block_type(block)
-        (block[:type] || block["type"]).to_s
+        (block[:type] || block['type']).to_s
       end
 
       def execute_tools(executor, tool_calls)
         tool_calls.map do |call|
-          tool_name = call[:name] || call["name"]
-          tool_input = call[:input] || call["input"] || {}
-          tool_id = call[:id] || call["id"]
+          tool_name = call[:name] || call['name']
+          tool_input = call[:input] || call['input'] || {}
+          tool_id = call[:id] || call['id']
 
           # Prevent recursive sub-agent spawning
           result = if SUB_AGENT_TOOLS.include?(tool_name)
-                     "Error: Sub-agents cannot spawn other sub-agents."
+                     'Error: Sub-agents cannot spawn other sub-agents.'
                    else
                      executor.execute(tool_name, tool_input)
                    end
 
           {
-            type: "tool_result",
+            type: 'tool_result',
             tool_use_id: tool_id,
             content: result.to_s
           }

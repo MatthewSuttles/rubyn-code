@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "json"
-require "securerandom"
+require 'json'
+require 'securerandom'
 
 module RubynCode
   module Learning
@@ -23,7 +23,7 @@ module RubynCode
         project_specific
       ].freeze
 
-      EXTRACTION_PROMPT = <<~PROMPT
+      EXTRACTION_PROMPT = <<~PROMPT.freeze
         Analyze the following conversation between a developer and an AI coding assistant.
         Extract reusable patterns that could help in future sessions for this project.
 
@@ -75,22 +75,22 @@ module RubynCode
         def request_extraction(messages, llm_client)
           # Serialize conversation into a single user message to avoid
           # "must end with user message" errors
-          transcript = messages.map { |m|
-            role = (m[:role] || m["role"] || "unknown").capitalize
-            content = m[:content] || m["content"]
+          transcript = messages.map do |m|
+            role = (m[:role] || m['role'] || 'unknown').capitalize
+            content = m[:content] || m['content']
             text = case content
                    when String then content
                    when Array
-                     content.filter_map { |b|
-                       b.respond_to?(:text) ? b.text : (b[:text] || b["text"])
-                     }.join("\n")
+                     content.filter_map do |b|
+                       b.respond_to?(:text) ? b.text : (b[:text] || b['text'])
+                     end.join("\n")
                    else content.to_s
                    end
             "#{role}: #{text}"
-          }.join("\n\n")
+          end.join("\n\n")
 
           llm_client.chat(
-            messages: [{ role: "user", content: "#{EXTRACTION_PROMPT}\n\nConversation:\n#{transcript}" }],
+            messages: [{ role: 'user', content: "#{EXTRACTION_PROMPT}\n\nConversation:\n#{transcript}" }],
             max_tokens: 2000
           )
         rescue StandardError => e
@@ -104,7 +104,7 @@ module RubynCode
 
           instincts.each do |inst|
             db.execute(
-              "INSERT INTO instincts (id, project_path, pattern, context_tags, confidence, decay_rate, times_applied, times_helpful, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              'INSERT INTO instincts (id, project_path, pattern, context_tags, confidence, decay_rate, times_applied, times_helpful, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
               [
                 SecureRandom.uuid,
                 inst[:project_path],
@@ -147,15 +147,15 @@ module RubynCode
             block = response.content.find { |b| b.respond_to?(:text) }
             block&.text
           elsif response.is_a?(Hash)
-            response.dig("content", 0, "text")
+            response.dig('content', 0, 'text')
           end
         end
 
         def normalize_pattern(raw, project_path)
-          type = raw["type"].to_s
-          pattern = raw["pattern"].to_s.strip
-          context_tags = Array(raw["context_tags"]).map(&:to_s)
-          confidence = raw["confidence"].to_f
+          type = raw['type'].to_s
+          pattern = raw['pattern'].to_s.strip
+          context_tags = Array(raw['context_tags']).map(&:to_s)
+          confidence = raw['confidence'].to_f
 
           return nil if pattern.empty?
           return nil unless VALID_TYPES.include?(type)
@@ -177,11 +177,11 @@ module RubynCode
         # Project-specific knowledge decays slower; workarounds decay faster.
         def decay_rate_for_type(type)
           case type
-          when "project_specific"     then 0.02
-          when "error_resolution"     then 0.03
-          when "debugging_technique"  then 0.04
-          when "user_correction"      then 0.05
-          when "workaround"           then 0.07
+          when 'project_specific'     then 0.02
+          when 'error_resolution'     then 0.03
+          when 'debugging_technique'  then 0.04
+          when 'user_correction'      then 0.05
+          when 'workaround'           then 0.07
           else 0.05
           end
         end

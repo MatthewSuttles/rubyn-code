@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require "open3"
-require "securerandom"
-require "timeout"
-require_relative "job"
-require_relative "notifier"
+require 'open3'
+require 'securerandom'
+require 'timeout'
+require_relative 'job'
+require_relative 'notifier'
 
 module RubynCode
   module Background
@@ -93,31 +93,55 @@ module RubynCode
       private
 
       def execute_job(job_id, command, timeout_seconds)
-        stdout, stderr, process_status = nil
+        stdout, stderr, = nil
         final_status = :completed
 
         begin
           stdin_io, stdout_io, stderr_io, wait_thr = Open3.popen3(command, chdir: @project_root)
           stdin_io.close
-          out_buf = +""
-          err_buf = +""
-          out_reader = Thread.new { out_buf << stdout_io.read rescue nil }
-          err_reader = Thread.new { err_buf << stderr_io.read rescue nil }
+          out_buf = +''
+          err_buf = +''
+          out_reader = Thread.new do
+            out_buf << stdout_io.read
+          rescue StandardError
+            nil
+          end
+          err_reader = Thread.new do
+            err_buf << stderr_io.read
+          rescue StandardError
+            nil
+          end
 
           unless wait_thr.join(timeout_seconds)
-            Process.kill("TERM", wait_thr.pid) rescue nil
+            begin
+              Process.kill('TERM', wait_thr.pid)
+            rescue StandardError
+              nil
+            end
             sleep 0.1
-            Process.kill("KILL", wait_thr.pid) rescue nil
+            begin
+              Process.kill('KILL', wait_thr.pid)
+            rescue StandardError
+              nil
+            end
             wait_thr.join(5)
             out_reader.join(2)
             err_reader.join(2)
-            [stdout_io, stderr_io].each { |io| io.close rescue nil }
+            [stdout_io, stderr_io].each do |io|
+              io.close
+            rescue StandardError
+              nil
+            end
             raise Timeout::Error
           end
 
           out_reader.join(5)
           err_reader.join(5)
-          [stdout_io, stderr_io].each { |io| io.close rescue nil }
+          [stdout_io, stderr_io].each do |io|
+            io.close
+          rescue StandardError
+            nil
+          end
 
           stdout = out_buf
           stderr = err_buf
@@ -148,19 +172,19 @@ module RubynCode
         end
 
         @notifier.push({
-          type: :job_completed,
-          job_id: job_id,
-          status: final_status,
-          result: result,
-          duration: completed_job.duration
-        })
+                         type: :job_completed,
+                         job_id: job_id,
+                         status: final_status,
+                         result: result,
+                         duration: completed_job.duration
+                       })
       end
 
       def build_result(stdout, stderr)
         parts = []
         parts << stdout if stdout && !stdout.empty?
         parts << "STDERR: #{stderr}" if stderr && !stderr.empty?
-        parts.empty? ? "(no output)" : parts.join("\n")
+        parts.empty? ? '(no output)' : parts.join("\n")
       end
     end
   end

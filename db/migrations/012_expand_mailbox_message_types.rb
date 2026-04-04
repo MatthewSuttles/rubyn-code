@@ -8,7 +8,7 @@
 module Migration012ExpandMailboxMessageTypes
   module_function
 
-  def up(db) # rubocop:disable Metrics/MethodLength
+  def up(db)
     db.execute(<<~SQL)
       CREATE TABLE mailbox_messages_new (
         id TEXT PRIMARY KEY,

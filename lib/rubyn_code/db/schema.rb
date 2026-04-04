@@ -15,9 +15,9 @@ module RubynCode
       # @return [Integer, nil] the version number, or nil if no migrations applied
       def current_version
         row = @connection.query(
-          "SELECT MAX(version) AS max_version FROM schema_migrations"
+          'SELECT MAX(version) AS max_version FROM schema_migrations'
         ).to_a.first
-        row && row["max_version"]
+        row && row['max_version']
       rescue StandardError
         nil
       end
@@ -27,8 +27,8 @@ module RubynCode
       # @return [Array<Integer>]
       def applied_versions
         @connection.query(
-          "SELECT version FROM schema_migrations ORDER BY version"
-        ).to_a.map { |row| row["version"] }
+          'SELECT version FROM schema_migrations ORDER BY version'
+        ).to_a.map { |row| row['version'] }
       rescue StandardError
         []
       end
@@ -39,7 +39,7 @@ module RubynCode
       # @return [Boolean]
       def version_applied?(version)
         rows = @connection.query(
-          "SELECT 1 FROM schema_migrations WHERE version = ?", [version]
+          'SELECT 1 FROM schema_migrations WHERE version = ?', [version]
         ).to_a
         !rows.empty?
       rescue StandardError
@@ -53,7 +53,7 @@ module RubynCode
         @connection.query(
           "SELECT name FROM sqlite_master WHERE type = 'table' " \
           "AND name NOT LIKE 'sqlite_%' ORDER BY name"
-        ).to_a.map { |row| row["name"] }
+        ).to_a.map { |row| row['name'] }
       end
 
       # Returns column information for the given table.

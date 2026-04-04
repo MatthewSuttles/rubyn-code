@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "json"
+require 'json'
 
 module RubynCode
   module Memory
@@ -24,16 +24,16 @@ module RubynCode
       # @param limit [Integer] maximum results (default 10)
       # @return [Array<MemoryRecord>]
       def search(query, tier: nil, category: nil, limit: 10)
-        conditions = ["m.project_path = ?"]
+        conditions = ['m.project_path = ?']
         params = [@project_path]
 
         if tier
-          conditions << "m.tier = ?"
+          conditions << 'm.tier = ?'
           params << tier
         end
 
         if category
-          conditions << "m.category = ?"
+          conditions << 'm.category = ?'
           params << category
         end
 
@@ -127,20 +127,20 @@ module RubynCode
       # @param row [Hash]
       # @return [MemoryRecord]
       def build_record(row)
-        metadata = parse_json(row["metadata"])
+        metadata = parse_json(row['metadata'])
 
         MemoryRecord.new(
-          id: row["id"],
-          project_path: row["project_path"],
-          tier: row["tier"],
-          category: row["category"],
-          content: row["content"],
-          relevance_score: row["relevance_score"].to_f,
-          access_count: row["access_count"].to_i,
-          last_accessed_at: row["last_accessed_at"],
-          expires_at: row["expires_at"],
+          id: row['id'],
+          project_path: row['project_path'],
+          tier: row['tier'],
+          category: row['category'],
+          content: row['content'],
+          relevance_score: row['relevance_score'].to_f,
+          access_count: row['access_count'].to_i,
+          last_accessed_at: row['last_accessed_at'],
+          expires_at: row['expires_at'],
           metadata: metadata,
-          created_at: row["created_at"]
+          created_at: row['created_at']
         )
       end
 
@@ -152,9 +152,9 @@ module RubynCode
       def touch_accessed(records)
         return if records.empty?
 
-        now = Time.now.utc.strftime("%Y-%m-%d %H:%M:%S")
+        now = Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
         ids = records.map(&:id)
-        placeholders = (["?"] * ids.size).join(", ")
+        placeholders = (['?'] * ids.size).join(', ')
 
         @db.execute(
           "UPDATE memories SET access_count = access_count + 1, last_accessed_at = ? WHERE id IN (#{placeholders})",

@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "tty-prompt"
-require "pastel"
-require "json"
+require 'tty-prompt'
+require 'pastel'
+require 'json'
 
 module RubynCode
   module Permissions
@@ -19,7 +19,7 @@ module RubynCode
         display_tool_summary(pastel, tool_name, tool_input)
 
         prompt.yes?(
-          pastel.yellow("Allow this tool call?"),
+          pastel.yellow('Allow this tool call?'),
           default: true
         )
       rescue TTY::Prompt::Reader::InputInterrupt
@@ -36,16 +36,16 @@ module RubynCode
         prompt = build_prompt
         pastel = Pastel.new
 
-        $stdout.puts pastel.red.bold("WARNING: Destructive operation requested")
-        $stdout.puts pastel.red("=" * 50)
+        $stdout.puts pastel.red.bold('WARNING: Destructive operation requested')
+        $stdout.puts pastel.red('=' * 50)
         display_tool_summary(pastel, tool_name, tool_input)
-        $stdout.puts pastel.red("=" * 50)
+        $stdout.puts pastel.red('=' * 50)
 
         answer = prompt.ask(
           pastel.red.bold('Type "yes" to confirm this destructive action:')
         )
 
-        answer&.strip&.downcase == "yes"
+        answer&.strip&.downcase == 'yes'
       rescue TTY::Prompt::Reader::InputInterrupt
         false
       end

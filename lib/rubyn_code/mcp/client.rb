@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "json"
+require 'json'
 
 module RubynCode
   module MCP
@@ -9,7 +9,8 @@ module RubynCode
     class Client
       INITIALIZE_TIMEOUT = 10
 
-      ClientError = Class.new(RubynCode::Error)
+      class ClientError < RubynCode::Error
+      end
 
       attr_reader :name, :transport
 
@@ -41,7 +42,7 @@ module RubynCode
       #
       # @return [Array<Hash>] tool definitions in JSON Schema format
       def tools
-        @tools_cache ||= discover_tools
+        @tools ||= discover_tools
       end
 
       # Invokes a tool on the MCP server.
@@ -53,10 +54,10 @@ module RubynCode
       def call_tool(tool_name, arguments = {})
         ensure_connected!
 
-        @transport.send_request("tools/call", {
-          name: tool_name,
-          arguments: arguments
-        })
+        @transport.send_request('tools/call', {
+                                  name: tool_name,
+                                  arguments: arguments
+                                })
       end
 
       # Gracefully disconnects from the MCP server.
@@ -107,28 +108,28 @@ module RubynCode
       private
 
       def perform_initialize
-        result = @transport.send_request("initialize", {
-          protocolVersion: "2024-11-05",
-          capabilities: {
-            tools: {}
-          },
-          clientInfo: {
-            name: "rubyn-code",
-            version: RubynCode::VERSION
-          }
-        })
+        result = @transport.send_request('initialize', {
+                                           protocolVersion: '2024-11-05',
+                                           capabilities: {
+                                             tools: {}
+                                           },
+                                           clientInfo: {
+                                             name: 'rubyn-code',
+                                             version: RubynCode::VERSION
+                                           }
+                                         })
 
-        @server_info = result&.dig("serverInfo")
-        @server_capabilities = result&.dig("capabilities")
+        @server_info = result&.dig('serverInfo')
+        @server_capabilities = result&.dig('capabilities')
 
-        @transport.send_notification("notifications/initialized") if @transport.respond_to?(:send_notification)
+        @transport.send_notification('notifications/initialized') if @transport.respond_to?(:send_notification)
       end
 
       def discover_tools
         ensure_connected!
 
-        result = @transport.send_request("tools/list")
-        result&.fetch("tools", []) || []
+        result = @transport.send_request('tools/list')
+        result&.fetch('tools', []) || []
       end
 
       def ensure_connected!

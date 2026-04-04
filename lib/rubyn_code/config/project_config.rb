@@ -1,17 +1,17 @@
 # frozen_string_literal: true
 
-require "yaml"
-require "fileutils"
-require_relative "defaults"
-require_relative "settings"
+require 'yaml'
+require 'fileutils'
+require_relative 'defaults'
+require_relative 'settings'
 
 module RubynCode
   module Config
     class ProjectConfig
       class LoadError < StandardError; end
 
-      PROJECT_DIR_NAME = ".rubyn-code"
-      CONFIG_FILENAME = "config.yml"
+      PROJECT_DIR_NAME = '.rubyn-code'
+      CONFIG_FILENAME = 'config.yml'
 
       attr_reader :project_root, :config_path, :data
 
@@ -73,9 +73,7 @@ module RubynCode
 
         loop do
           candidate = File.join(dir, PROJECT_DIR_NAME, CONFIG_FILENAME)
-          if File.exist?(candidate)
-            return new(project_root: dir, global_settings: global_settings)
-          end
+          return new(project_root: dir, global_settings: global_settings) if File.exist?(candidate)
 
           parent = File.dirname(dir)
           break if parent == dir # filesystem root reached

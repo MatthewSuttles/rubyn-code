@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "faraday"
-require "json"
+require 'faraday'
+require 'json'
 
 module RubynCode
   module CLI
@@ -9,8 +9,8 @@ module RubynCode
     # Runs in a background thread so it never delays startup.
     # Caches the result for 24 hours to avoid hammering the API.
     class VersionCheck
-      RUBYGEMS_API = "https://rubygems.org/api/v1/versions/rubyn-code/latest.json"
-      CACHE_FILE = File.join(Config::Defaults::HOME_DIR, ".version_check")
+      RUBYGEMS_API = 'https://rubygems.org/api/v1/versions/rubyn-code/latest.json'
+      CACHE_FILE = File.join(Config::Defaults::HOME_DIR, '.version_check')
       CACHE_TTL = 86_400 # 24 hours
 
       def initialize(renderer:)
@@ -20,7 +20,7 @@ module RubynCode
 
       # Kicks off a background check. Call `notify` later to display results.
       def start
-        return if ENV["RUBYN_NO_UPDATE_CHECK"]
+        return if ENV['RUBYN_NO_UPDATE_CHECK']
 
         @thread = Thread.new { check }
         @thread.abort_on_exception = false
@@ -33,12 +33,12 @@ module RubynCode
         @thread.join(timeout)
         return unless @result
 
-        if newer?(@result, RubynCode::VERSION)
-          @renderer.warning(
-            "Update available: #{RubynCode::VERSION} -> #{@result}  " \
-            "(gem install rubyn-code)"
-          )
-        end
+        return unless newer?(@result, RubynCode::VERSION)
+
+        @renderer.warning(
+          "Update available: #{RubynCode::VERSION} -> #{@result}  " \
+          '(gem install rubyn-code)'
+        )
       end
 
       private
@@ -50,12 +50,15 @@ module RubynCode
           return
         end
 
-        conn = Faraday.new { |f| f.options.timeout = 5; f.options.open_timeout = 3 }
+        conn = Faraday.new do |f|
+          f.options.timeout = 5
+          f.options.open_timeout = 3
+        end
         response = conn.get(RUBYGEMS_API)
         return unless response.success?
 
         data = JSON.parse(response.body)
-        latest = data["version"]
+        latest = data['version']
         return unless latest
         return unless latest.match?(/\A\d+\.\d+/)
         return unless Gem::Version.correct?(latest)

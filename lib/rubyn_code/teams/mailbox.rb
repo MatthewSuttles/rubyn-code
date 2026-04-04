@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "json"
-require "securerandom"
+require 'json'
+require 'securerandom'
 
 module RubynCode
   module Teams
@@ -23,18 +23,18 @@ module RubynCode
       # @param content [String] message body
       # @param message_type [String] type of message (default: "message")
       # @return [String] the message id
-      def send(from:, to:, content:, message_type: "message")
+      def send(from:, to:, content:, message_type: 'message')
         id = SecureRandom.uuid
         now = Time.now.utc.iso8601
 
         payload = JSON.generate({
-          id: id,
-          from: from,
-          to: to,
-          content: content,
-          message_type: message_type,
-          timestamp: now
-        })
+                                  id: id,
+                                  from: from,
+                                  to: to,
+                                  content: content,
+                                  message_type: message_type,
+                                  timestamp: now
+                                })
 
         @db.execute(
           <<~SQL,
@@ -63,11 +63,11 @@ module RubynCode
 
         return [] if rows.empty?
 
-        ids = rows.map { |r| r["id"] }
-        messages = rows.map { |r| JSON.parse(r["payload"], symbolize_names: true) }
+        ids = rows.map { |r| r['id'] }
+        messages = rows.map { |r| JSON.parse(r['payload'], symbolize_names: true) }
 
         # Mark all fetched messages as read in a single statement
-        placeholders = ids.map { "?" }.join(", ")
+        placeholders = ids.map { '?' }.join(', ')
         @db.execute(
           "UPDATE mailbox_messages SET read = 1 WHERE id IN (#{placeholders})",
           ids
@@ -86,7 +86,7 @@ module RubynCode
         recipients = all_names.reject { |n| n == from }
 
         recipients.map do |recipient|
-          send(from: from, to: recipient, content: content, message_type: "broadcast")
+          send(from: from, to: recipient, content: content, message_type: 'broadcast')
         end
       end
 
@@ -105,7 +105,7 @@ module RubynCode
           [name]
         ).to_a
 
-        rows.map { |r| JSON.parse(r["payload"], symbolize_names: true) }
+        rows.map { |r| JSON.parse(r['payload'], symbolize_names: true) }
       end
 
       # Returns the count of unread messages for the given agent.
@@ -114,10 +114,10 @@ module RubynCode
       # @return [Integer]
       def unread_count(name)
         rows = @db.query(
-          "SELECT COUNT(*) AS cnt FROM mailbox_messages WHERE recipient = ? AND read = 0",
+          'SELECT COUNT(*) AS cnt FROM mailbox_messages WHERE recipient = ? AND read = 0',
           [name]
         ).to_a
-        rows.first&.fetch("cnt", 0) || 0
+        rows.first&.fetch('cnt', 0) || 0
       end
 
       private

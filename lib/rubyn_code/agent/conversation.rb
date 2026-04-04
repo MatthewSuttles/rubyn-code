@@ -14,7 +14,7 @@ module RubynCode
       # @param content [String]
       # @return [Hash] the appended message
       def add_user_message(content)
-        message = { role: "user", content: content }
+        message = { role: 'user', content: content }
         @messages << message
         message
       end
@@ -26,7 +26,7 @@ module RubynCode
       # @return [Hash] the appended message
       def add_assistant_message(content, tool_calls: [])
         blocks = normalize_content(content, tool_calls)
-        message = { role: "assistant", content: blocks }
+        message = { role: 'assistant', content: blocks }
         @messages << message
         message
       end
@@ -38,9 +38,9 @@ module RubynCode
       # @param output [String]
       # @param is_error [Boolean]
       # @return [Hash] the appended message
-      def add_tool_result(tool_use_id, tool_name, output, is_error: false)
+      def add_tool_result(tool_use_id, _tool_name, output, is_error: false)
         result_block = {
-          type: "tool_result",
+          type: 'tool_result',
           tool_use_id: tool_use_id,
           content: output.to_s
         }
@@ -50,10 +50,10 @@ module RubynCode
         # is an array of tool_result blocks.  When the previous message is
         # already a user/tool_result message we append to it so that multiple
         # tool results for the same assistant turn are batched together.
-        if @messages.last && @messages.last[:role] == "user" && tool_result_message?(@messages.last)
+        if @messages.last && @messages.last[:role] == 'user' && tool_result_message?(@messages.last)
           @messages.last[:content] << result_block
         else
-          @messages << { role: "user", content: [result_block] }
+          @messages << { role: 'user', content: [result_block] }
         end
 
         result_block
@@ -63,7 +63,7 @@ module RubynCode
       #
       # @return [String, nil]
       def last_assistant_text
-        assistant_msg = @messages.reverse_each.find { |m| m[:role] == "assistant" }
+        assistant_msg = @messages.reverse_each.find { |m| m[:role] == 'assistant' }
         return nil unless assistant_msg
 
         extract_text(assistant_msg[:content])
@@ -110,7 +110,7 @@ module RubynCode
         removed = 0
         while @messages.any? && removed < 2
           last = @messages.last
-          break if removed == 1 && last[:role] != "assistant" && last[:role] != "user"
+          break if removed == 1 && last[:role] != 'assistant' && last[:role] != 'user'
 
           @messages.pop
           removed += 1
@@ -131,11 +131,11 @@ module RubynCode
         # Collect all tool_use IDs from assistant messages
         tool_use_ids = Set.new
         formatted.each do |msg|
-          next unless msg[:role] == "assistant" && msg[:content].is_a?(Array)
+          next unless msg[:role] == 'assistant' && msg[:content].is_a?(Array)
 
           msg[:content].each do |block|
-            if block.is_a?(Hash) && (block[:type] == "tool_use" || block["type"] == "tool_use")
-              tool_use_ids << (block[:id] || block["id"])
+            if block.is_a?(Hash) && (block[:type] == 'tool_use' || block['type'] == 'tool_use')
+              tool_use_ids << (block[:id] || block['id'])
             end
           end
         end
@@ -143,11 +143,11 @@ module RubynCode
         # Collect all tool_result IDs from user messages
         tool_result_ids = Set.new
         formatted.each do |msg|
-          next unless msg[:role] == "user" && msg[:content].is_a?(Array)
+          next unless msg[:role] == 'user' && msg[:content].is_a?(Array)
 
           msg[:content].each do |block|
-            if block.is_a?(Hash) && (block[:type] == "tool_result" || block["type"] == "tool_result")
-              tool_result_ids << (block[:tool_use_id] || block["tool_use_id"])
+            if block.is_a?(Hash) && (block[:type] == 'tool_result' || block['type'] == 'tool_result')
+              tool_result_ids << (block[:tool_use_id] || block['tool_use_id'])
             end
           end
         end
@@ -158,11 +158,11 @@ module RubynCode
 
         # Inject synthetic tool_results for orphans
         orphan_results = orphaned.map do |id|
-          { type: "tool_result", tool_use_id: id, content: "[interrupted]", is_error: true }
+          { type: 'tool_result', tool_use_id: id, content: '[interrupted]', is_error: true }
         end
 
         # Append as a user message after the last assistant message
-        formatted << { role: "user", content: orphan_results }
+        formatted << { role: 'user', content: orphan_results }
         formatted
       end
 
@@ -174,7 +174,7 @@ module RubynCode
         when Array
           content.each { |b| blocks << block_to_hash(b) }
         when String
-          blocks << { type: "text", text: content } unless content.empty?
+          blocks << { type: 'text', text: content } unless content.empty?
         when Hash
           blocks << content
         else
@@ -194,7 +194,7 @@ module RubynCode
         when String then content
         when Array
           content.map { |block| block_to_hash(block) }
-        else ""
+        else ''
         end
       end
 
@@ -203,12 +203,12 @@ module RubynCode
 
         if block.respond_to?(:type)
           case block.type.to_s
-          when "text"
-            { type: "text", text: block.text }
-          when "tool_use"
-            { type: "tool_use", id: block.id, name: block.name, input: block.input }
-          when "tool_result"
-            h = { type: "tool_result", tool_use_id: block.tool_use_id, content: block.content.to_s }
+          when 'text'
+            { type: 'text', text: block.text }
+          when 'tool_use'
+            { type: 'tool_use', id: block.id, name: block.name, input: block.input }
+          when 'tool_result'
+            h = { type: 'tool_result', tool_use_id: block.tool_use_id, content: block.content.to_s }
             h[:is_error] = true if block.respond_to?(:is_error) && block.is_error
             h
           else
@@ -225,7 +225,7 @@ module RubynCode
         when String
           content
         when Array
-          text_blocks = content.select { |b| b.is_a?(Hash) && b[:type] == "text" }
+          text_blocks = content.select { |b| b.is_a?(Hash) && b[:type] == 'text' }
           texts = text_blocks.map { |b| b[:text] }
           texts.empty? ? nil : texts.join("\n")
         end
@@ -235,7 +235,7 @@ module RubynCode
       def tool_result_message?(msg)
         return false unless msg[:content].is_a?(Array)
 
-        msg[:content].all? { |b| b.is_a?(Hash) && b[:type] == "tool_result" }
+        msg[:content].all? { |b| b.is_a?(Hash) && b[:type] == 'tool_result' }
       end
     end
   end

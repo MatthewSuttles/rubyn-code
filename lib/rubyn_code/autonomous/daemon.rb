@@ -32,7 +32,7 @@ module RubynCode
       # @param on_state_change [Proc, nil] callback invoked with (old_state, new_state)
       # @param on_task_complete [Proc, nil] callback invoked with (task, result_text)
       # @param on_task_error [Proc, nil] callback invoked with (task, error)
-      def initialize( # rubocop:disable Metrics/MethodLength,Metrics/ParameterLists
+      def initialize( # rubocop:disable Metrics/ParameterLists
         agent_name:, role:, llm_client:, project_root:, task_manager:, mailbox:,
         max_runs: 100, max_cost: 10.0, poll_interval: 5, idle_timeout: 60,
         on_state_change: nil, on_task_complete: nil, on_task_error: nil
@@ -136,7 +136,7 @@ module RubynCode
       #
       # @param task [Tasks::Task]
       # @return [void]
-      def run_work_phase(task) # rubocop:disable Metrics/MethodLength
+      def run_work_phase(task)
         transition_to(:working)
 
         agent_loop = build_agent_loop
@@ -158,7 +158,7 @@ module RubynCode
       # Each task gets its own conversation and context so they don't bleed.
       #
       # @return [Agent::Loop]
-      def build_agent_loop # rubocop:disable Metrics/MethodLength
+      def build_agent_loop
         conversation    = Agent::Conversation.new
         tool_executor   = Tools::Executor.new(project_root: @project_root)
         context_manager = Context::Manager.new

@@ -22,8 +22,8 @@ module RubynCode
           mailbox.send(
             from: from,
             to: to,
-            content: "shutdown_request",
-            message_type: "shutdown_request"
+            content: 'shutdown_request',
+            message_type: 'shutdown_request'
           )
 
           deadline = Time.now + timeout
@@ -31,7 +31,7 @@ module RubynCode
           loop do
             messages = mailbox.read_inbox(from)
             response = messages.find do |msg|
-              msg[:from] == to && msg[:message_type] == "shutdown_response"
+              msg[:from] == to && msg[:message_type] == 'shutdown_response'
             end
 
             return :acknowledged if response
@@ -50,13 +50,13 @@ module RubynCode
         # @param approve [Boolean] whether to approve the shutdown (default: true)
         # @return [String] the message id
         def respond(mailbox:, from:, to:, approve: true)
-          content = approve ? "shutdown_approved" : "shutdown_denied"
+          content = approve ? 'shutdown_approved' : 'shutdown_denied'
 
           mailbox.send(
             from: from,
             to: to,
             content: content,
-            message_type: "shutdown_response"
+            message_type: 'shutdown_response'
           )
         end
 
@@ -74,16 +74,14 @@ module RubynCode
           save_state(agent_name, session_persistence, conversation)
 
           # Step 2: Send shutdown acknowledgement if there is a requester
-          if requester
-            respond(mailbox: mailbox, from: agent_name, to: requester, approve: true)
-          end
+          respond(mailbox: mailbox, from: agent_name, to: requester, approve: true) if requester
 
           # Step 3: Broadcast offline status to all listeners
           mailbox.send(
             from: agent_name,
-            to: "_system",
+            to: '_system',
             content: "#{agent_name} is now offline",
-            message_type: "status_change"
+            message_type: 'status_change'
           )
         end
 
@@ -101,7 +99,7 @@ module RubynCode
             messages: conversation.messages
           )
         rescue StandardError => e
-          $stderr.puts "[ShutdownHandshake] Warning: failed to save state for '#{agent_name}': #{e.message}"
+          warn "[ShutdownHandshake] Warning: failed to save state for '#{agent_name}': #{e.message}"
         end
       end
     end

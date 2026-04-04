@@ -3,7 +3,7 @@
 module RubynCode
   module Skills
     class Catalog
-      SKILL_GLOB = "**/*.md"
+      SKILL_GLOB = '**/*.md'
 
       attr_reader :skills_dirs
 
@@ -14,7 +14,7 @@ module RubynCode
 
       def descriptions
         entries = available
-        return "" if entries.empty?
+        return '' if entries.empty?
 
         entries.map { |entry| "- /#{entry[:name]}: #{entry[:description]}" }.join("\n")
       end
@@ -37,7 +37,7 @@ module RubynCode
         skills_dirs.each do |dir|
           next unless File.directory?(dir)
 
-          Dir.glob(File.join(dir, SKILL_GLOB)).sort.each do |path|
+          Dir.glob(File.join(dir, SKILL_GLOB)).each do |path|
             entry = extract_metadata(path)
             @index << entry if entry
           end
@@ -47,12 +47,12 @@ module RubynCode
       end
 
       def extract_metadata(path)
-        header = File.read(path, 1024, encoding: "UTF-8")
-                     .encode("UTF-8", invalid: :replace, undef: :replace, replace: "")
+        header = File.read(path, 1024, encoding: 'UTF-8')
+                     .encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
         doc = Document.parse(header, filename: path)
 
-        name = if doc.name.empty? || doc.name == "unknown"
-                 File.basename(path, ".md")
+        name = if doc.name.empty? || doc.name == 'unknown'
+                 File.basename(path, '.md')
                else
                  doc.name
                end

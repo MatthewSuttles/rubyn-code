@@ -13,9 +13,7 @@ module RubynCode
       def load(name)
         name = name.to_s
 
-        if @loaded.key?(name)
-          return @loaded[name]
-        end
+        return @loaded[name] if @loaded.key?(name)
 
         path = catalog.find(name)
         raise Error, "Skill not found: #{name}" unless path
@@ -41,16 +39,16 @@ module RubynCode
         parts = []
         parts << "<skill name=\"#{escape_xml(doc.name)}\">"
         parts << doc.body unless doc.body.empty?
-        parts << "</skill>"
+        parts << '</skill>'
         parts.join("\n")
       end
 
       def escape_xml(text)
         text.to_s
-            .gsub("&", "&amp;")
-            .gsub("<", "&lt;")
-            .gsub(">", "&gt;")
-            .gsub("\"", "&quot;")
+            .gsub('&', '&amp;')
+            .gsub('<', '&lt;')
+            .gsub('>', '&gt;')
+            .gsub('"', '&quot;')
       end
     end
   end
