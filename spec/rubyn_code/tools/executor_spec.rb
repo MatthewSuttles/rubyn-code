@@ -61,6 +61,27 @@ RSpec.describe RubynCode::Tools::Executor do
       end
     end
 
+    it "filters params to only those accepted by the tool" do
+      strict_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, "strict_tool")
+        const_set(:DESCRIPTION, "Strict params")
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :read)
+
+        def execute(name:, count: 1)
+          "#{name} x#{count}"
+        end
+      end
+      RubynCode::Tools::Registry.register(strict_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        # Pass extra params that the tool doesn't accept — should not crash
+        result = executor.execute("strict_tool", { "name" => "ruby", "count" => 3, "extra_junk" => true })
+        expect(result).to eq("ruby x3")
+      end
+    end
+
     it "truncates long output" do
       verbose_tool = Class.new(RubynCode::Tools::Base) do
         const_set(:TOOL_NAME, "verbose_tool")
