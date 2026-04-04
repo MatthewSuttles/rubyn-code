@@ -93,7 +93,12 @@ module RubynCode
         @response_id = message["id"]
 
         if (u = message["usage"])
-          @usage = Usage.new(input_tokens: u["input_tokens"].to_i, output_tokens: u["output_tokens"].to_i)
+          @usage = Usage.new(
+            input_tokens: u["input_tokens"].to_i,
+            output_tokens: u["output_tokens"].to_i,
+            cache_creation_input_tokens: u["cache_creation_input_tokens"].to_i,
+            cache_read_input_tokens: u["cache_read_input_tokens"].to_i
+          )
         end
 
         emit(:message_start, data)
@@ -160,7 +165,9 @@ module RubynCode
         if (u = data["usage"])
           @usage = Usage.new(
             input_tokens: (@usage&.input_tokens || 0),
-            output_tokens: u["output_tokens"].to_i
+            output_tokens: u["output_tokens"].to_i,
+            cache_creation_input_tokens: (@usage&.cache_creation_input_tokens || 0),
+            cache_read_input_tokens: (@usage&.cache_read_input_tokens || 0)
           )
         end
 

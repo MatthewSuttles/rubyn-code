@@ -20,7 +20,12 @@ module RubynCode
         inject_dependencies(tool, tool_name)
 
         symbolized = params.transform_keys(&:to_sym)
-        result = tool.execute(**symbolized)
+        # Filter to only params the tool's execute method accepts — LLM may send extra keys
+        allowed = tool.method(:execute).parameters
+                      .select { |type, _| type == :key || type == :keyreq }
+                      .map(&:last)
+        filtered = allowed.empty? ? symbolized : symbolized.slice(*allowed)
+        result = tool.execute(**filtered)
         tool.truncate(result.to_s)
       rescue ToolNotFoundError => e
         error_result("Tool error: #{e.message}")

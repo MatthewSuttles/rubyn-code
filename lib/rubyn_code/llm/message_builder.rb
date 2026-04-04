@@ -18,7 +18,11 @@ module RubynCode
       end
     end
 
-    Usage = Data.define(:input_tokens, :output_tokens)
+    Usage = Data.define(:input_tokens, :output_tokens, :cache_creation_input_tokens, :cache_read_input_tokens) do
+      def initialize(input_tokens:, output_tokens:, cache_creation_input_tokens: 0, cache_read_input_tokens: 0)
+        super
+      end
+    end
 
     Response = Data.define(:id, :content, :stop_reason, :usage) do
       def text
