@@ -59,7 +59,7 @@ module RubynCode
 
       def search_duckduckgo(query, num_results)
         encoded = CGI.escape(query)
-        stdout, _, status = Open3.capture3(
+        stdout, _, status = safe_capture3(
           "curl", "-sL", "--max-time", "15",
           "-H", "User-Agent: Mozilla/5.0 (compatible; RubynCode/1.0)",
           "https://lite.duckduckgo.com/lite/?q=#{encoded}"

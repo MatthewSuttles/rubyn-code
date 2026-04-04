@@ -18,7 +18,7 @@ module RubynCode
 
       def execute(direction: "up", steps: nil)
         command = build_command(direction, steps)
-        stdout, stderr, status = Open3.capture3(command, chdir: project_root)
+        stdout, stderr, status = safe_capture3(command, chdir: project_root)
 
         build_output(stdout, stderr, status)
       end

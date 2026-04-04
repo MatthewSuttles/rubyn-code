@@ -20,7 +20,7 @@ module RubynCode
         validate_rails_project!
 
         command = "bundle exec rails generate #{generator} #{args}"
-        stdout, stderr, status = Open3.capture3(command, chdir: project_root)
+        stdout, stderr, status = safe_capture3(command, chdir: project_root)
 
         build_output(stdout, stderr, status)
       end

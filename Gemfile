@@ -11,3 +11,5 @@ group :development, :test do
   gem "rubocop", "~> 1.21"
   gem "rake", "~> 13.0"
 end
+
+gem "base64", "~> 0.3.0"

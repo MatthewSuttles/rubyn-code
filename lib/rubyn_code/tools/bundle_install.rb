@@ -20,7 +20,7 @@ module RubynCode
           raise Error, "No Gemfile found in project root. Cannot run bundle install."
         end
 
-        stdout, stderr, status = Open3.capture3("bundle install", chdir: project_root)
+        stdout, stderr, status = safe_capture3("bundle install", chdir: project_root)
 
         build_output(stdout, stderr, status)
       end

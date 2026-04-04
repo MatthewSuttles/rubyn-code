@@ -21,7 +21,7 @@ module RubynCode
         validate_git_repo!
 
         cmd = build_diff_command(target.to_s.strip)
-        stdout, stderr, status = Open3.capture3(*cmd, chdir: project_root)
+        stdout, stderr, status = safe_capture3(*cmd, chdir: project_root)
 
         unless status.success?
           raise Error, "git diff failed: #{stderr.strip}"
@@ -38,7 +38,7 @@ module RubynCode
       private
 
       def validate_git_repo!
-        _, _, status = Open3.capture3("git", "rev-parse", "--is-inside-work-tree", chdir: project_root)
+        _, _, status = safe_capture3("git", "rev-parse", "--is-inside-work-tree", chdir: project_root)
         unless status.success?
           raise Error, "Not a git repository: #{project_root}"
         end
