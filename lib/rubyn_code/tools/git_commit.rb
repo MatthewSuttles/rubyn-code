@@ -58,22 +58,23 @@ module RubynCode
       def create_commit(message)
         stdout, stderr, status = safe_capture3('git', 'commit', '-m', message, chdir: project_root)
 
-        unless status.success?
-          output = "#{stdout}\n#{stderr}"
-          return 'Nothing to commit — working tree is clean.' if output.include?('nothing to commit')
+        return handle_commit_failure(stdout, stderr) unless status.success?
 
-          raise Error, "Commit failed: #{stderr.strip.empty? ? stdout.strip : stderr.strip}"
-        end
+        format_commit_output(stdout)
+      end
 
-        # Extract the commit hash from the output
-        commit_hash = extract_commit_hash
-        branch = current_branch
+      def handle_commit_failure(stdout, stderr)
+        output = "#{stdout}\n#{stderr}"
+        return 'Nothing to commit — working tree is clean.' if output.include?('nothing to commit')
 
-        lines = ["Committed on branch: #{branch}"]
-        lines << "Commit: #{commit_hash}" if commit_hash
+        raise Error, "Commit failed: #{stderr.strip.empty? ? stdout.strip : stderr.strip}"
+      end
+
+      def format_commit_output(stdout)
+        lines = ["Committed on branch: #{current_branch}"]
+        lines << "Commit: #{extract_commit_hash}" if extract_commit_hash
         lines << ''
         lines << stdout.strip
-
         lines.join("\n")
       end
 

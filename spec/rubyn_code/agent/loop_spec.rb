@@ -205,7 +205,9 @@ RSpec.describe RubynCode::Agent::Loop do
 
         blocked_msg = conversation.messages.any? do |m|
           m[:role] == 'user' && m[:content].is_a?(Array) &&
-            m[:content].any? { |b| b[:content].to_s.downcase.include?('blocked') || b[:content].to_s.downcase.include?('denied') }
+            m[:content].any? do |b|
+              b[:content].to_s.downcase.include?('blocked') || b[:content].to_s.downcase.include?('denied')
+            end
         end
         expect(blocked_msg).to be true
       end

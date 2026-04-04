@@ -19,7 +19,8 @@ RSpec.describe RubynCode::Tools::RunSpecs do
             # Stub at the boundary — safe_capture3 is the I/O boundary
             allow(tool).to receive(:safe_capture3)
               .with('bundle exec rspec --format documentation', chdir: dir)
-              .and_return(["5 examples, 0 failures\n", '', instance_double(Process::Status, success?: true, exitstatus: 0)])
+              .and_return(["5 examples, 0 failures\n", '',
+                           instance_double(Process::Status, success?: true, exitstatus: 0)])
 
             result = tool.execute
 
@@ -256,7 +257,8 @@ RSpec.describe RubynCode::Tools::RunSpecs do
           tool = build_tool(dir)
 
           allow(tool).to receive(:safe_capture3)
-            .and_return(["5 examples, 0 failures\n", '', instance_double(Process::Status, success?: true, exitstatus: 0)])
+            .and_return(["5 examples, 0 failures\n", '',
+                         instance_double(Process::Status, success?: true, exitstatus: 0)])
 
           result = tool.execute
 
@@ -270,7 +272,8 @@ RSpec.describe RubynCode::Tools::RunSpecs do
           tool = build_tool(dir)
 
           allow(tool).to receive(:safe_capture3)
-            .and_return(['output', 'warning: deprecation', instance_double(Process::Status, success?: true, exitstatus: 0)])
+            .and_return(['output', 'warning: deprecation',
+                         instance_double(Process::Status, success?: true, exitstatus: 0)])
 
           result = tool.execute
 
@@ -285,7 +288,8 @@ RSpec.describe RubynCode::Tools::RunSpecs do
           tool = build_tool(dir)
 
           allow(tool).to receive(:safe_capture3)
-            .and_return(["3 examples, 1 failure\n", '', instance_double(Process::Status, success?: false, exitstatus: 1)])
+            .and_return(["3 examples, 1 failure\n", '',
+                         instance_double(Process::Status, success?: false, exitstatus: 1)])
 
           result = tool.execute
 

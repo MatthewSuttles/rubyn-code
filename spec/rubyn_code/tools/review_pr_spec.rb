@@ -76,7 +76,7 @@ RSpec.describe RubynCode::Tools::ReviewPr do
           tool = build_tool(dir)
           result = tool.execute(base_branch: 'nonexistent')
 
-          expect(result).to include("not found")
+          expect(result).to include('not found')
         end
       end
     end

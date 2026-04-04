@@ -160,3 +160,14 @@ bundle install && ruby -Ilib exe/rubyn-code   # from source
 bundle exec rspec                               # tests
 bundle exec rubocop                             # lint
 ```
+
+## Pre-Commit Checklist
+
+**Always run both before committing:**
+
+```bash
+bundle exec rspec && bundle exec rubocop
+```
+
+Do NOT commit if either fails. Fix lint offenses before pushing — RuboCop is enforced
+(120 char lines, 25-line methods, 200-line classes).
