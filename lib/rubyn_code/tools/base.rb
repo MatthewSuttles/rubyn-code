@@ -72,6 +72,33 @@ module RubynCode
 
       private
 
+      # Safe replacement for Open3.capture3 that avoids Ruby 4.0's IOError
+      # when threads race on stream closure. All tools should use this instead
+      # of Open3.capture3 directly.
+      def safe_capture3(*cmd, chdir: project_root, timeout: 120, **opts)
+        stdin, stdout_io, stderr_io, wait_thr = Open3.popen3(*cmd, chdir: chdir, **opts)
+        stdin.close
+
+        stdout = +""
+        stderr = +""
+
+        out_reader = Thread.new { stdout << stdout_io.read rescue nil }
+        err_reader = Thread.new { stderr << stderr_io.read rescue nil }
+
+        unless wait_thr.join(timeout)
+          Process.kill("TERM", wait_thr.pid) rescue nil
+          sleep 0.1
+          Process.kill("KILL", wait_thr.pid) rescue nil
+          wait_thr.join(5)
+        end
+
+        out_reader.join(5)
+        err_reader.join(5)
+        [stdout_io, stderr_io].each { |io| io.close rescue nil }
+
+        [stdout, stderr, wait_thr.value]
+      end
+
       def read_file_safely(path)
         resolved = safe_path(path)
         raise Error, "File not found: #{path}" unless File.exist?(resolved)

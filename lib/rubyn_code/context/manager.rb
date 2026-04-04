@@ -53,11 +53,21 @@ module RubynCode
       #
       # @param conversation [#messages, #messages=] conversation wrapper
       # @return [void]
+      # Fraction of the compaction threshold at which micro-compact kicks in.
+      # Running it too early busts the prompt cache prefix (mutated messages
+      # change the hash, invalidating server-side cached tokens).
+      MICRO_COMPACT_RATIO = 0.7
+
       def check_compaction!(conversation)
         messages = conversation.messages
 
-        # Step 1: Zero-cost micro-compact (replace old tool results with placeholders)
-        MicroCompact.call(messages)
+        # Step 1: Zero-cost micro-compact — but only when we're approaching
+        # the compaction threshold. Running it every turn mutates old messages,
+        # which invalidates the prompt cache prefix and wastes tokens.
+        est = estimated_tokens(messages)
+        if est > (@threshold * MICRO_COMPACT_RATIO)
+          MicroCompact.call(messages)
+        end
 
         return unless needs_compaction?(messages)
 

@@ -29,7 +29,7 @@ module RubynCode
       private
 
       def validate_git_repo!
-        _, _, status = Open3.capture3("git", "rev-parse", "--is-inside-work-tree", chdir: project_root)
+        _, _, status = safe_capture3("git", "rev-parse", "--is-inside-work-tree", chdir: project_root)
         unless status.success?
           raise Error, "Not a git repository: #{project_root}"
         end
@@ -43,14 +43,14 @@ module RubynCode
 
       def stage_files(files)
         if files.strip.downcase == "all"
-          stdout, stderr, status = Open3.capture3("git", "add", "-A", chdir: project_root)
+          stdout, stderr, status = safe_capture3("git", "add", "-A", chdir: project_root)
         else
           file_list = files.split(/\s+/).reject(&:empty?)
           if file_list.empty?
             raise Error, "No files specified to stage"
           end
 
-          stdout, stderr, status = Open3.capture3("git", "add", "--", *file_list, chdir: project_root)
+          stdout, stderr, status = safe_capture3("git", "add", "--", *file_list, chdir: project_root)
         end
 
         unless status.success?
@@ -59,7 +59,7 @@ module RubynCode
       end
 
       def create_commit(message)
-        stdout, stderr, status = Open3.capture3("git", "commit", "-m", message, chdir: project_root)
+        stdout, stderr, status = safe_capture3("git", "commit", "-m", message, chdir: project_root)
 
         unless status.success?
           if stderr.include?("nothing to commit")
@@ -82,12 +82,12 @@ module RubynCode
       end
 
       def extract_commit_hash
-        stdout, _, status = Open3.capture3("git", "rev-parse", "--short", "HEAD", chdir: project_root)
+        stdout, _, status = safe_capture3("git", "rev-parse", "--short", "HEAD", chdir: project_root)
         status.success? ? stdout.strip : nil
       end
 
       def current_branch
-        stdout, _, status = Open3.capture3("git", "branch", "--show-current", chdir: project_root)
+        stdout, _, status = safe_capture3("git", "branch", "--show-current", chdir: project_root)
         status.success? && !stdout.strip.empty? ? stdout.strip : "HEAD (detached)"
       end
     end

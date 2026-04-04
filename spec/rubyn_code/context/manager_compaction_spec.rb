@@ -22,8 +22,10 @@ RSpec.describe RubynCode::Context::Manager, "compaction pipeline" do
   end
 
   describe "#check_compaction!" do
-    it "runs micro-compact on every call" do
-      manager = described_class.new(threshold: 999_999)
+    it "runs micro-compact when estimated tokens exceed 70% of threshold" do
+      # Threshold of 400 means micro-compact triggers at 280 tokens;
+      # this conversation is ~287 estimated tokens — just above the gate.
+      manager = described_class.new(threshold: 400)
       conversation = double("conversation", messages: [
         user_msg("hi"),
         tool_call_msg("t1", "bash"),

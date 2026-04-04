@@ -97,10 +97,31 @@ module RubynCode
         final_status = :completed
 
         begin
-          Timeout.timeout(timeout_seconds) do
-            stdout, stderr, process_status = Open3.capture3(command, chdir: @project_root)
+          stdin_io, stdout_io, stderr_io, wait_thr = Open3.popen3(command, chdir: @project_root)
+          stdin_io.close
+          out_buf = +""
+          err_buf = +""
+          out_reader = Thread.new { out_buf << stdout_io.read rescue nil }
+          err_reader = Thread.new { err_buf << stderr_io.read rescue nil }
+
+          unless wait_thr.join(timeout_seconds)
+            Process.kill("TERM", wait_thr.pid) rescue nil
+            sleep 0.1
+            Process.kill("KILL", wait_thr.pid) rescue nil
+            wait_thr.join(5)
+            out_reader.join(2)
+            err_reader.join(2)
+            [stdout_io, stderr_io].each { |io| io.close rescue nil }
+            raise Timeout::Error
           end
 
+          out_reader.join(5)
+          err_reader.join(5)
+          [stdout_io, stderr_io].each { |io| io.close rescue nil }
+
+          stdout = out_buf
+          stderr = err_buf
+          process_status = wait_thr.value
           final_status = process_status.success? ? :completed : :error
         rescue Timeout::Error
           final_status = :timeout

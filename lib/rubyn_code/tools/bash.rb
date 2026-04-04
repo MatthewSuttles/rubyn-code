@@ -20,19 +20,9 @@ module RubynCode
       def execute(command:, timeout: 120)
         validate_command!(command)
 
-        env = scrubbed_env
+        stdout, stderr, status = safe_capture3(scrubbed_env, command, chdir: project_root, timeout: timeout)
 
-        stdout, stderr, status = nil
-        begin
-          Timeout.timeout(timeout) do
-            stdout, stderr, status = Open3.capture3(env, command, chdir: project_root)
-          end
-        rescue Timeout::Error
-          raise Error, "Command timed out after #{timeout} seconds: #{command}"
-        end
-
-        output = build_output(stdout, stderr, status)
-        output
+        build_output(stdout, stderr, status)
       end
 
       private

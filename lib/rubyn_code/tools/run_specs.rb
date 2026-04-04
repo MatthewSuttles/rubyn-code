@@ -21,7 +21,7 @@ module RubynCode
         framework = detect_framework
 
         command = build_command(framework, path, format, fail_fast)
-        stdout, stderr, status = Open3.capture3(command, chdir: project_root)
+        stdout, stderr, status = safe_capture3(command, chdir: project_root)
 
         build_output(stdout, stderr, status)
       end

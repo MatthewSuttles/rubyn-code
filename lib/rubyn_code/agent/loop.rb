@@ -222,8 +222,11 @@ module RubynCode
         - Run specs after changes. If they break, fix them.
         - When you are asked to work in a NEW directory you haven't seen yet, check for RUBYN.md, CLAUDE.md, or AGENT.md there. But don't do this unprompted on startup — those files are already loaded into your context.
         - Load skills when you need deep knowledge on a topic. Don't wing it.
+        - You have 112 curated best-practice skill documents covering Ruby, Rails, RSpec, design patterns, and code quality. When writing new code or reviewing existing code, load the relevant skill BEFORE implementing. Don't reinvent patterns that are already documented.
+        - HOWEVER: always respect patterns already established in the codebase. If the project uses a specific convention (e.g. service objects, a particular test style, a custom base class), follow that convention even if it differs from the skill doc. Consistency with the codebase beats textbook best practice. Only break from established patterns if they are genuinely harmful (security issues, major performance problems, or bugs).
         - Keep responses concise. Code speaks louder than paragraphs.
         - Use spawn_agent sparingly — only for tasks that require reading many files (10+) or deep exploration. For simple reads or edits, use tools directly. Don't spawn a sub-agent when a single read_file or grep will do.
+        - IMPORTANT: You can call MULTIPLE tools in a single response. When you need to read several files, search multiple patterns, or perform independent operations, return all tool_use blocks at once rather than one at a time. This is dramatically faster and cheaper. For example, if you need to read 5 files, emit 5 read_file tool calls in one response — don't read them one by one across 5 turns.
 
         ## Memory
         You have persistent memory across sessions via `memory_write` and `memory_search` tools.
@@ -459,7 +462,7 @@ module RubynCode
             deny_list: @deny_list
           )
 
-          @on_tool_call&.call(tool_name, tool_input)
+          @on_tool_call&.call(tool_name, tool_input) rescue nil
 
           result, is_error = execute_with_permission(decision, tool_name, tool_input, tool_id)
 
@@ -471,9 +474,11 @@ module RubynCode
             RubynCode::Debug.token("Tool result budget exceeded: #{aggregate_chars}/#{budget} chars")
           end
 
-          @on_tool_result&.call(tool_name, result, is_error)
+          @on_tool_result&.call(tool_name, result, is_error) rescue nil
 
           @stall_detector.record(tool_name, tool_input)
+          # CRITICAL: always add tool_result to conversation — without this the
+          # API will reject the next request with "tool_use without tool_result"
           @conversation.add_tool_result(tool_id, tool_name, result, is_error: is_error)
         end
       end
