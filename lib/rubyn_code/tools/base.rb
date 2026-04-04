@@ -85,7 +85,9 @@ module RubynCode
         out_reader = Thread.new { stdout << stdout_io.read rescue nil }
         err_reader = Thread.new { stderr << stderr_io.read rescue nil }
 
+        timed_out = false
         unless wait_thr.join(timeout)
+          timed_out = true
           Process.kill("TERM", wait_thr.pid) rescue nil
           sleep 0.1
           Process.kill("KILL", wait_thr.pid) rescue nil
@@ -95,6 +97,10 @@ module RubynCode
         out_reader.join(5)
         err_reader.join(5)
         [stdout_io, stderr_io].each { |io| io.close rescue nil }
+
+        if timed_out
+          raise Error, "Command timed out after #{timeout}s"
+        end
 
         [stdout, stderr, wait_thr.value]
       end

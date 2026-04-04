@@ -139,11 +139,11 @@ RSpec.describe RubynCode::Tools::WebSearch do
     end
 
     it 'calls curl with correct URL and user agent' do
-      allow(Open3).to receive(:capture3).and_return([ddg_html, '', success_status])
+      allow(tool).to receive(:safe_capture3).and_return([ddg_html, '', success_status])
 
       tool.execute(query: 'ruby programming')
 
-      expect(Open3).to have_received(:capture3).with(
+      expect(tool).to have_received(:safe_capture3).with(
         'curl', '-sL', '--max-time', '15',
         '-H', 'User-Agent: Mozilla/5.0 (compatible; RubynCode/1.0)',
         "https://lite.duckduckgo.com/lite/?q=ruby+programming"
@@ -151,7 +151,7 @@ RSpec.describe RubynCode::Tools::WebSearch do
     end
 
     it 'parses HTML results with links and snippets' do
-      allow(Open3).to receive(:capture3).and_return([ddg_html, '', success_status])
+      allow(tool).to receive(:safe_capture3).and_return([ddg_html, '', success_status])
 
       result = tool.execute(query: 'test query')
 
@@ -164,7 +164,7 @@ RSpec.describe RubynCode::Tools::WebSearch do
     end
 
     it 'returns empty array when curl fails' do
-      allow(Open3).to receive(:capture3).and_return(['', '', failure_status])
+      allow(tool).to receive(:safe_capture3).and_return(['', '', failure_status])
 
       result = tool.execute(query: 'failing query')
 
@@ -172,7 +172,7 @@ RSpec.describe RubynCode::Tools::WebSearch do
     end
 
     it 'limits results to num_results' do
-      allow(Open3).to receive(:capture3).and_return([ddg_html, '', success_status])
+      allow(tool).to receive(:safe_capture3).and_return([ddg_html, '', success_status])
 
       result = tool.execute(query: 'test', num_results: 1)
 
@@ -182,7 +182,7 @@ RSpec.describe RubynCode::Tools::WebSearch do
     end
 
     it 'strips HTML tags and decodes entities from results' do
-      allow(Open3).to receive(:capture3).and_return([ddg_html, '', success_status])
+      allow(tool).to receive(:safe_capture3).and_return([ddg_html, '', success_status])
 
       result = tool.execute(query: 'test')
 
@@ -198,7 +198,7 @@ RSpec.describe RubynCode::Tools::WebSearch do
         <a rel="nofollow" href="https://example.com/real">Real Result</a>
         <td class="result-snippet">Real snippet.</td>
       HTML
-      allow(Open3).to receive(:capture3).and_return([html_with_ddg_link, '', success_status])
+      allow(tool).to receive(:safe_capture3).and_return([html_with_ddg_link, '', success_status])
 
       result = tool.execute(query: 'test')
 
@@ -211,7 +211,7 @@ RSpec.describe RubynCode::Tools::WebSearch do
         <a href="https://example.com/fallback">Fallback Result</a>
         <td class="result-snippet">Fallback snippet.</td>
       HTML
-      allow(Open3).to receive(:capture3).and_return([html_without_nofollow, '', success_status])
+      allow(tool).to receive(:safe_capture3).and_return([html_without_nofollow, '', success_status])
 
       result = tool.execute(query: 'test')
 

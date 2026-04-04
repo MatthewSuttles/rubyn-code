@@ -22,13 +22,13 @@ RSpec.describe RubynCode::LLM::Client, "prompt caching" do
   end
 
   describe "OAuth system prompt caching" do
-    it "adds cache_control to the system block after the OAuth gate" do
+    it "adds cache_control to both system blocks for OAuth" do
       body = build_body(system: "You are helpful.")
 
       expect(body[:system]).to be_an(Array)
       expect(body[:system].size).to eq(2)
-      # OAuth gate — no cache_control
-      expect(body[:system][0][:cache_control]).to be_nil
+      # OAuth gate — cached (static across all turns)
+      expect(body[:system][0][:cache_control]).to eq({ type: "ephemeral" })
       expect(body[:system][0][:text]).to include("Claude Code")
       # System prompt — cached
       expect(body[:system][1][:cache_control]).to eq({ type: "ephemeral" })

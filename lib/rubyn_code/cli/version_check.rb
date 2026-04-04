@@ -57,6 +57,8 @@ module RubynCode
         data = JSON.parse(response.body)
         latest = data["version"]
         return unless latest
+        return unless latest.match?(/\A\d+\.\d+/)
+        return unless Gem::Version.correct?(latest)
 
         write_cache(latest)
         @result = latest

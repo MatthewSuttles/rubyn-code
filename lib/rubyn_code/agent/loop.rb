@@ -85,13 +85,10 @@ module RubynCode
               response = recover_truncated_response(response)
             end
 
-            # Before returning, check if background jobs finished while we were thinking
-            drain_background_notifications
+            # If background jobs are running, wait for them instead of burning LLM calls
             if has_pending_background_jobs?
               @conversation.add_assistant_message(response_content(response))
-              @conversation.add_user_message(
-                "[system] Background jobs are still running. You may continue or wait for results."
-              )
+              wait_for_background_jobs
               next
             end
 
@@ -442,6 +439,26 @@ module RubynCode
         Tools::Registry.all
                         .select { |t| PLAN_MODE_RISK_LEVELS.include?(t::RISK_LEVEL) }
                         .map(&:to_schema)
+      end
+
+      # ── Background job waiting ────────────────────────────────────────
+
+      def wait_for_background_jobs
+        max_wait = 300 # 5 minutes max
+        poll_interval = 3
+
+        RubynCode::Debug.agent("Waiting for background jobs to finish (polling every #{poll_interval}s, max #{max_wait}s)")
+
+        elapsed = 0
+        while elapsed < max_wait && has_pending_background_jobs?
+          sleep poll_interval
+          elapsed += poll_interval
+          drain_background_notifications
+        end
+
+        # Final drain to pick up any last results
+        drain_background_notifications
+        RubynCode::Debug.agent("Background wait done (#{elapsed}s)")
       end
 
       # ── Tool processing ──────────────────────────────────────────────

@@ -86,12 +86,14 @@ module RubynCode
       #
       # @return [Array<Hash>]
       def to_api_format
-        @messages.map do |msg|
+        formatted = @messages.map do |msg|
           {
             role: msg[:role],
             content: format_content(msg[:content])
           }
         end
+
+        repair_orphaned_tool_uses(formatted)
       end
 
       # Remove the last user + assistant exchange. Useful for undo.
@@ -115,7 +117,54 @@ module RubynCode
         end
       end
 
+      # Replace messages with a new array (used after compaction).
+      def replace!(new_messages)
+        @messages.replace(new_messages)
+      end
+
       private
+
+      # Ensure every tool_use block has a matching tool_result.
+      # If a tool_use is orphaned (e.g. from Ctrl-C interruption),
+      # inject a synthetic tool_result so the API doesn't reject the request.
+      def repair_orphaned_tool_uses(formatted)
+        # Collect all tool_use IDs from assistant messages
+        tool_use_ids = Set.new
+        formatted.each do |msg|
+          next unless msg[:role] == "assistant" && msg[:content].is_a?(Array)
+
+          msg[:content].each do |block|
+            if block.is_a?(Hash) && (block[:type] == "tool_use" || block["type"] == "tool_use")
+              tool_use_ids << (block[:id] || block["id"])
+            end
+          end
+        end
+
+        # Collect all tool_result IDs from user messages
+        tool_result_ids = Set.new
+        formatted.each do |msg|
+          next unless msg[:role] == "user" && msg[:content].is_a?(Array)
+
+          msg[:content].each do |block|
+            if block.is_a?(Hash) && (block[:type] == "tool_result" || block["type"] == "tool_result")
+              tool_result_ids << (block[:tool_use_id] || block["tool_use_id"])
+            end
+          end
+        end
+
+        # Find orphans
+        orphaned = tool_use_ids - tool_result_ids
+        return formatted if orphaned.empty?
+
+        # Inject synthetic tool_results for orphans
+        orphan_results = orphaned.map do |id|
+          { type: "tool_result", tool_use_id: id, content: "[interrupted]", is_error: true }
+        end
+
+        # Append as a user message after the last assistant message
+        formatted << { role: "user", content: orphan_results }
+        formatted
+      end
 
       # Normalize content and tool_calls into a single array of content blocks.
       def normalize_content(content, tool_calls)
