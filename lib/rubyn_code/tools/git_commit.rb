@@ -59,9 +59,10 @@ module RubynCode
         stdout, stderr, status = safe_capture3('git', 'commit', '-m', message, chdir: project_root)
 
         unless status.success?
-          return 'Nothing to commit — working tree is clean.' if stderr.include?('nothing to commit')
+          output = "#{stdout}\n#{stderr}"
+          return 'Nothing to commit — working tree is clean.' if output.include?('nothing to commit')
 
-          raise Error, "Commit failed: #{stderr.strip}"
+          raise Error, "Commit failed: #{stderr.strip.empty? ? stdout.strip : stderr.strip}"
         end
 
         # Extract the commit hash from the output

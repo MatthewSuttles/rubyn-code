@@ -66,7 +66,7 @@ module RubynCode
       def disconnect!
         @transport.stop!
         @initialized = false
-        @tools_cache = nil
+        @tools = nil
       end
 
       # Returns whether the client is connected and the transport is alive.
