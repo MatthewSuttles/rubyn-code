@@ -131,7 +131,7 @@ module RubynCode
             end
             @renderer.tool_call(name, params)
           },
-          on_tool_result: ->(name, result) {
+          on_tool_result: ->(name, result, _is_error = false) {
             @renderer.tool_result(name, result)
             @spinner.start
           },
@@ -142,7 +142,7 @@ module RubynCode
               puts
               @streaming_first_chunk = false
             end
-            @stream_formatter&.print_chunk(text)
+            @stream_formatter&.feed(text)
           },
           skill_loader: @skill_loader,
           project_root: @project_root
@@ -232,8 +232,9 @@ module RubynCode
           session_persistence: @session_persistence,
           background_worker: @background_worker,
           permission_tier: @permission_tier,
-          plan_mode: @plan_mode
-        ).with_message_handler(method(:handle_message))
+          plan_mode: @plan_mode,
+          message_handler: method(:handle_message)
+        )
       end
 
       # Handle structured results from commands that need to mutate REPL state
