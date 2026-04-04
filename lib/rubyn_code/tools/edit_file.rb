@@ -1,18 +1,19 @@
 # frozen_string_literal: true
 
-require_relative "base"
-require_relative "registry"
+require_relative 'base'
+require_relative 'registry'
 
 module RubynCode
   module Tools
     class EditFile < Base
-      TOOL_NAME = "edit_file"
-      DESCRIPTION = "Performs exact string replacement in a file. Fails if old_text is not found or is ambiguous."
+      TOOL_NAME = 'edit_file'
+      DESCRIPTION = 'Performs exact string replacement in a file. Fails if old_text is not found or is ambiguous.'
       PARAMETERS = {
-        path: { type: :string, required: true, description: "Path to the file to edit" },
-        old_text: { type: :string, required: true, description: "The exact text to find and replace" },
-        new_text: { type: :string, required: true, description: "The replacement text" },
-        replace_all: { type: :boolean, required: false, default: false, description: "Replace all occurrences (default: false)" }
+        path: { type: :string, required: true, description: 'Path to the file to edit' },
+        old_text: { type: :string, required: true, description: 'The exact text to find and replace' },
+        new_text: { type: :string, required: true, description: 'The replacement text' },
+        replace_all: { type: :boolean, required: false, default: false,
+                       description: 'Replace all occurrences (default: false)' }
       }.freeze
       RISK_LEVEL = :write
       REQUIRES_CONFIRMATION = false
@@ -23,12 +24,11 @@ module RubynCode
 
         occurrences = content.scan(old_text).length
 
-        if occurrences.zero?
-          raise Error, "old_text not found in #{path}. No changes made."
-        end
+        raise Error, "old_text not found in #{path}. No changes made." if occurrences.zero?
 
         if !replace_all && occurrences > 1
-          raise Error, "old_text found #{occurrences} times in #{path}. Use replace_all: true to replace all, or provide a more specific old_text."
+          raise Error,
+                "old_text found #{occurrences} times in #{path}. Use replace_all: true to replace all, or provide a more specific old_text."
         end
 
         new_content = if replace_all

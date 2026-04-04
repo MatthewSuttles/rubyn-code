@@ -1,17 +1,22 @@
 # frozen_string_literal: true
 
-require "securerandom"
-require "digest"
-require "base64"
-require "faraday"
-require "json"
+require 'securerandom'
+require 'digest'
+require 'base64'
+require 'faraday'
+require 'json'
 
 module RubynCode
   module Auth
     class OAuth
-      StateMismatchError = Class.new(RubynCode::AuthenticationError)
-      TokenExchangeError = Class.new(RubynCode::AuthenticationError)
-      RefreshError = Class.new(RubynCode::AuthenticationError)
+      class StateMismatchError < RubynCode::AuthenticationError
+      end
+
+      class TokenExchangeError < RubynCode::AuthenticationError
+      end
+
+      class RefreshError < RubynCode::AuthenticationError
+      end
 
       VERIFIER_LENGTH = 43
 
@@ -28,7 +33,7 @@ module RubynCode
         result = callback_server.wait_for_callback(timeout: 120)
 
         unless secure_compare(result[:state], state)
-          raise StateMismatchError, "OAuth state parameter mismatch — possible CSRF attack"
+          raise StateMismatchError, 'OAuth state parameter mismatch — possible CSRF attack'
         end
 
         tokens = exchange_code(code: result[:code], code_verifier:)
@@ -44,12 +49,12 @@ module RubynCode
 
       def refresh!
         stored = TokenStore.load
-        raise RefreshError, "No stored refresh token available" unless stored&.dig(:refresh_token)
+        raise RefreshError, 'No stored refresh token available' unless stored&.dig(:refresh_token)
 
         response = http_client.post(token_url) do |req|
-          req.headers["Content-Type"] = "application/x-www-form-urlencoded"
+          req.headers['Content-Type'] = 'application/x-www-form-urlencoded'
           req.body = URI.encode_www_form(
-            grant_type: "refresh_token",
+            grant_type: 'refresh_token',
             client_id: client_id,
             refresh_token: stored[:refresh_token]
           )
@@ -57,23 +62,23 @@ module RubynCode
 
         unless response.success?
           body = parse_json(response.body)
-          error_msg = body&.dig("error_description") || body&.dig("error") || response.body
+          error_msg = body&.dig('error_description') || body&.dig('error') || response.body
           raise RefreshError, "Token refresh failed (#{response.status}): #{error_msg}"
         end
 
         body = parse_json(response.body)
-        raise RefreshError, "Invalid response from token endpoint" unless body
+        raise RefreshError, 'Invalid response from token endpoint' unless body
 
         TokenStore.save(
-          access_token: body["access_token"],
-          refresh_token: body["refresh_token"] || stored[:refresh_token],
-          expires_at: Time.now + body["expires_in"].to_i
+          access_token: body['access_token'],
+          refresh_token: body['refresh_token'] || stored[:refresh_token],
+          expires_at: Time.now + body['expires_in'].to_i
         )
 
         {
-          access_token: body["access_token"],
-          refresh_token: body["refresh_token"] || stored[:refresh_token],
-          expires_in: body["expires_in"]
+          access_token: body['access_token'],
+          refresh_token: body['refresh_token'] || stored[:refresh_token],
+          expires_in: body['expires_in']
         }
       end
 
@@ -90,13 +95,13 @@ module RubynCode
 
       def build_authorization_url(code_challenge:, state:)
         params = URI.encode_www_form(
-          response_type: "code",
+          response_type: 'code',
           client_id: client_id,
           redirect_uri: redirect_uri,
           scope: scopes,
           state: state,
           code_challenge: code_challenge,
-          code_challenge_method: "S256"
+          code_challenge_method: 'S256'
         )
 
         "#{authorize_url}?#{params}"
@@ -104,9 +109,9 @@ module RubynCode
 
       def exchange_code(code:, code_verifier:)
         response = http_client.post(token_url) do |req|
-          req.headers["Content-Type"] = "application/x-www-form-urlencoded"
+          req.headers['Content-Type'] = 'application/x-www-form-urlencoded'
           req.body = URI.encode_www_form(
-            grant_type: "authorization_code",
+            grant_type: 'authorization_code',
             client_id: client_id,
             code: code,
             redirect_uri: redirect_uri,
@@ -116,26 +121,26 @@ module RubynCode
 
         unless response.success?
           body = parse_json(response.body)
-          error_msg = body&.dig("error_description") || body&.dig("error") || response.body
+          error_msg = body&.dig('error_description') || body&.dig('error') || response.body
           raise TokenExchangeError, "Code exchange failed (#{response.status}): #{error_msg}"
         end
 
         body = parse_json(response.body)
-        raise TokenExchangeError, "Invalid response from token endpoint" unless body
+        raise TokenExchangeError, 'Invalid response from token endpoint' unless body
 
         {
-          access_token: body["access_token"],
-          refresh_token: body["refresh_token"],
-          expires_in: body["expires_in"]
+          access_token: body['access_token'],
+          refresh_token: body['refresh_token'],
+          expires_in: body['expires_in']
         }
       end
 
       def open_browser(url)
         launcher = case RUBY_PLATFORM
-                   when /darwin/  then "open"
-                   when /linux/   then "xdg-open"
-                   when /mingw|mswin/ then "start"
-                   else "xdg-open"
+                   when /darwin/  then 'open'
+                   when /linux/   then 'xdg-open'
+                   when /mingw|mswin/ then 'start'
+                   else 'xdg-open'
                    end
 
         system(launcher, url, exception: false)
@@ -159,8 +164,8 @@ module RubynCode
         return false if a.nil? || b.nil?
         return false unless a.bytesize == b.bytesize
 
-        l = a.unpack("C*")
-        r = b.unpack("C*")
+        l = a.unpack('C*')
+        r = b.unpack('C*')
         l.zip(r).reduce(0) { |acc, (x, y)| acc | (x ^ y) }.zero?
       end
 

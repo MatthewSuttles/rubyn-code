@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "json"
+require 'json'
 
 module RubynCode
   module Context
@@ -82,7 +82,7 @@ module RubynCode
       def ensure_llm_client!
         return if @llm_client
 
-        raise RubynCode::Error, "LLM client is required for summarization-based compaction"
+        raise RubynCode::Error, 'LLM client is required for summarization-based compaction'
       end
     end
   end

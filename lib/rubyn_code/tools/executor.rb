@@ -22,7 +22,7 @@ module RubynCode
         symbolized = params.transform_keys(&:to_sym)
         # Filter to only params the tool's execute method accepts — LLM may send extra keys
         allowed = tool.method(:execute).parameters
-                      .select { |type, _| type == :key || type == :keyreq }
+                      .slice(:key, :keyreq)
                       .map(&:last)
         filtered = allowed.empty? ? symbolized : symbolized.slice(*allowed)
         result = tool.execute(**filtered)
@@ -47,14 +47,14 @@ module RubynCode
 
       def inject_dependencies(tool, tool_name)
         case tool_name
-        when "spawn_agent"
+        when 'spawn_agent'
           tool.llm_client = @llm_client if tool.respond_to?(:llm_client=)
           tool.on_status = @on_agent_status if tool.respond_to?(:on_status=)
-        when "spawn_teammate"
+        when 'spawn_teammate'
           tool.llm_client = @llm_client if tool.respond_to?(:llm_client=)
           tool.on_status = @on_agent_status if tool.respond_to?(:on_status=)
           tool.db = @db if tool.respond_to?(:db=)
-        when "background_run"
+        when 'background_run'
           tool.background_worker = @background_worker if tool.respond_to?(:background_worker=)
         end
       end

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "time"
+require 'time'
 
 module RubynCode
   module Learning
@@ -44,10 +44,10 @@ module RubynCode
 
       # Confidence label thresholds, checked in descending order.
       CONFIDENCE_LABELS = [
-        [0.9, "near-certain"],
-        [0.7, "confident"],
-        [0.5, "moderate"],
-        [0.3, "tentative"]
+        [0.9, 'near-certain'],
+        [0.7, 'confident'],
+        [0.5, 'moderate'],
+        [0.3, 'tentative']
       ].freeze
 
       class << self
@@ -105,7 +105,7 @@ module RubynCode
             return label if score >= threshold
           end
 
-          "unreliable"
+          'unreliable'
         end
 
         # Reinforces an instinct in the database by updating confidence
@@ -120,7 +120,7 @@ module RubynCode
 
           if helpful
             db.execute(
-              "UPDATE instincts SET confidence = MIN(1.0, confidence + 0.1 * (1.0 - confidence)), times_applied = times_applied + 1, times_helpful = times_helpful + 1, updated_at = ? WHERE id = ?",
+              'UPDATE instincts SET confidence = MIN(1.0, confidence + 0.1 * (1.0 - confidence)), times_applied = times_applied + 1, times_helpful = times_helpful + 1, updated_at = ? WHERE id = ?',
               [now, instinct_id]
             )
           else
@@ -141,25 +141,29 @@ module RubynCode
         # @return [void]
         def decay_all(db, project_path:)
           rows = db.query(
-            "SELECT id, confidence, decay_rate, updated_at FROM instincts WHERE project_path = ?",
+            'SELECT id, confidence, decay_rate, updated_at FROM instincts WHERE project_path = ?',
             [project_path]
           ).to_a
 
           now = Time.now
           rows.each do |row|
-            updated_at = Time.parse(row["updated_at"].to_s) rescue Time.now
+            updated_at = begin
+              Time.parse(row['updated_at'].to_s)
+            rescue StandardError
+              Time.now
+            end
             elapsed_days = (now - updated_at).to_f / 86_400
             next if elapsed_days <= 0
 
-            decay_factor = Math.exp(-row["decay_rate"].to_f * elapsed_days)
-            new_confidence = (row["confidence"].to_f * decay_factor).clamp(MIN_CONFIDENCE, 1.0)
+            decay_factor = Math.exp(-row['decay_rate'].to_f * elapsed_days)
+            new_confidence = (row['confidence'].to_f * decay_factor).clamp(MIN_CONFIDENCE, 1.0)
 
             if new_confidence <= MIN_CONFIDENCE
-              db.execute("DELETE FROM instincts WHERE id = ?", [row["id"]])
+              db.execute('DELETE FROM instincts WHERE id = ?', [row['id']])
             else
               db.execute(
-                "UPDATE instincts SET confidence = ? WHERE id = ?",
-                [new_confidence, row["id"]]
+                'UPDATE instincts SET confidence = ? WHERE id = ?',
+                [new_confidence, row['id']]
               )
             end
           end

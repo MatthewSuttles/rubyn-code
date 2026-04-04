@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "json"
+require 'json'
 
 module RubynCode
   module Context
@@ -65,9 +65,7 @@ module RubynCode
         # the compaction threshold. Running it every turn mutates old messages,
         # which invalidates the prompt cache prefix and wastes tokens.
         est = estimated_tokens(messages)
-        if est > (@threshold * MICRO_COMPACT_RATIO)
-          MicroCompact.call(messages)
-        end
+        MicroCompact.call(messages) if est > (@threshold * MICRO_COMPACT_RATIO)
 
         return unless needs_compaction?(messages)
 

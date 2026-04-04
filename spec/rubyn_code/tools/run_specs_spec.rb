@@ -18,10 +18,10 @@ RSpec.describe RubynCode::Tools::RunSpecs do
             create_test_file(dir, 'Gemfile', "gem 'rspec'\n")
             tool = build_tool(dir)
 
-            allow(Open3).to receive(:capture3).and_return(['5 examples, 0 failures', '', success_status])
+            allow(tool).to receive(:safe_capture3).and_return(['5 examples, 0 failures', '', success_status])
             result = tool.execute
 
-            expect(Open3).to have_received(:capture3)
+            expect(tool).to have_received(:safe_capture3)
               .with(a_string_matching(/bundle exec rspec/), chdir: dir)
           end
         end
@@ -31,10 +31,10 @@ RSpec.describe RubynCode::Tools::RunSpecs do
             create_test_file(dir, 'Gemfile', "gem 'rspec-rails'\n")
             tool = build_tool(dir)
 
-            allow(Open3).to receive(:capture3).and_return(['5 examples', '', success_status])
+            allow(tool).to receive(:safe_capture3).and_return(['5 examples', '', success_status])
             tool.execute
 
-            expect(Open3).to have_received(:capture3)
+            expect(tool).to have_received(:safe_capture3)
               .with(a_string_matching(/bundle exec rspec/), chdir: dir)
           end
         end
@@ -46,10 +46,10 @@ RSpec.describe RubynCode::Tools::RunSpecs do
             create_test_file(dir, 'Gemfile', "gem 'minitest'\n")
             tool = build_tool(dir)
 
-            allow(Open3).to receive(:capture3).and_return(['0 failures', '', success_status])
+            allow(tool).to receive(:safe_capture3).and_return(['0 failures', '', success_status])
             tool.execute
 
-            expect(Open3).to have_received(:capture3)
+            expect(tool).to have_received(:safe_capture3)
               .with('bundle exec rails test', chdir: dir)
           end
         end
@@ -61,10 +61,10 @@ RSpec.describe RubynCode::Tools::RunSpecs do
             create_test_file(dir, '.rspec', '--format documentation')
             tool = build_tool(dir)
 
-            allow(Open3).to receive(:capture3).and_return(['pass', '', success_status])
+            allow(tool).to receive(:safe_capture3).and_return(['pass', '', success_status])
             tool.execute
 
-            expect(Open3).to have_received(:capture3)
+            expect(tool).to have_received(:safe_capture3)
               .with(a_string_matching(/bundle exec rspec/), chdir: dir)
           end
         end
@@ -76,10 +76,10 @@ RSpec.describe RubynCode::Tools::RunSpecs do
             FileUtils.mkdir_p(File.join(dir, 'spec'))
             tool = build_tool(dir)
 
-            allow(Open3).to receive(:capture3).and_return(['pass', '', success_status])
+            allow(tool).to receive(:safe_capture3).and_return(['pass', '', success_status])
             tool.execute
 
-            expect(Open3).to have_received(:capture3)
+            expect(tool).to have_received(:safe_capture3)
               .with(a_string_matching(/bundle exec rspec/), chdir: dir)
           end
         end
@@ -91,10 +91,10 @@ RSpec.describe RubynCode::Tools::RunSpecs do
             FileUtils.mkdir_p(File.join(dir, 'test'))
             tool = build_tool(dir)
 
-            allow(Open3).to receive(:capture3).and_return(['pass', '', success_status])
+            allow(tool).to receive(:safe_capture3).and_return(['pass', '', success_status])
             tool.execute
 
-            expect(Open3).to have_received(:capture3)
+            expect(tool).to have_received(:safe_capture3)
               .with('bundle exec rails test', chdir: dir)
           end
         end
@@ -113,30 +113,28 @@ RSpec.describe RubynCode::Tools::RunSpecs do
     end
 
     context 'rspec command building' do
-      before do
-        allow(Open3).to receive(:capture3).and_return(['output', '', success_status])
-      end
-
       it 'includes format option' do
         with_temp_project do |dir|
           create_test_file(dir, 'Gemfile', "gem 'rspec'\n")
           tool = build_tool(dir)
 
+          allow(tool).to receive(:safe_capture3).and_return(['output', '', success_status])
           tool.execute(format: 'progress')
 
-          expect(Open3).to have_received(:capture3)
+          expect(tool).to have_received(:safe_capture3)
             .with('bundle exec rspec --format progress', chdir: dir)
         end
       end
 
-      it 'defaults to documentation format' do
+      it 'uses documentation format by default' do
         with_temp_project do |dir|
           create_test_file(dir, 'Gemfile', "gem 'rspec'\n")
           tool = build_tool(dir)
 
+          allow(tool).to receive(:safe_capture3).and_return(['output', '', success_status])
           tool.execute
 
-          expect(Open3).to have_received(:capture3)
+          expect(tool).to have_received(:safe_capture3)
             .with('bundle exec rspec --format documentation', chdir: dir)
         end
       end
@@ -146,9 +144,10 @@ RSpec.describe RubynCode::Tools::RunSpecs do
           create_test_file(dir, 'Gemfile', "gem 'rspec'\n")
           tool = build_tool(dir)
 
+          allow(tool).to receive(:safe_capture3).and_return(['output', '', success_status])
           tool.execute(fail_fast: true)
 
-          expect(Open3).to have_received(:capture3)
+          expect(tool).to have_received(:safe_capture3)
             .with('bundle exec rspec --format documentation --fail-fast', chdir: dir)
         end
       end
@@ -158,9 +157,10 @@ RSpec.describe RubynCode::Tools::RunSpecs do
           create_test_file(dir, 'Gemfile', "gem 'rspec'\n")
           tool = build_tool(dir)
 
+          allow(tool).to receive(:safe_capture3).and_return(['output', '', success_status])
           tool.execute(path: 'spec/models/user_spec.rb')
 
-          expect(Open3).to have_received(:capture3)
+          expect(tool).to have_received(:safe_capture3)
             .with('bundle exec rspec --format documentation spec/models/user_spec.rb', chdir: dir)
         end
       end
@@ -170,27 +170,25 @@ RSpec.describe RubynCode::Tools::RunSpecs do
           create_test_file(dir, 'Gemfile', "gem 'rspec'\n")
           tool = build_tool(dir)
 
+          allow(tool).to receive(:safe_capture3).and_return(['output', '', success_status])
           tool.execute(path: 'spec/foo_spec.rb', format: 'json', fail_fast: true)
 
-          expect(Open3).to have_received(:capture3)
+          expect(tool).to have_received(:safe_capture3)
             .with('bundle exec rspec --format json --fail-fast spec/foo_spec.rb', chdir: dir)
         end
       end
     end
 
     context 'minitest command building' do
-      before do
-        allow(Open3).to receive(:capture3).and_return(['output', '', success_status])
-      end
-
       it 'runs specific path with ruby -Itest' do
         with_temp_project do |dir|
           create_test_file(dir, 'Gemfile', "gem 'minitest'\n")
           tool = build_tool(dir)
 
+          allow(tool).to receive(:safe_capture3).and_return(['output', '', success_status])
           tool.execute(path: 'test/models/user_test.rb')
 
-          expect(Open3).to have_received(:capture3)
+          expect(tool).to have_received(:safe_capture3)
             .with('bundle exec ruby -Itest test/models/user_test.rb', chdir: dir)
         end
       end
@@ -200,9 +198,10 @@ RSpec.describe RubynCode::Tools::RunSpecs do
           create_test_file(dir, 'Gemfile', "gem 'minitest'\n")
           tool = build_tool(dir)
 
+          allow(tool).to receive(:safe_capture3).and_return(['output', '', success_status])
           tool.execute
 
-          expect(Open3).to have_received(:capture3)
+          expect(tool).to have_received(:safe_capture3)
             .with('bundle exec rails test', chdir: dir)
         end
       end
@@ -214,7 +213,7 @@ RSpec.describe RubynCode::Tools::RunSpecs do
           create_test_file(dir, 'Gemfile', "gem 'rspec'\n")
           tool = build_tool(dir)
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .and_return(["5 examples, 0 failures\n", '', success_status])
 
           result = tool.execute
@@ -227,7 +226,7 @@ RSpec.describe RubynCode::Tools::RunSpecs do
           create_test_file(dir, 'Gemfile', "gem 'rspec'\n")
           tool = build_tool(dir)
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .and_return(['output', 'warning: deprecation', success_status])
 
           result = tool.execute
@@ -241,7 +240,7 @@ RSpec.describe RubynCode::Tools::RunSpecs do
           create_test_file(dir, 'Gemfile', "gem 'rspec'\n")
           tool = build_tool(dir)
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .and_return(["3 examples, 1 failure\n", '', failure_status])
 
           result = tool.execute
@@ -255,7 +254,7 @@ RSpec.describe RubynCode::Tools::RunSpecs do
           create_test_file(dir, 'Gemfile', "gem 'rspec'\n")
           tool = build_tool(dir)
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .and_return(['', '', success_status])
 
           result = tool.execute

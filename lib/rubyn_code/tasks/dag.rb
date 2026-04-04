@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "set"
-
 module RubynCode
   module Tasks
     # Directed acyclic graph tracking task dependencies.
@@ -24,13 +22,13 @@ module RubynCode
       # @raise [ArgumentError] if this would create a cycle
       # @return [void]
       def add_dependency(task_id, depends_on_id)
-        raise ArgumentError, "A task cannot depend on itself" if task_id == depends_on_id
-        raise ArgumentError, "Cycle detected" if reachable?(depends_on_id, task_id)
+        raise ArgumentError, 'A task cannot depend on itself' if task_id == depends_on_id
+        raise ArgumentError, 'Cycle detected' if reachable?(depends_on_id, task_id)
 
         return if @forward[task_id].include?(depends_on_id)
 
         @db.execute(
-          "INSERT OR IGNORE INTO task_dependencies (task_id, depends_on_id) VALUES (?, ?)",
+          'INSERT OR IGNORE INTO task_dependencies (task_id, depends_on_id) VALUES (?, ?)',
           [task_id, depends_on_id]
         )
         @forward[task_id].add(depends_on_id)
@@ -44,7 +42,7 @@ module RubynCode
       # @return [void]
       def remove_dependency(task_id, depends_on_id)
         @db.execute(
-          "DELETE FROM task_dependencies WHERE task_id = ? AND depends_on_id = ?",
+          'DELETE FROM task_dependencies WHERE task_id = ? AND depends_on_id = ?',
           [task_id, depends_on_id]
         )
         @forward[task_id].delete(depends_on_id)
@@ -94,11 +92,11 @@ module RubynCode
         dependents_of(completed_task_id).each do |dep_id|
           next if blocked?(dep_id)
 
-          rows = @db.query("SELECT status FROM tasks WHERE id = ?", [dep_id]).to_a
+          rows = @db.query('SELECT status FROM tasks WHERE id = ?', [dep_id]).to_a
           next if rows.empty?
 
-          current_status = rows.first["status"]
-          next unless current_status == "blocked"
+          current_status = rows.first['status']
+          next unless current_status == 'blocked'
 
           @db.execute(
             "UPDATE tasks SET status = 'pending', updated_at = datetime('now') WHERE id = ?",
@@ -151,9 +149,7 @@ module RubynCode
           end
         end
 
-        if sorted.size != all_nodes.size
-          raise "Cycle detected in task dependency graph"
-        end
+        raise 'Cycle detected in task dependency graph' if sorted.size != all_nodes.size
 
         sorted
       end
@@ -173,10 +169,10 @@ module RubynCode
       end
 
       def load_from_db
-        rows = @db.query("SELECT task_id, depends_on_id FROM task_dependencies").to_a
+        rows = @db.query('SELECT task_id, depends_on_id FROM task_dependencies').to_a
         rows.each do |row|
-          tid = row["task_id"]
-          did = row["depends_on_id"]
+          tid = row['task_id']
+          did = row['depends_on_id']
           @forward[tid].add(did)
           @reverse[did].add(tid)
         end
@@ -201,7 +197,7 @@ module RubynCode
       end
 
       def placeholders(count)
-        (["?"] * count).join(", ")
+        (['?'] * count).join(', ')
       end
     end
   end

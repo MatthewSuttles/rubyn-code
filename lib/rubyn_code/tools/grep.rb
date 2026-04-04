@@ -1,18 +1,20 @@
 # frozen_string_literal: true
 
-require_relative "base"
-require_relative "registry"
+require_relative 'base'
+require_relative 'registry'
 
 module RubynCode
   module Tools
     class Grep < Base
-      TOOL_NAME = "grep"
-      DESCRIPTION = "Searches file contents using regular expressions. Returns matching lines with file paths and line numbers."
+      TOOL_NAME = 'grep'
+      DESCRIPTION = 'Searches file contents using regular expressions. Returns matching lines with file paths and line numbers.'
       PARAMETERS = {
-        pattern: { type: :string, required: true, description: "Regular expression pattern to search for" },
-        path: { type: :string, required: false, description: "File or directory to search in (defaults to project root)" },
+        pattern: { type: :string, required: true, description: 'Regular expression pattern to search for' },
+        path: { type: :string, required: false,
+                description: 'File or directory to search in (defaults to project root)' },
         glob_filter: { type: :string, required: false, description: "Glob pattern to filter files (e.g. '*.rb')" },
-        max_results: { type: :integer, required: false, default: 50, description: "Maximum number of matching lines to return" }
+        max_results: { type: :integer, required: false, default: 50,
+                       description: 'Maximum number of matching lines to return' }
       }.freeze
       RISK_LEVEL = :read
       REQUIRES_CONFIRMATION = false
@@ -41,7 +43,7 @@ module RubynCode
         if File.file?(search_path)
           [search_path]
         elsif File.directory?(search_path)
-          glob_pattern = glob_filter || "**/*"
+          glob_pattern = glob_filter || '**/*'
           Dir.glob(File.join(search_path, glob_pattern))
              .select { |f| File.file?(f) }
              .reject { |f| binary_file?(f) }
@@ -70,7 +72,7 @@ module RubynCode
         sample = File.read(path, 512)
         return false if sample.nil?
 
-        sample.bytes.any? { |b| b.zero? }
+        sample.bytes.any?(&:zero?)
       rescue StandardError
         true
       end

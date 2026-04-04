@@ -1,16 +1,16 @@
 # frozen_string_literal: true
 
-require_relative "base"
-require_relative "registry"
+require_relative 'base'
+require_relative 'registry'
 
 module RubynCode
   module Tools
     # Tool for reading unread messages from a teammate's inbox.
     class ReadInbox < Base
-      TOOL_NAME = "read_inbox"
+      TOOL_NAME = 'read_inbox'
       DESCRIPTION = "Reads all unread messages from the agent's inbox and marks them as read."
       PARAMETERS = {
-        name: { type: :string, required: true, description: "The agent name whose inbox to read" }
+        name: { type: :string, required: true, description: 'The agent name whose inbox to read' }
       }.freeze
       RISK_LEVEL = :read
       REQUIRES_CONFIRMATION = false
@@ -27,7 +27,7 @@ module RubynCode
       # @param name [String] the reader's agent name
       # @return [String] formatted messages or a notice if the inbox is empty
       def execute(name:)
-        raise Error, "Agent name is required" if name.nil? || name.strip.empty?
+        raise Error, 'Agent name is required' if name.nil? || name.strip.empty?
 
         messages = @mailbox.read_inbox(name)
 

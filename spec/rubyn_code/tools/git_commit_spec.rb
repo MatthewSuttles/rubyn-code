@@ -15,7 +15,7 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'raises an error' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .with('git', 'rev-parse', '--is-inside-work-tree', chdir: dir)
             .and_return(['', 'not a git repo', failure_status])
 
@@ -29,7 +29,7 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'raises an error for nil message' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
+          stub_valid_git_repo(tool, dir)
 
           expect { tool.execute(message: nil) }
             .to raise_error(RubynCode::Error, 'Commit message cannot be empty')
@@ -39,7 +39,7 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'raises an error for whitespace-only message' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
+          stub_valid_git_repo(tool, dir)
 
           expect { tool.execute(message: '   ') }
             .to raise_error(RubynCode::Error, 'Commit message cannot be empty')
@@ -51,13 +51,13 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'runs git add -A' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
-          stub_stage_all(dir)
-          stub_successful_commit(dir)
+          stub_valid_git_repo(tool, dir)
+          stub_stage_all(tool, dir)
+          stub_successful_commit(tool, dir)
 
           tool.execute(message: 'test commit', files: 'all')
 
-          expect(Open3).to have_received(:capture3)
+          expect(tool).to have_received(:safe_capture3)
             .with('git', 'add', '-A', chdir: dir)
         end
       end
@@ -65,13 +65,13 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'defaults to staging all files' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
-          stub_stage_all(dir)
-          stub_successful_commit(dir)
+          stub_valid_git_repo(tool, dir)
+          stub_stage_all(tool, dir)
+          stub_successful_commit(tool, dir)
 
           tool.execute(message: 'test commit')
 
-          expect(Open3).to have_received(:capture3)
+          expect(tool).to have_received(:safe_capture3)
             .with('git', 'add', '-A', chdir: dir)
         end
       end
@@ -81,16 +81,16 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'runs git add with file list' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
+          stub_valid_git_repo(tool, dir)
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .with('git', 'add', '--', 'file1.rb', 'file2.rb', chdir: dir)
             .and_return(['', '', success_status])
-          stub_successful_commit(dir)
+          stub_successful_commit(tool, dir)
 
           tool.execute(message: 'commit specific', files: 'file1.rb file2.rb')
 
-          expect(Open3).to have_received(:capture3)
+          expect(tool).to have_received(:safe_capture3)
             .with('git', 'add', '--', 'file1.rb', 'file2.rb', chdir: dir)
         end
       end
@@ -98,7 +98,7 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'raises error for empty file list after splitting' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
+          stub_valid_git_repo(tool, dir)
 
           expect { tool.execute(message: 'test', files: '   ') }
             .to raise_error(RubynCode::Error, 'No files specified to stage')
@@ -110,9 +110,9 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'raises error with stderr message' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
+          stub_valid_git_repo(tool, dir)
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .with('git', 'add', '-A', chdir: dir)
             .and_return(['', 'fatal: pathspec error', failure_status])
 
@@ -126,44 +126,33 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'returns formatted commit output with branch and hash' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
-          stub_stage_all(dir)
-
-          allow(Open3).to receive(:capture3)
-            .with('git', 'commit', '-m', 'Add feature', chdir: dir)
-            .and_return(["[main abc1234] Add feature\n 1 file changed", '', success_status])
-
-          allow(Open3).to receive(:capture3)
-            .with('git', 'rev-parse', '--short', 'HEAD', chdir: dir)
-            .and_return(["abc1234\n", '', success_status])
-
-          allow(Open3).to receive(:capture3)
-            .with('git', 'branch', '--show-current', chdir: dir)
-            .and_return(["main\n", '', success_status])
+          stub_valid_git_repo(tool, dir)
+          stub_stage_all(tool, dir)
+          stub_successful_commit(tool, dir)
 
           result = tool.execute(message: 'Add feature')
 
           expect(result).to include('Committed on branch: main')
           expect(result).to include('Commit: abc1234')
-          expect(result).to include('[main abc1234] Add feature')
+          expect(result).to include('committed')
         end
       end
 
-      it 'handles detached HEAD' do
+      it 'handles detached HEAD state' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
-          stub_stage_all(dir)
+          stub_valid_git_repo(tool, dir)
+          stub_stage_all(tool, dir)
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .with('git', 'commit', '-m', 'detached commit', chdir: dir)
             .and_return(['committed', '', success_status])
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .with('git', 'rev-parse', '--short', 'HEAD', chdir: dir)
             .and_return(["def5678\n", '', success_status])
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .with('git', 'branch', '--show-current', chdir: dir)
             .and_return(['', '', success_status])
 
@@ -176,18 +165,18 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'handles missing commit hash gracefully' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
-          stub_stage_all(dir)
+          stub_valid_git_repo(tool, dir)
+          stub_stage_all(tool, dir)
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .with('git', 'commit', '-m', 'no hash', chdir: dir)
             .and_return(['committed', '', success_status])
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .with('git', 'rev-parse', '--short', 'HEAD', chdir: dir)
             .and_return(['', '', failure_status])
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .with('git', 'branch', '--show-current', chdir: dir)
             .and_return(["main\n", '', success_status])
 
@@ -203,10 +192,10 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'returns clean working tree message' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
-          stub_stage_all(dir)
+          stub_valid_git_repo(tool, dir)
+          stub_stage_all(tool, dir)
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .with('git', 'commit', '-m', 'empty', chdir: dir)
             .and_return(['', 'nothing to commit, working tree clean', failure_status])
 
@@ -221,10 +210,10 @@ RSpec.describe RubynCode::Tools::GitCommit do
       it 'raises error with stderr' do
         with_temp_project do |dir|
           tool = build_tool(dir)
-          stub_valid_git_repo(dir)
-          stub_stage_all(dir)
+          stub_valid_git_repo(tool, dir)
+          stub_stage_all(tool, dir)
 
-          allow(Open3).to receive(:capture3)
+          allow(tool).to receive(:safe_capture3)
             .with('git', 'commit', '-m', 'fail', chdir: dir)
             .and_return(['', 'permission denied', failure_status])
 
@@ -255,28 +244,28 @@ RSpec.describe RubynCode::Tools::GitCommit do
 
   private
 
-  def stub_valid_git_repo(dir)
-    allow(Open3).to receive(:capture3)
+  def stub_valid_git_repo(tool, dir)
+    allow(tool).to receive(:safe_capture3)
       .with('git', 'rev-parse', '--is-inside-work-tree', chdir: dir)
       .and_return(['true', '', success_status])
   end
 
-  def stub_stage_all(dir)
-    allow(Open3).to receive(:capture3)
+  def stub_stage_all(tool, dir)
+    allow(tool).to receive(:safe_capture3)
       .with('git', 'add', '-A', chdir: dir)
       .and_return(['', '', success_status])
   end
 
-  def stub_successful_commit(dir)
-    allow(Open3).to receive(:capture3)
+  def stub_successful_commit(tool, dir)
+    allow(tool).to receive(:safe_capture3)
       .with('git', 'commit', '-m', anything, chdir: dir)
       .and_return(['committed', '', success_status])
 
-    allow(Open3).to receive(:capture3)
+    allow(tool).to receive(:safe_capture3)
       .with('git', 'rev-parse', '--short', 'HEAD', chdir: dir)
       .and_return(["abc1234\n", '', success_status])
 
-    allow(Open3).to receive(:capture3)
+    allow(tool).to receive(:safe_capture3)
       .with('git', 'branch', '--show-current', chdir: dir)
       .and_return(["main\n", '', success_status])
   end

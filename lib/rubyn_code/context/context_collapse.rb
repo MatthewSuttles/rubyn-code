@@ -9,7 +9,7 @@ module RubynCode
     # Keeps the first message (initial user request), the most recent N exchanges,
     # and replaces everything in between with a "[earlier conversation snipped]" marker.
     module ContextCollapse
-      SNIP_MARKER = "[%d earlier messages snipped for context efficiency]"
+      SNIP_MARKER = '[%d earlier messages snipped for context efficiency]'
       CHARS_PER_TOKEN = 4
 
       # Returns a collapsed copy of messages if doing so brings the estimated
@@ -30,7 +30,7 @@ module RubynCode
 
         collapsed = [
           first,
-          { role: "user", content: format(SNIP_MARKER, snipped_count) },
+          { role: 'user', content: format(SNIP_MARKER, snipped_count) },
           *recent
         ]
 

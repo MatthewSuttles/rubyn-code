@@ -6,7 +6,7 @@ module RubynCode
     # (except the most recent N) with short placeholders to reduce token count
     # without losing conversational continuity.
     module MicroCompact
-      PLACEHOLDER_TEMPLATE = "[Previous: used %<tool_name>s]"
+      PLACEHOLDER_TEMPLATE = '[Previous: used %<tool_name>s]'
       MIN_CONTENT_LENGTH = 100
 
       # Mutates +messages+ in place, replacing old tool_result content with
@@ -32,7 +32,7 @@ module RubynCode
           tool_name = resolve_tool_name(block, tool_name_index)
           next if preserve_tools.include?(tool_name)
 
-          placeholder = format(PLACEHOLDER_TEMPLATE, tool_name: tool_name || "tool")
+          placeholder = format(PLACEHOLDER_TEMPLATE, tool_name: tool_name || 'tool')
           replace_content!(block, placeholder)
           compacted += 1
         end
@@ -48,7 +48,7 @@ module RubynCode
         refs = []
 
         messages.each do |msg|
-          next unless msg[:role] == "user" && msg[:content].is_a?(Array)
+          next unless msg[:role] == 'user' && msg[:content].is_a?(Array)
 
           msg[:content].each_with_index do |block, idx|
             next unless tool_result_block?(block)
@@ -68,12 +68,12 @@ module RubynCode
         index = {}
 
         messages.each do |msg|
-          next unless msg[:role] == "assistant" && msg[:content].is_a?(Array)
+          next unless msg[:role] == 'assistant' && msg[:content].is_a?(Array)
 
           msg[:content].each do |block|
             case block
             when Hash
-              index[block[:id] || block["id"]] = block[:name] || block["name"] if block_type(block) == "tool_use"
+              index[block[:id] || block['id']] = block[:name] || block['name'] if block_type(block) == 'tool_use'
             when LLM::ToolUseBlock
               index[block.id] = block.name
             end
@@ -86,7 +86,7 @@ module RubynCode
       def self.tool_result_block?(block)
         case block
         when Hash
-          block_type(block) == "tool_result"
+          block_type(block) == 'tool_result'
         when LLM::ToolResultBlock
           true
         else
@@ -95,13 +95,13 @@ module RubynCode
       end
 
       def self.block_type(hash)
-        hash[:type] || hash["type"]
+        hash[:type] || hash['type']
       end
 
       def self.extract_content(block)
         case block
         when Hash
-          val = block[:content] || block["content"]
+          val = block[:content] || block['content']
           val.is_a?(String) ? val : val.to_s
         when LLM::ToolResultBlock
           block.content.to_s
@@ -110,7 +110,7 @@ module RubynCode
 
       def self.resolve_tool_name(block, index)
         tool_use_id = case block
-                      when Hash then block[:tool_use_id] || block["tool_use_id"]
+                      when Hash then block[:tool_use_id] || block['tool_use_id']
                       when LLM::ToolResultBlock then block.tool_use_id
                       end
 
@@ -120,10 +120,10 @@ module RubynCode
       def self.replace_content!(block, placeholder)
         case block
         when Hash
-          key = block.key?(:content) ? :content : "content"
+          key = block.key?(:content) ? :content : 'content'
           block[key] = placeholder
         end
-        # Note: Data.define instances are frozen; for ToolResultBlock objects
+        # NOTE: Data.define instances are frozen; for ToolResultBlock objects
         # we rely on messages being stored as hashes in the conversation array.
       end
 

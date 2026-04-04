@@ -192,9 +192,8 @@ RSpec.describe RubynCode::Tools::SpawnTeammate do
           block.call
         end
 
-        # Suppress poll_inbox from looping
         tool = build_tool(dir)
-        allow(tool).to receive(:sleep)
+        allow(tool).to receive(:poll_inbox) # suppress infinite loop
         allow(RubynCode::Debug).to receive(:agent)
 
         tool.execute(name: 'filter_test', role: 'coder', prompt: 'Test')
@@ -223,7 +222,7 @@ RSpec.describe RubynCode::Tools::SpawnTeammate do
         end
 
         tool = build_tool(dir)
-        allow(tool).to receive(:sleep)
+        allow(tool).to receive(:poll_inbox)
         allow(RubynCode::Debug).to receive(:agent)
 
         tool.execute(name: 'recurse_test', role: 'coder', prompt: 'Try recursion')
@@ -253,7 +252,7 @@ RSpec.describe RubynCode::Tools::SpawnTeammate do
         )
 
         tool = build_tool(dir)
-        allow(tool).to receive(:sleep)
+        allow(tool).to receive(:poll_inbox)
         allow(RubynCode::Debug).to receive(:agent)
 
         tool.execute(name: 'error_test', role: 'coder', prompt: 'Read file')

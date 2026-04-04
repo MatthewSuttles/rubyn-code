@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "json"
-require "securerandom"
-require_relative "teammate"
+require 'json'
+require 'securerandom'
+require_relative 'teammate'
 
 module RubynCode
   module Teams
@@ -40,7 +40,7 @@ module RubynCode
             INSERT INTO teammates (id, name, role, persona, model, status, metadata, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           SQL
-          [id, name, role, persona, model, "idle", metadata_json, now]
+          [id, name, role, persona, model, 'idle', metadata_json, now]
         )
 
         Teammate.new(
@@ -49,7 +49,7 @@ module RubynCode
           role: role,
           persona: persona,
           model: model,
-          status: "idle",
+          status: 'idle',
           metadata: {},
           created_at: now
         )
@@ -59,7 +59,7 @@ module RubynCode
       #
       # @return [Array<Teammate>]
       def list
-        rows = @db.query("SELECT * FROM teammates ORDER BY created_at ASC").to_a
+        rows = @db.query('SELECT * FROM teammates ORDER BY created_at ASC').to_a
         rows.map { |row| row_to_teammate(row) }
       end
 
@@ -68,7 +68,7 @@ module RubynCode
       # @param name [String]
       # @return [Teammate, nil]
       def get(name)
-        rows = @db.query("SELECT * FROM teammates WHERE name = ? LIMIT 1", [name]).to_a
+        rows = @db.query('SELECT * FROM teammates WHERE name = ? LIMIT 1', [name]).to_a
         return nil if rows.empty?
 
         row_to_teammate(rows.first)
@@ -90,7 +90,7 @@ module RubynCode
         raise Error, "Teammate '#{name}' not found" unless teammate
 
         @db.execute(
-          "UPDATE teammates SET status = ? WHERE name = ?",
+          'UPDATE teammates SET status = ? WHERE name = ?',
           [status, name]
         )
       end
@@ -104,7 +104,7 @@ module RubynCode
         teammate = get(name)
         raise Error, "Teammate '#{name}' not found" unless teammate
 
-        @db.execute("DELETE FROM teammates WHERE name = ?", [name])
+        @db.execute('DELETE FROM teammates WHERE name = ?', [name])
       end
 
       # Returns all teammates with status "active".
@@ -112,8 +112,8 @@ module RubynCode
       # @return [Array<Teammate>]
       def active_teammates
         rows = @db.query(
-          "SELECT * FROM teammates WHERE status = ? ORDER BY created_at ASC",
-          ["active"]
+          'SELECT * FROM teammates WHERE status = ? ORDER BY created_at ASC',
+          ['active']
         ).to_a
         rows.map { |row| row_to_teammate(row) }
       end
@@ -125,17 +125,17 @@ module RubynCode
       # @param row [Hash]
       # @return [Teammate]
       def row_to_teammate(row)
-        metadata = parse_metadata(row["metadata"])
+        metadata = parse_metadata(row['metadata'])
 
         Teammate.new(
-          id: row["id"],
-          name: row["name"],
-          role: row["role"],
-          persona: row["persona"],
-          model: row["model"],
-          status: row["status"],
+          id: row['id'],
+          name: row['name'],
+          role: row['role'],
+          persona: row['persona'],
+          model: row['model'],
+          status: row['status'],
           metadata: metadata,
-          created_at: row["created_at"]
+          created_at: row['created_at']
         )
       end
 

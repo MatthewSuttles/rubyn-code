@@ -45,7 +45,7 @@ module RubynCode
           result = safe_call(hook, :pre_tool_use, context)
           next unless result.is_a?(Hash) && result[:deny]
 
-          return { deny: true, reason: result[:reason] || "Denied by hook" }
+          return { deny: true, reason: result[:reason] || 'Denied by hook' }
         end
 
         nil

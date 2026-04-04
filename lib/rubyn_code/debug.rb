@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "pastel"
+require 'pastel'
 
 module RubynCode
   module Debug
@@ -21,12 +21,10 @@ module RubynCode
       end
 
       def enabled?
-        @enabled || ENV["RUBYN_DEBUG"]
+        @enabled || ENV.fetch('RUBYN_DEBUG', nil)
       end
 
-      def output=(io)
-        @output = io
-      end
+      attr_writer :output
 
       # ── Core logging ──────────────────────────────────────────────
 
@@ -34,7 +32,7 @@ module RubynCode
         return unless enabled?
 
         timestamp = Time.now.strftime('%H:%M:%S.%L')
-        prefix = PASTEL.dim("[#{timestamp}]") + " " + PASTEL.send(color, "[#{tag}]")
+        prefix = "#{PASTEL.dim("[#{timestamp}]")} #{PASTEL.send(color, "[#{tag}]")}"
         @output.puts "#{prefix} #{message}"
       end
 

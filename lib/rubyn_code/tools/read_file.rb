@@ -1,17 +1,18 @@
 # frozen_string_literal: true
 
-require_relative "base"
-require_relative "registry"
+require_relative 'base'
+require_relative 'registry'
 
 module RubynCode
   module Tools
     class ReadFile < Base
-      TOOL_NAME = "read_file"
-      DESCRIPTION = "Reads a file from the filesystem. Returns file content with line numbers prepended."
+      TOOL_NAME = 'read_file'
+      DESCRIPTION = 'Reads a file from the filesystem. Returns file content with line numbers prepended.'
       PARAMETERS = {
-        path: { type: :string, required: true, description: "Path to the file to read (relative to project root or absolute)" },
-        offset: { type: :integer, required: false, description: "Line number to start reading from (1-based)" },
-        limit: { type: :integer, required: false, description: "Number of lines to read" }
+        path: { type: :string, required: true,
+                description: 'Path to the file to read (relative to project root or absolute)' },
+        offset: { type: :integer, required: false, description: 'Line number to start reading from (1-based)' },
+        limit: { type: :integer, required: false, description: 'Number of lines to read' }
       }.freeze
       RISK_LEVEL = :read
       REQUIRES_CONFIRMATION = false

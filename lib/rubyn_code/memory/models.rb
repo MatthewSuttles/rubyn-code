@@ -33,13 +33,13 @@ module RubynCode
       end
 
       # @return [Boolean]
-      def short? = tier == "short"
+      def short? = tier == 'short'
 
       # @return [Boolean]
-      def medium? = tier == "medium"
+      def medium? = tier == 'medium'
 
       # @return [Boolean]
-      def long? = tier == "long"
+      def long? = tier == 'long'
 
       # @return [Hash]
       def to_h

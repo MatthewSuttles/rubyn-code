@@ -38,7 +38,7 @@ module RubynCode
 
       private
 
-      def build_daemon # rubocop:disable Metrics/MethodLength
+      def build_daemon
         Autonomous::Daemon.new(
           agent_name: @daemon_opts[:agent_name],
           role: @daemon_opts[:role],
@@ -75,7 +75,7 @@ module RubynCode
 
       def ensure_home_dir!
         dir = Config::Defaults::HOME_DIR
-        FileUtils.mkdir_p(dir) unless Dir.exist?(dir)
+        FileUtils.mkdir_p(dir)
       end
 
       def ensure_auth!

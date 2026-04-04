@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "json"
+require 'json'
 
 module RubynCode
   module MCP
@@ -17,7 +17,7 @@ module RubynCode
     #     }
     #   }
     module Config
-      CONFIG_FILENAME = ".rubyn-code/mcp.json"
+      CONFIG_FILENAME = '.rubyn-code/mcp.json'
 
       ENV_VAR_PATTERN = /\$\{([^}]+)\}/
 
@@ -32,14 +32,14 @@ module RubynCode
 
           raw = File.read(config_path)
           data = JSON.parse(raw)
-          servers = data["mcpServers"] || {}
+          servers = data['mcpServers'] || {}
 
           servers.map do |name, server_def|
             {
               name: name,
-              command: server_def["command"],
-              args: Array(server_def["args"]),
-              env: expand_env(server_def["env"] || {})
+              command: server_def['command'],
+              args: Array(server_def['args']),
+              env: expand_env(server_def['env'] || {})
             }
           end
         rescue JSON::ParserError => e
@@ -73,7 +73,7 @@ module RubynCode
             env_name = ::Regexp.last_match(1)
             ENV.fetch(env_name) do
               warn "[MCP::Config] Environment variable #{env_name} is not set"
-              ""
+              ''
             end
           end
         end

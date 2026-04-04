@@ -3,15 +3,15 @@
 module RubynCode
   module LLM
     TextBlock = Data.define(:text) do
-      def type = "text"
+      def type = 'text'
     end
 
     ToolUseBlock = Data.define(:id, :name, :input) do
-      def type = "tool_use"
+      def type = 'tool_use'
     end
 
     ToolResultBlock = Data.define(:tool_use_id, :content, :is_error) do
-      def type = "tool_result"
+      def type = 'tool_result'
 
       def initialize(tool_use_id:, content:, is_error: false)
         super
@@ -26,15 +26,15 @@ module RubynCode
 
     Response = Data.define(:id, :content, :stop_reason, :usage) do
       def text
-        content.select { |b| b.type == "text" }.map(&:text).join
+        content.select { |b| b.type == 'text' }.map(&:text).join
       end
 
       def tool_calls
-        content.select { |b| b.type == "tool_use" }
+        content.select { |b| b.type == 'tool_use' }
       end
 
       def tool_use?
-        stop_reason == "tool_use"
+        stop_reason == 'tool_use'
       end
     end
 
@@ -50,13 +50,13 @@ module RubynCode
 
       def build_system_prompt(skills: [], instincts: [], project_path: Dir.pwd)
         skills_section = if skills.empty?
-                           ""
+                           ''
                          else
                            "## Available Skills\n#{skills.map { |s| "- #{s}" }.join("\n")}"
                          end
 
         instincts_section = if instincts.empty?
-                              ""
+                              ''
                             else
                               "## Learned Instincts\n#{instincts.map { |i| "- #{i}" }.join("\n")}"
                             end
@@ -85,14 +85,14 @@ module RubynCode
       def format_tool_results(results)
         content = results.map do |result|
           {
-            type: "tool_result",
+            type: 'tool_result',
             tool_use_id: result[:tool_use_id] || result[:id],
             content: result[:content].to_s,
             **(result[:is_error] ? { is_error: true } : {})
           }
         end
 
-        { role: "user", content: content }
+        { role: 'user', content: content }
       end
 
       private
@@ -101,17 +101,17 @@ module RubynCode
         blocks.map do |block|
           case block
           when TextBlock
-            { type: "text", text: block.text }
+            { type: 'text', text: block.text }
           when ToolUseBlock
-            { type: "tool_use", id: block.id, name: block.name, input: block.input }
+            { type: 'tool_use', id: block.id, name: block.name, input: block.input }
           when ToolResultBlock
-            hash = { type: "tool_result", tool_use_id: block.tool_use_id, content: block.content.to_s }
+            hash = { type: 'tool_result', tool_use_id: block.tool_use_id, content: block.content.to_s }
             hash[:is_error] = true if block.is_error
             hash
           when Hash
             block
           else
-            { type: "text", text: block.to_s }
+            { type: 'text', text: block.to_s }
           end
         end
       end

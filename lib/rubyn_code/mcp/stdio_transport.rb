@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "json"
-require "open3"
-require "timeout"
+require 'json'
+require 'open3'
+require 'timeout'
 
 module RubynCode
   module MCP
@@ -14,8 +14,11 @@ module RubynCode
     class StdioTransport
       DEFAULT_TIMEOUT = 30 # seconds
 
-      TransportError = Class.new(RubynCode::Error)
-      TimeoutError = Class.new(TransportError)
+      class TransportError < RubynCode::Error
+      end
+
+      class TimeoutError < TransportError
+      end
 
       # @param command [String] executable to spawn
       # @param args [Array<String>] arguments for the command
@@ -39,7 +42,7 @@ module RubynCode
       # @return [void]
       # @raise [TransportError] if the process fails to start
       def start!
-        raise TransportError, "Transport already started" if alive?
+        raise TransportError, 'Transport already started' if alive?
 
         @stdin, @stdout, @stderr, @wait_thread = Open3.popen3(@env, @command, *@args)
       rescue Errno::ENOENT => e
@@ -54,11 +57,11 @@ module RubynCode
       # @raise [TransportError] on protocol or server errors
       # @raise [TimeoutError] if the response is not received within the timeout
       def send_request(method, params = {})
-        raise TransportError, "Transport is not running" unless alive?
+        raise TransportError, 'Transport is not running' unless alive?
 
         id = next_request_id
         request = {
-          jsonrpc: "2.0",
+          jsonrpc: '2.0',
           id: id,
           method: method,
           params: params
@@ -74,10 +77,10 @@ module RubynCode
       # @param params [Hash] parameters for the notification
       # @return [void]
       def send_notification(method, params = {})
-        raise TransportError, "Transport is not running" unless alive?
+        raise TransportError, 'Transport is not running' unless alive?
 
         notification = {
-          jsonrpc: "2.0",
+          jsonrpc: '2.0',
           method: method,
           params: params
         }
@@ -92,7 +95,7 @@ module RubynCode
         return unless alive?
 
         begin
-          send_notification("notifications/cancelled")
+          send_notification('notifications/cancelled')
           @stdin&.close
         rescue IOError, Errno::EPIPE
           # Process may already be gone
@@ -138,7 +141,7 @@ module RubynCode
         Timeout.timeout(@timeout, TimeoutError, "MCP server did not respond within #{@timeout}s") do
           loop do
             line = @stdout.gets
-            raise TransportError, "MCP server closed stdout unexpectedly" if line.nil?
+            raise TransportError, 'MCP server closed stdout unexpectedly' if line.nil?
 
             line = line.strip
             next if line.empty?
@@ -147,17 +150,17 @@ module RubynCode
             next unless message
 
             # Skip notifications (no id field)
-            next unless message.key?("id")
+            next unless message.key?('id')
 
             # Skip responses for other requests
-            next unless message["id"] == expected_id
+            next unless message['id'] == expected_id
 
-            if message.key?("error")
-              err = message["error"]
+            if message.key?('error')
+              err = message['error']
               raise TransportError, "MCP error (#{err['code']}): #{err['message']}"
             end
 
-            return message["result"]
+            return message['result']
           end
         end
       end
@@ -172,9 +175,9 @@ module RubynCode
         return unless @wait_thread
 
         pid = @wait_thread.pid
-        Process.kill("TERM", pid)
+        Process.kill('TERM', pid)
         sleep(0.5)
-        Process.kill("KILL", pid) if @wait_thread.alive?
+        Process.kill('KILL', pid) if @wait_thread.alive?
       rescue Errno::ESRCH, Errno::EPERM
         # Process already gone or we lack permissions
       end

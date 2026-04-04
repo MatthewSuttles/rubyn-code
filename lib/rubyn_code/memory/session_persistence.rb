@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "securerandom"
-require "json"
+require 'securerandom'
+require 'json'
 
 module RubynCode
   module Memory
@@ -24,11 +24,11 @@ module RubynCode
       # @param metadata [Hash] arbitrary metadata
       # @return [void]
       def save_session(session_id:, project_path:, messages:, title: nil, model: nil, metadata: {})
-        now = Time.now.utc.strftime("%Y-%m-%d %H:%M:%S")
+        now = Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
         messages_json = JSON.generate(messages)
         meta_json = JSON.generate(metadata)
 
-        @db.execute(<<~SQL, [session_id, project_path, title, model, messages_json, "active", meta_json, now, now, messages_json, title, model, meta_json, now])
+        @db.execute(<<~SQL, [session_id, project_path, title, model, messages_json, 'active', meta_json, now, now, messages_json, title, model, meta_json, now])
           INSERT INTO sessions (id, project_path, title, model, messages, status, metadata, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
@@ -46,21 +46,21 @@ module RubynCode
       # @return [Hash, nil] { messages:, metadata:, title:, model:, status:, project_path: } or nil
       def load_session(session_id)
         rows = @db.query(
-          "SELECT * FROM sessions WHERE id = ?",
+          'SELECT * FROM sessions WHERE id = ?',
           [session_id]
         ).to_a
         return nil if rows.empty?
 
         row = rows.first
         {
-          messages: parse_json_array(row["messages"]),
-          metadata: parse_json_hash(row["metadata"]),
-          title: row["title"],
-          model: row["model"],
-          status: row["status"],
-          project_path: row["project_path"],
-          created_at: row["created_at"],
-          updated_at: row["updated_at"]
+          messages: parse_json_array(row['messages']),
+          metadata: parse_json_hash(row['metadata']),
+          title: row['title'],
+          model: row['model'],
+          status: row['status'],
+          project_path: row['project_path'],
+          created_at: row['created_at'],
+          updated_at: row['updated_at']
         }
       end
 
@@ -75,16 +75,16 @@ module RubynCode
         params = []
 
         if project_path
-          conditions << "project_path = ?"
+          conditions << 'project_path = ?'
           params << project_path
         end
 
         if status
-          conditions << "status = ?"
+          conditions << 'status = ?'
           params << status
         end
 
-        where_clause = conditions.empty? ? "" : "WHERE #{conditions.join(' AND ')}"
+        where_clause = conditions.empty? ? '' : "WHERE #{conditions.join(' AND ')}"
         params << limit
 
         rows = @db.query(<<~SQL, params).to_a
@@ -97,14 +97,14 @@ module RubynCode
 
         rows.map do |row|
           {
-            id: row["id"],
-            project_path: row["project_path"],
-            title: row["title"],
-            model: row["model"],
-            status: row["status"],
-            metadata: parse_json_hash(row["metadata"]),
-            created_at: row["created_at"],
-            updated_at: row["updated_at"]
+            id: row['id'],
+            project_path: row['project_path'],
+            title: row['title'],
+            model: row['model'],
+            status: row['status'],
+            metadata: parse_json_hash(row['metadata']),
+            created_at: row['created_at'],
+            updated_at: row['updated_at']
           }
         end
       end
@@ -123,27 +123,27 @@ module RubynCode
         attrs.each do |key, value|
           case key
           when :title
-            sets << "title = ?"
+            sets << 'title = ?'
             params << value
           when :status
-            sets << "status = ?"
+            sets << 'status = ?'
             params << value
           when :model
-            sets << "model = ?"
+            sets << 'model = ?'
             params << value
           when :metadata
-            sets << "metadata = ?"
+            sets << 'metadata = ?'
             params << JSON.generate(value)
           when :messages
-            sets << "messages = ?"
+            sets << 'messages = ?'
             params << JSON.generate(value)
           end
         end
 
         return if sets.empty?
 
-        sets << "updated_at = ?"
-        params << Time.now.utc.strftime("%Y-%m-%d %H:%M:%S")
+        sets << 'updated_at = ?'
+        params << Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
         params << session_id
 
         @db.execute("UPDATE sessions SET #{sets.join(', ')} WHERE id = ?", params)
@@ -154,7 +154,7 @@ module RubynCode
       # @param session_id [String]
       # @return [void]
       def delete_session(session_id)
-        @db.execute("DELETE FROM sessions WHERE id = ?", [session_id])
+        @db.execute('DELETE FROM sessions WHERE id = ?', [session_id])
       end
 
       private

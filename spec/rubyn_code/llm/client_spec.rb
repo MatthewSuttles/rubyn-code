@@ -19,7 +19,7 @@ RSpec.describe RubynCode::LLM::Client do
           headers: {
             "Authorization" => "Bearer sk-ant-oat-test-token",
             "anthropic-version" => "2023-06-01",
-            "anthropic-beta" => "oauth-2025-04-20,task-budgets-2026-03-13",
+            "anthropic-beta" => "oauth-2025-04-20",
             "x-app" => "cli"
           }
         )

@@ -81,17 +81,14 @@ module RubynCode
 
           if tool_calls.empty?
             if truncated?(response)
-              RubynCode::Debug.recovery("Text response truncated, entering recovery")
+              RubynCode::Debug.recovery('Text response truncated, entering recovery')
               response = recover_truncated_response(response)
             end
 
-            # Before returning, check if background jobs finished while we were thinking
-            drain_background_notifications
+            # If background jobs are running, wait for them instead of burning LLM calls
             if has_pending_background_jobs?
               @conversation.add_assistant_message(response_content(response))
-              @conversation.add_user_message(
-                "[system] Background jobs are still running. You may continue or wait for results."
-              )
+              wait_for_background_jobs
               next
             end
 
@@ -100,12 +97,10 @@ module RubynCode
           end
 
           # Tier 1: If a tool-use response was truncated, silently escalate and retry
-          if truncated?(response)
-            unless @max_tokens_override
-              RubynCode::Debug.recovery("Tier 1: Escalating max_tokens from #{Config::Defaults::CAPPED_MAX_OUTPUT_TOKENS} to #{Config::Defaults::ESCALATED_MAX_OUTPUT_TOKENS}")
-              @max_tokens_override = Config::Defaults::ESCALATED_MAX_OUTPUT_TOKENS
-              next
-            end
+          if truncated?(response) && !@max_tokens_override
+            RubynCode::Debug.recovery("Tier 1: Escalating max_tokens from #{Config::Defaults::CAPPED_MAX_OUTPUT_TOKENS} to #{Config::Defaults::ESCALATED_MAX_OUTPUT_TOKENS}")
+            @max_tokens_override = Config::Defaults::ESCALATED_MAX_OUTPUT_TOKENS
+            next
           end
 
           @conversation.add_assistant_message(get_content(response))
@@ -139,9 +134,7 @@ module RubynCode
         opts[:max_tokens] = @max_tokens_override if @max_tokens_override
 
         # Task budget: tell the model how many tokens remain for this task
-        if @task_budget_remaining
-          opts[:task_budget] = { total: TASK_BUDGET_TOTAL, remaining: @task_budget_remaining }
-        end
+        opts[:task_budget] = { total: TASK_BUDGET_TOTAL, remaining: @task_budget_remaining } if @task_budget_remaining
 
         response = @llm_client.chat(**opts)
 
@@ -152,17 +145,17 @@ module RubynCode
         response
       rescue LLM::Client::PromptTooLongError
         # 413: context too large — compact and retry once
-        RubynCode::Debug.recovery("413 prompt too long — running emergency compaction")
+        RubynCode::Debug.recovery('413 prompt too long — running emergency compaction')
         @context_manager.check_compaction!(@conversation)
 
-        response = @llm_client.chat(**opts.merge(messages: @conversation.to_api_format))
+        response = @llm_client.chat(**opts, messages: @conversation.to_api_format)
         @hook_runner.fire(:post_llm_call, response: response, conversation: @conversation)
         track_usage(response)
 
         response
       end
 
-      SYSTEM_PROMPT = <<~PROMPT.freeze
+      SYSTEM_PROMPT = <<~PROMPT
         You are Rubyn — a snarky but lovable AI coding assistant who lives and breathes Ruby.
         You're the kind of pair programmer who'll roast your colleague's `if/elsif/elsif/else` chain
         with a smirk, then immediately rewrite it as a beautiful `case/in` with pattern matching.
@@ -240,7 +233,7 @@ module RubynCode
         Categories: user_preference, project_convention, error_resolution, decision, code_pattern
       PROMPT
 
-      PLAN_MODE_PROMPT = <<~PLAN.freeze
+      PLAN_MODE_PROMPT = <<~PLAN
         ## 🧠 Plan Mode Active
 
         You are in PLAN MODE. This means:
@@ -290,7 +283,7 @@ module RubynCode
         deferred = deferred_tool_names
         unless deferred.empty?
           parts << "\n## Additional Tools Available"
-          parts << "These tools are available but not loaded yet. Just call them by name and they will work:"
+          parts << 'These tools are available but not loaded yet. Just call them by name and they will work:'
           parts << deferred.map { |n| "- #{n}" }.join("\n")
         end
 
@@ -298,49 +291,49 @@ module RubynCode
       end
 
       def deferred_tool_names
-        all_names = @tool_executor.tool_definitions.map { |t| t[:name] || t["name"] }
-        active_names = tool_definitions.map { |t| t[:name] || t["name"] }
+        all_names = @tool_executor.tool_definitions.map { |t| t[:name] || t['name'] }
+        active_names = tool_definitions.map { |t| t[:name] || t['name'] }
         all_names - active_names
       end
 
       def load_memories
-        return "" unless @project_root
+        return '' unless @project_root
 
         db = DB::Connection.instance
         search = Memory::Search.new(db, project_path: @project_root)
         recent = search.recent(limit: 20)
 
-        return "" if recent.empty?
+        return '' if recent.empty?
 
-        recent.map { |m|
-          category = m.respond_to?(:category) ? m.category : (m[:category] || m["category"])
-          content = m.respond_to?(:content) ? m.content : (m[:content] || m["content"])
+        recent.map do |m|
+          category = m.respond_to?(:category) ? m.category : (m[:category] || m['category'])
+          content = m.respond_to?(:content) ? m.content : (m[:content] || m['content'])
           "[#{category}] #{content}"
-        }.join("\n")
+        end.join("\n")
       rescue StandardError
-        ""
+        ''
       end
 
       def load_instincts
-        return "" unless @project_root
+        return '' unless @project_root
 
         db = DB::Connection.instance
         Learning::Injector.call(db: db, project_path: @project_root)
       rescue StandardError
-        ""
+        ''
       end
 
       # ── Instinct reinforcement ───────────────────────────────────
 
-      POSITIVE_PATTERNS = /\b(yes that fixed it|that worked|perfect|thanks|exactly|great|nailed it|that.s right|correct)\b/i.freeze
-      NEGATIVE_PATTERNS = /\b(no[, ]+use|wrong|that.s not right|instead use|don.t do that|actually[, ]+use|incorrect)\b/i.freeze
+      POSITIVE_PATTERNS = /\b(yes that fixed it|that worked|perfect|thanks|exactly|great|nailed it|that.s right|correct)\b/i
+      NEGATIVE_PATTERNS = /\b(no[, ]+use|wrong|that.s not right|instead use|don.t do that|actually[, ]+use|incorrect)\b/i
 
       def check_user_feedback(user_input)
         return unless @project_root
 
         db = DB::Connection.instance
         recent_instincts = db.query(
-          "SELECT id FROM instincts WHERE project_path = ? ORDER BY updated_at DESC LIMIT 5",
+          'SELECT id FROM instincts WHERE project_path = ? ORDER BY updated_at DESC LIMIT 5',
           [@project_root]
         ).to_a
 
@@ -348,11 +341,11 @@ module RubynCode
 
         if user_input.match?(POSITIVE_PATTERNS)
           recent_instincts.first(2).each do |row|
-            Learning::InstinctMethods.reinforce_in_db(row["id"], db, helpful: true)
+            Learning::InstinctMethods.reinforce_in_db(row['id'], db, helpful: true)
           end
         elsif user_input.match?(NEGATIVE_PATTERNS)
           recent_instincts.first(2).each do |row|
-            Learning::InstinctMethods.reinforce_in_db(row["id"], db, helpful: false)
+            Learning::InstinctMethods.reinforce_in_db(row['id'], db, helpful: false)
           end
         end
       rescue StandardError
@@ -375,31 +368,32 @@ module RubynCode
           INSTRUCTION_FILES.each do |name|
             collect_instruction(File.join(@project_root, name), found)
           end
-          collect_instruction(File.join(@project_root, ".rubyn-code", "RUBYN.md"), found)
+          collect_instruction(File.join(@project_root, '.rubyn-code', 'RUBYN.md'), found)
 
           # One level of child directories
           INSTRUCTION_FILES.each do |name|
-            Dir.glob(File.join(@project_root, "*", name)).each do |path|
+            Dir.glob(File.join(@project_root, '*', name)).each do |path|
               collect_instruction(path, found)
             end
           end
         end
 
         # User global
-        collect_instruction(File.join(Config::Defaults::HOME_DIR, "RUBYN.md"), found)
+        collect_instruction(File.join(Config::Defaults::HOME_DIR, 'RUBYN.md'), found)
 
         found.uniq.join("\n\n")
       end
 
       def walk_up_for_instructions(start_dir, found)
         dir = File.dirname(start_dir)
-        home = File.expand_path("~")
+        home = File.expand_path('~')
 
         while dir.length >= home.length
           INSTRUCTION_FILES.each do |name|
             collect_instruction(File.join(dir, name), found)
           end
           break if dir == home
+
           dir = File.dirname(dir)
         end
       end
@@ -407,8 +401,8 @@ module RubynCode
       def collect_instruction(path, found)
         return unless File.exist?(path) && File.file?(path)
 
-        content = File.read(path, encoding: "utf-8")
-                      .encode("UTF-8", invalid: :replace, undef: :replace, replace: "")
+        content = File.read(path, encoding: 'utf-8')
+                      .encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
                       .strip
         return if content.empty?
 
@@ -427,10 +421,10 @@ module RubynCode
 
         @discovered_tools ||= Set.new
 
-        all_tools.select { |t|
-          name = t[:name] || t["name"]
+        all_tools.select do |t|
+          name = t[:name] || t['name']
           CORE_TOOLS.include?(name) || @discovered_tools.include?(name)
-        }
+        end
       end
 
       def discover_tool(name)
@@ -440,8 +434,28 @@ module RubynCode
 
       def read_only_tool_definitions
         Tools::Registry.all
-                        .select { |t| PLAN_MODE_RISK_LEVELS.include?(t::RISK_LEVEL) }
-                        .map(&:to_schema)
+                       .select { |t| PLAN_MODE_RISK_LEVELS.include?(t::RISK_LEVEL) }
+                       .map(&:to_schema)
+      end
+
+      # ── Background job waiting ────────────────────────────────────────
+
+      def wait_for_background_jobs
+        max_wait = 300 # 5 minutes max
+        poll_interval = 3
+
+        RubynCode::Debug.agent("Waiting for background jobs to finish (polling every #{poll_interval}s, max #{max_wait}s)")
+
+        elapsed = 0
+        while elapsed < max_wait && has_pending_background_jobs?
+          sleep poll_interval
+          elapsed += poll_interval
+          drain_background_notifications
+        end
+
+        # Final drain to pick up any last results
+        drain_background_notifications
+        RubynCode::Debug.agent("Background wait done (#{elapsed}s)")
       end
 
       # ── Tool processing ──────────────────────────────────────────────
@@ -462,7 +476,11 @@ module RubynCode
             deny_list: @deny_list
           )
 
-          @on_tool_call&.call(tool_name, tool_input) rescue nil
+          begin
+            @on_tool_call&.call(tool_name, tool_input)
+          rescue StandardError
+            nil
+          end
 
           result, is_error = execute_with_permission(decision, tool_name, tool_input, tool_id)
 
@@ -470,11 +488,16 @@ module RubynCode
           aggregate_chars += result.to_s.length
           if aggregate_chars > budget
             remaining = [budget - (aggregate_chars - result.to_s.length), 500].max
-            result = "#{result.to_s[0, remaining]}\n\n[truncated — tool result budget exceeded (#{budget} chars/message)]"
+            result = "#{result.to_s[0,
+                                    remaining]}\n\n[truncated — tool result budget exceeded (#{budget} chars/message)]"
             RubynCode::Debug.token("Tool result budget exceeded: #{aggregate_chars}/#{budget} chars")
           end
 
-          @on_tool_result&.call(tool_name, result, is_error) rescue nil
+          begin
+            @on_tool_result&.call(tool_name, result, is_error)
+          rescue StandardError
+            nil
+          end
 
           @stall_detector.record(tool_name, tool_input)
           # CRITICAL: always add tool_result to conversation — without this the
@@ -483,7 +506,7 @@ module RubynCode
         end
       end
 
-      def execute_with_permission(decision, tool_name, tool_input, tool_id)
+      def execute_with_permission(decision, tool_name, tool_input, _tool_id)
         case decision
         when :deny
           ["Tool '#{tool_name}' is blocked by the deny list.", true]
@@ -533,7 +556,7 @@ module RubynCode
 
       # ── Maintenance ──────────────────────────────────────────────────
 
-      def run_maintenance(iteration)
+      def run_maintenance(_iteration)
         run_compaction
         check_budget
         check_stall_detection
@@ -588,7 +611,7 @@ module RubynCode
       def has_pending_background_jobs?
         return false unless @background_manager
 
-        @background_manager.active_count > 0
+        @background_manager.active_count.positive?
       rescue NoMethodError
         false
       end
@@ -616,9 +639,9 @@ module RubynCode
         reason = if response.respond_to?(:stop_reason)
                    response.stop_reason
                  elsif response.is_a?(Hash)
-                   response[:stop_reason] || response["stop_reason"]
+                   response[:stop_reason] || response['stop_reason']
                  end
-        reason == "max_tokens"
+        reason == 'max_tokens'
       end
 
       def recover_truncated_response(response)
@@ -633,8 +656,8 @@ module RubynCode
           RubynCode::Debug.recovery("Tier 2: Recovery attempt #{attempt + 1}/#{max_retries}")
 
           @conversation.add_user_message(
-            "Output token limit hit. Resume directly — no apology, no recap, " \
-            "just continue exactly where you left off."
+            'Output token limit hit. Resume directly — no apology, no recap, ' \
+            'just continue exactly where you left off.'
           )
 
           response = call_llm
@@ -658,7 +681,7 @@ module RubynCode
       # ── Response helpers ─────────────────────────────────────────────
 
       def extract_tool_calls(response)
-        get_content(response).select { |block| block_type(block) == "tool_use" }
+        get_content(response).select { |block| block_type(block) == 'tool_use' }
       end
 
       def response_content(response)
@@ -667,8 +690,8 @@ module RubynCode
 
       def extract_response_text(response)
         blocks = get_content(response)
-        blocks.select { |b| block_type(b) == "text" }
-              .map { |b| b.respond_to?(:text) ? b.text : (b[:text] || b["text"]) }
+        blocks.select { |b| block_type(b) == 'text' }
+              .map { |b| b.respond_to?(:text) ? b.text : (b[:text] || b['text']) }
               .compact.join("\n")
       end
 
@@ -677,7 +700,7 @@ module RubynCode
         when ->(r) { r.respond_to?(:content) }
           Array(response.content)
         when Hash
-          Array(response[:content] || response["content"])
+          Array(response[:content] || response['content'])
         else
           []
         end
@@ -687,7 +710,7 @@ module RubynCode
         if block.respond_to?(:type)
           block.type.to_s
         elsif block.is_a?(Hash)
-          (block[:type] || block["type"]).to_s
+          (block[:type] || block['type']).to_s
         end
       end
 
@@ -695,7 +718,7 @@ module RubynCode
         usage = if response.respond_to?(:usage)
                   response.usage
                 elsif response.is_a?(Hash)
-                  response[:usage] || response["usage"]
+                  response[:usage] || response['usage']
                 end
         return unless usage
 
@@ -703,7 +726,7 @@ module RubynCode
         output_tokens = usage.respond_to?(:output_tokens) ? usage.output_tokens : usage[:output_tokens]
         cache_create = usage.respond_to?(:cache_creation_input_tokens) ? usage.cache_creation_input_tokens.to_i : 0
         cache_read = usage.respond_to?(:cache_read_input_tokens) ? usage.cache_read_input_tokens.to_i : 0
-        cache_info = cache_create > 0 || cache_read > 0 ? " cache_create=#{cache_create} cache_read=#{cache_read}" : ""
+        cache_info = cache_create.positive? || cache_read.positive? ? " cache_create=#{cache_create} cache_read=#{cache_read}" : ''
         RubynCode::Debug.token("in=#{input_tokens} out=#{output_tokens}#{cache_info}")
 
         @context_manager.track_usage(usage)
@@ -727,9 +750,9 @@ module RubynCode
 
       def max_iterations_warning
         warning = "Reached maximum iteration limit (#{MAX_ITERATIONS}). " \
-                  "The conversation may be incomplete. Please review the current state " \
-                  "and continue if needed."
-        @conversation.add_assistant_message([{ type: "text", text: warning }])
+                  'The conversation may be incomplete. Please review the current state ' \
+                  'and continue if needed.'
+        @conversation.add_assistant_message([{ type: 'text', text: warning }])
         warning
       end
 

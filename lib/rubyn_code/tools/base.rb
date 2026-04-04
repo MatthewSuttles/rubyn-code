@@ -3,8 +3,8 @@
 module RubynCode
   module Tools
     class Base
-      TOOL_NAME = ""
-      DESCRIPTION = ""
+      TOOL_NAME = ''
+      DESCRIPTION = ''
       PARAMETERS = {}.freeze
       RISK_LEVEL = :read
       REQUIRES_CONFIRMATION = false
@@ -75,26 +75,50 @@ module RubynCode
       # Safe replacement for Open3.capture3 that avoids Ruby 4.0's IOError
       # when threads race on stream closure. All tools should use this instead
       # of Open3.capture3 directly.
-      def safe_capture3(*cmd, chdir: project_root, timeout: 120, **opts)
-        stdin, stdout_io, stderr_io, wait_thr = Open3.popen3(*cmd, chdir: chdir, **opts)
+      def safe_capture3(*cmd, chdir: project_root, timeout: 120, **)
+        stdin, stdout_io, stderr_io, wait_thr = Open3.popen3(*cmd, chdir: chdir, **)
         stdin.close
 
-        stdout = +""
-        stderr = +""
+        stdout = +''
+        stderr = +''
 
-        out_reader = Thread.new { stdout << stdout_io.read rescue nil }
-        err_reader = Thread.new { stderr << stderr_io.read rescue nil }
+        out_reader = Thread.new do
+          stdout << stdout_io.read
+        rescue StandardError
+          nil
+        end
+        err_reader = Thread.new do
+          stderr << stderr_io.read
+        rescue StandardError
+          nil
+        end
 
+        timed_out = false
         unless wait_thr.join(timeout)
-          Process.kill("TERM", wait_thr.pid) rescue nil
+          timed_out = true
+          begin
+            Process.kill('TERM', wait_thr.pid)
+          rescue StandardError
+            nil
+          end
           sleep 0.1
-          Process.kill("KILL", wait_thr.pid) rescue nil
+          begin
+            Process.kill('KILL', wait_thr.pid)
+          rescue StandardError
+            nil
+          end
           wait_thr.join(5)
         end
 
         out_reader.join(5)
         err_reader.join(5)
-        [stdout_io, stderr_io].each { |io| io.close rescue nil }
+        [stdout_io, stderr_io].each do |io|
+          io.close
+        rescue StandardError
+          nil
+        end
+
+        raise Error, "Command timed out after #{timeout}s" if timed_out
 
         [stdout, stderr, wait_thr.value]
       end

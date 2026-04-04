@@ -49,9 +49,7 @@ module RubynCode
         args = parts[1]&.split(/\s+/) || []
 
         # Quick exit for /quit and friends
-        if SLASH_COMMANDS[cmd] == :quit
-          return Command.new(action: :quit, args: [])
-        end
+        return Command.new(action: :quit, args: []) if SLASH_COMMANDS[cmd] == :quit
 
         # Dispatch through registry if available
         if @command_registry&.known?(cmd)

@@ -1,15 +1,16 @@
 # frozen_string_literal: true
 
-require "webrick"
-require "uri"
+require 'webrick'
+require 'uri'
 
 module RubynCode
   module Auth
     class Server
-      LISTEN_HOST = "127.0.0.1"
+      LISTEN_HOST = '127.0.0.1'
       LISTEN_PORT = 19_275
 
-      CallbackTimeout = Class.new(RubynCode::AuthenticationError)
+      class CallbackTimeout < RubynCode::AuthenticationError
+      end
 
       def initialize
         @result = nil
@@ -46,7 +47,7 @@ module RubynCode
           AccessLog: access_log
         )
 
-        server.mount_proc("/callback") do |req, res|
+        server.mount_proc('/callback') do |req, res|
           handle_callback(req, res, server)
         end
 
@@ -55,8 +56,8 @@ module RubynCode
 
       def handle_callback(req, res, server)
         params = parse_query(req.query_string)
-        code = params["code"]
-        state = params["state"]
+        code = params['code']
+        state = params['state']
 
         if code
           @mutex.synchronize do
@@ -65,14 +66,14 @@ module RubynCode
           end
 
           res.status = 200
-          res.content_type = "text/html; charset=utf-8"
+          res.content_type = 'text/html; charset=utf-8'
           res.body = success_html
         else
-          error = params["error"] || "unknown"
-          description = params["error_description"] || "No authorization code received"
+          error = params['error'] || 'unknown'
+          description = params['error_description'] || 'No authorization code received'
 
           res.status = 400
-          res.content_type = "text/html; charset=utf-8"
+          res.content_type = 'text/html; charset=utf-8'
           res.body = error_html(error, description)
 
           @mutex.synchronize do
@@ -80,7 +81,10 @@ module RubynCode
           end
         end
 
-        Thread.new { sleep(0.5); server.shutdown }
+        Thread.new do
+          sleep(0.5)
+          server.shutdown
+        end
       end
 
       def parse_query(query_string)

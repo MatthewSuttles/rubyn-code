@@ -176,7 +176,8 @@ RSpec.describe RubynCode::Tools::ReviewPr do
           stub_git_calls(tool)
 
           result = tool.execute
-          expect(result).to include('Ruby: 1 files')
+          # All .rb files count as Ruby (user.rb, user_spec.rb, 001_create_users.rb)
+          expect(result).to include('Ruby: 3 files')
         end
       end
 

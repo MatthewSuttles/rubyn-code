@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "tty-prompt"
-require "tty-reader"
-require "pastel"
+require 'tty-prompt'
+require 'tty-reader'
+require 'pastel'
 
 module RubynCode
   module Protocols
@@ -25,10 +25,10 @@ module RubynCode
           tty = build_prompt
 
           $stdout.puts
-          $stdout.puts pastel.cyan.bold("Proposed Plan")
-          $stdout.puts pastel.cyan("=" * 60)
+          $stdout.puts pastel.cyan.bold('Proposed Plan')
+          $stdout.puts pastel.cyan('=' * 60)
           $stdout.puts plan_text
-          $stdout.puts pastel.cyan("=" * 60)
+          $stdout.puts pastel.cyan('=' * 60)
           $stdout.puts
 
           if prompt
@@ -37,15 +37,15 @@ module RubynCode
           end
 
           approved = tty.yes?(
-            pastel.yellow.bold("Do you approve this plan?"),
+            pastel.yellow.bold('Do you approve this plan?'),
             default: false
           )
 
           if approved
-            $stdout.puts pastel.green("Plan approved.")
+            $stdout.puts pastel.green('Plan approved.')
             APPROVED
           else
-            $stdout.puts pastel.red("Plan rejected.")
+            $stdout.puts pastel.red('Plan rejected.')
             REJECTED
           end
         rescue TTY::Reader::InputInterrupt

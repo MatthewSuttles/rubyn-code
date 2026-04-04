@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "faraday"
-require "json"
-require "uri"
+require 'faraday'
+require 'json'
+require 'uri'
 
 module RubynCode
   module MCP
@@ -15,8 +15,11 @@ module RubynCode
     class SSETransport
       DEFAULT_TIMEOUT = 30 # seconds
 
-      TransportError = Class.new(RubynCode::Error)
-      TimeoutError = Class.new(TransportError)
+      class TransportError < RubynCode::Error
+      end
+
+      class TimeoutError < TransportError
+      end
 
       # @param url [String] the SSE endpoint URL of the MCP server
       # @param timeout [Integer] default timeout in seconds per request
@@ -36,7 +39,7 @@ module RubynCode
       # @return [void]
       # @raise [TransportError] if the connection cannot be established
       def start!
-        raise TransportError, "Transport already started" if @connected
+        raise TransportError, 'Transport already started' if @connected
 
         @pending_responses = {}
         @sse_thread = Thread.new { run_sse_listener }
@@ -61,14 +64,14 @@ module RubynCode
       # @raise [TransportError] on protocol or server errors
       # @raise [TimeoutError] if the response is not received in time
       def send_request(method, params = {})
-        raise TransportError, "Transport is not connected" unless @connected
+        raise TransportError, 'Transport is not connected' unless @connected
 
         id = next_request_id
         queue = Queue.new
         @mutex.synchronize { @pending_responses[id] = queue }
 
         request = {
-          jsonrpc: "2.0",
+          jsonrpc: '2.0',
           id: id,
           method: method,
           params: params
@@ -111,7 +114,7 @@ module RubynCode
         @connection ||= Faraday.new(url: base_url) do |f|
           f.options.timeout = @timeout
           f.options.open_timeout = @timeout
-          f.headers["Content-Type"] = "application/json"
+          f.headers['Content-Type'] = 'application/json'
           f.adapter Faraday.default_adapter
         end
       end
@@ -121,9 +124,7 @@ module RubynCode
           req.body = JSON.generate(request)
         end
 
-        unless response.success?
-          raise TransportError, "MCP server returned HTTP #{response.status}: #{response.body}"
-        end
+        raise TransportError, "MCP server returned HTTP #{response.status}: #{response.body}" unless response.success?
       rescue Faraday::Error => e
         raise TransportError, "Failed to send request to MCP server: #{e.message}"
       end
@@ -138,8 +139,8 @@ module RubynCode
           @mutex.synchronize { @pending_responses.delete(id) }
         end
 
-        if result.is_a?(Hash) && result.key?("error")
-          err = result["error"]
+        if result.is_a?(Hash) && result.key?('error')
+          err = result['error']
           raise TransportError, "MCP error (#{err['code']}): #{err['message']}"
         end
 
@@ -150,11 +151,11 @@ module RubynCode
         sse_connection = Faraday.new(url: base_url) do |f|
           f.options.timeout = nil # Keep-alive
           f.options.open_timeout = @timeout
-          f.headers["Accept"] = "text/event-stream"
+          f.headers['Accept'] = 'text/event-stream'
           f.adapter Faraday.default_adapter
         end
 
-        buffer = +""
+        buffer = +''
 
         sse_connection.get(@url) do |req|
           req.options.on_data = proc do |chunk, _bytes, _env|
@@ -181,10 +182,10 @@ module RubynCode
 
         raw.each_line do |line|
           line = line.chomp
-          if line.start_with?("event:")
-            event_type = line.sub("event:", "").strip
-          elsif line.start_with?("data:")
-            data_lines << line.sub("data:", "").strip
+          if line.start_with?('event:')
+            event_type = line.sub('event:', '').strip
+          elsif line.start_with?('data:')
+            data_lines << line.sub('data:', '').strip
           end
         end
 
@@ -195,9 +196,9 @@ module RubynCode
 
       def handle_sse_event(event)
         case event[:type]
-        when "endpoint"
+        when 'endpoint'
           @post_endpoint = event[:data]
-        when "message"
+        when 'message'
           dispatch_message(event[:data])
         else
           dispatch_message(event[:data])
@@ -206,16 +207,16 @@ module RubynCode
 
       def dispatch_message(data)
         message = JSON.parse(data)
-        return unless message.is_a?(Hash) && message.key?("id")
+        return unless message.is_a?(Hash) && message.key?('id')
 
-        id = message["id"]
+        id = message['id']
         queue = @mutex.synchronize { @pending_responses[id] }
         return unless queue
 
-        if message.key?("error")
+        if message.key?('error')
           queue.push(message)
         else
-          queue.push(message["result"])
+          queue.push(message['result'])
         end
       rescue JSON::ParserError
         # Ignore malformed messages

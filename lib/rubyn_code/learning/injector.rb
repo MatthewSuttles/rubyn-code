@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
-require "json"
-require "time"
-require "set"
+require 'json'
+require 'time'
 
 module RubynCode
   module Learning
@@ -15,7 +14,7 @@ module RubynCode
       # Default maximum number of instincts to inject.
       DEFAULT_MAX_INSTINCTS = 10
 
-      INSTINCTS_TABLE = "instincts"
+      INSTINCTS_TABLE = 'instincts'
 
       class << self
         # Queries and formats relevant instincts for system prompt injection.
@@ -27,7 +26,7 @@ module RubynCode
         # @return [String] formatted instincts block, or empty string if none found
         def call(db:, project_path:, context_tags: [], max_instincts: DEFAULT_MAX_INSTINCTS)
           rows = fetch_instincts(db, project_path)
-          return "" if rows.empty?
+          return '' if rows.empty?
 
           instincts = rows.map { |row| row_to_instinct(row) }
 
@@ -46,7 +45,7 @@ module RubynCode
                       .sort_by { |inst| -inst.confidence }
                       .first(max_instincts)
 
-          return "" if instincts.empty?
+          return '' if instincts.empty?
 
           format_instincts(instincts)
         end
@@ -65,16 +64,16 @@ module RubynCode
 
         def row_to_instinct(row)
           Instinct.new(
-            id: row["id"],
-            project_path: row["project_path"],
-            pattern: row["pattern"],
-            context_tags: parse_tags(row["context_tags"]),
-            confidence: row["confidence"].to_f,
-            decay_rate: row["decay_rate"].to_f,
-            times_applied: row["times_applied"].to_i,
-            times_helpful: row["times_helpful"].to_i,
-            created_at: parse_time(row["created_at"]),
-            updated_at: parse_time(row["updated_at"])
+            id: row['id'],
+            project_path: row['project_path'],
+            pattern: row['pattern'],
+            context_tags: parse_tags(row['context_tags']),
+            confidence: row['confidence'].to_f,
+            decay_rate: row['decay_rate'].to_f,
+            times_applied: row['times_applied'].to_i,
+            times_helpful: row['times_helpful'].to_i,
+            created_at: parse_time(row['created_at']),
+            updated_at: parse_time(row['updated_at'])
           )
         end
 
@@ -84,7 +83,7 @@ module RubynCode
             begin
               JSON.parse(tags)
             rescue JSON::ParserError
-              tags.split(",").map(&:strip)
+              tags.split(',').map(&:strip)
             end
           when Array
             tags
@@ -111,7 +110,7 @@ module RubynCode
         # @param tags [Array<String>] required context tags
         # @return [Array<Instinct>] filtered instincts
         def filter_by_tags(instincts, tags)
-          tag_set = tags.map(&:downcase).to_set
+          tag_set = tags.to_set(&:downcase)
 
           instincts.select do |inst|
             inst_tags = inst.context_tags.map(&:downcase)

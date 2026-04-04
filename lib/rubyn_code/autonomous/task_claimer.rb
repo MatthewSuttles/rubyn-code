@@ -66,20 +66,20 @@ module RubynCode
         # @param row [Hash] a database row hash
         # @return [Tasks::Task]
         def build_task(row)
-          metadata = parse_json(row["metadata"])
+          metadata = parse_json(row['metadata'])
 
           Tasks::Task.new(
-            id: row["id"],
-            session_id: row["session_id"],
-            title: row["title"],
-            description: row["description"],
-            status: row["status"],
-            priority: row["priority"].to_i,
-            owner: row["owner"],
-            result: row["result"],
+            id: row['id'],
+            session_id: row['session_id'],
+            title: row['title'],
+            description: row['description'],
+            status: row['status'],
+            priority: row['priority'].to_i,
+            owner: row['owner'],
+            result: row['result'],
             metadata: metadata,
-            created_at: row["created_at"],
-            updated_at: row["updated_at"]
+            created_at: row['created_at'],
+            updated_at: row['updated_at']
           )
         end
 

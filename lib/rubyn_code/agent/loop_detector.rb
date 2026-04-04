@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "digest"
+require 'digest'
 
 module RubynCode
   module Agent
@@ -49,9 +49,9 @@ module RubynCode
       #
       # @return [String]
       def nudge_message
-        "You appear to be repeating the same tool call without making progress. " \
-          "Please try a different approach, use a different tool, or ask the user " \
-          "for clarification. Do not repeat the same action."
+        'You appear to be repeating the same tool call without making progress. ' \
+          'Please try a different approach, use a different tool, or ask the user ' \
+          'for clarification. Do not repeat the same action.'
       end
 
       private
@@ -60,7 +60,7 @@ module RubynCode
         input_str = case tool_input
                     when Hash   then stable_hash(tool_input)
                     when String then tool_input
-                    else ""
+                    else ''
                     end
 
         "#{tool_name}:#{Digest::SHA256.hexdigest(input_str)[0, 16]}"
@@ -71,7 +71,7 @@ module RubynCode
       def stable_hash(hash)
         hash.sort_by { |k, _| k.to_s }
             .map { |k, v| "#{k}=#{v}" }
-            .join("&")
+            .join('&')
       end
     end
   end

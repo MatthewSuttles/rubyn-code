@@ -1,20 +1,21 @@
 # frozen_string_literal: true
 
-require_relative "base"
-require_relative "registry"
+require_relative 'base'
+require_relative 'registry'
 
 module RubynCode
   module Tools
     class MemorySearch < Base
-      TOOL_NAME = "memory_search"
-      DESCRIPTION = "Searches project memories using full-text search. " \
-                    "Returns relevant memories including code patterns, user preferences, " \
-                    "project conventions, error resolutions, and past decisions."
+      TOOL_NAME = 'memory_search'
+      DESCRIPTION = 'Searches project memories using full-text search. ' \
+                    'Returns relevant memories including code patterns, user preferences, ' \
+                    'project conventions, error resolutions, and past decisions.'
       PARAMETERS = {
-        query: { type: :string, required: true, description: "Search query for finding relevant memories" },
-        tier: { type: :string, required: false, description: "Filter by memory tier: short, medium, or long" },
-        category: { type: :string, required: false, description: "Filter by category: code_pattern, user_preference, project_convention, error_resolution, or decision" },
-        limit: { type: :integer, required: false, description: "Maximum number of results to return (default 10)" }
+        query: { type: :string, required: true, description: 'Search query for finding relevant memories' },
+        tier: { type: :string, required: false, description: 'Filter by memory tier: short, medium, or long' },
+        category: { type: :string, required: false,
+                    description: 'Filter by category: code_pattern, user_preference, project_convention, error_resolution, or decision' },
+        limit: { type: :integer, required: false, description: 'Maximum number of results to return (default 10)' }
       }.freeze
       RISK_LEVEL = :read
       REQUIRES_CONFIRMATION = false
@@ -55,9 +56,9 @@ module RubynCode
           lines << "Tier: #{record.tier} | Category: #{record.category || 'none'}"
           lines << "Relevance: #{format('%.2f', record.relevance_score)} | Accessed: #{record.access_count} times"
           lines << "Created: #{record.created_at}"
-          lines << ""
+          lines << ''
           lines << record.content
-          lines << ""
+          lines << ''
         end
 
         lines.join("\n")

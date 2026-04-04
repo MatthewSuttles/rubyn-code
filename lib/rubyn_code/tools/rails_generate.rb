@@ -1,17 +1,19 @@
 # frozen_string_literal: true
 
-require "open3"
-require_relative "base"
-require_relative "registry"
+require 'open3'
+require_relative 'base'
+require_relative 'registry'
 
 module RubynCode
   module Tools
     class RailsGenerate < Base
-      TOOL_NAME = "rails_generate"
-      DESCRIPTION = "Runs a Rails generator command. Validates that the project is a Rails application."
+      TOOL_NAME = 'rails_generate'
+      DESCRIPTION = 'Runs a Rails generator command. Validates that the project is a Rails application.'
       PARAMETERS = {
-        generator: { type: :string, required: true, description: "Generator name (e.g. 'model', 'controller', 'migration')" },
-        args: { type: :string, required: true, description: "Arguments for the generator (e.g. 'User name:string email:string')" }
+        generator: { type: :string, required: true,
+                     description: "Generator name (e.g. 'model', 'controller', 'migration')" },
+        args: { type: :string, required: true,
+                description: "Arguments for the generator (e.g. 'User name:string email:string')" }
       }.freeze
       RISK_LEVEL = :execute
       REQUIRES_CONFIRMATION = false
@@ -28,16 +30,14 @@ module RubynCode
       private
 
       def validate_rails_project!
-        gemfile_path = File.join(project_root, "Gemfile")
+        gemfile_path = File.join(project_root, 'Gemfile')
 
-        unless File.exist?(gemfile_path)
-          raise Error, "No Gemfile found. This does not appear to be a Ruby project."
-        end
+        raise Error, 'No Gemfile found. This does not appear to be a Ruby project.' unless File.exist?(gemfile_path)
 
         gemfile_content = File.read(gemfile_path)
-        unless gemfile_content.match?(/['"]rails['"]/)
-          raise Error, "Gemfile does not include Rails. This does not appear to be a Rails project."
-        end
+        return if gemfile_content.match?(/['"]rails['"]/)
+
+        raise Error, 'Gemfile does not include Rails. This does not appear to be a Rails project.'
       end
 
       def build_output(stdout, stderr, status)
@@ -45,7 +45,7 @@ module RubynCode
         parts << stdout unless stdout.empty?
         parts << "STDERR:\n#{stderr}" unless stderr.empty?
         parts << "Exit code: #{status.exitstatus}" unless status.success?
-        parts.empty? ? "(no output)" : parts.join("\n")
+        parts.empty? ? '(no output)' : parts.join("\n")
       end
     end
 

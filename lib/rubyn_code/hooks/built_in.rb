@@ -22,14 +22,14 @@ module RubynCode
         def call(response:, **_kwargs)
           return unless @budget_enforcer
 
-          usage = response[:usage] || response["usage"]
+          usage = response[:usage] || response['usage']
           return unless usage
 
-          model          = response[:model] || response["model"] || "unknown"
-          input_tokens   = usage[:input_tokens] || usage["input_tokens"] || 0
-          output_tokens  = usage[:output_tokens] || usage["output_tokens"] || 0
-          cache_read     = usage[:cache_read_input_tokens] || usage["cache_read_input_tokens"] || 0
-          cache_write    = usage[:cache_creation_input_tokens] || usage["cache_creation_input_tokens"] || 0
+          model          = response[:model] || response['model'] || 'unknown'
+          input_tokens   = usage[:input_tokens] || usage['input_tokens'] || 0
+          output_tokens  = usage[:output_tokens] || usage['output_tokens'] || 0
+          cache_read     = usage[:cache_read_input_tokens] || usage['cache_read_input_tokens'] || 0
+          cache_write    = usage[:cache_creation_input_tokens] || usage['cache_creation_input_tokens'] || 0
 
           @budget_enforcer.record!(
             model: model,
@@ -114,9 +114,9 @@ module RubynCode
             registry.on(:post_tool_use, logging_hook, priority: 50)
           end
 
-          if context_manager
-            registry.on(:post_llm_call, AutoCompactHook.new(context_manager: context_manager), priority: 90)
-          end
+          return unless context_manager
+
+          registry.on(:post_llm_call, AutoCompactHook.new(context_manager: context_manager), priority: 90)
         end
       end
     end

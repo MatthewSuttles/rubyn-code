@@ -23,7 +23,7 @@ module RubynCode
             @last_interrupt_at = nil
           end
 
-          trap("INT") do
+          trap('INT') do
             handle_interrupt
           end
         end

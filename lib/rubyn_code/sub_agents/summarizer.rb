@@ -8,7 +8,7 @@ module RubynCode
 
       class << self
         def call(text, max_length: DEFAULT_MAX_LENGTH)
-          return "" if text.nil? || text.empty?
+          return '' if text.nil? || text.empty?
 
           text = text.to_s.strip
 

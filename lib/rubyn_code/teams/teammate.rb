@@ -10,15 +10,14 @@ module RubynCode
     Teammate = Data.define(
       :id, :name, :role, :persona, :model, :status, :metadata, :created_at
     ) do
+      # @return [Boolean]
+      def idle? = status == 'idle'
 
       # @return [Boolean]
-      def idle? = status == "idle"
+      def active? = status == 'active'
 
       # @return [Boolean]
-      def active? = status == "active"
-
-      # @return [Boolean]
-      def offline? = status == "offline"
+      def offline? = status == 'offline'
 
       # @return [Hash]
       def to_h

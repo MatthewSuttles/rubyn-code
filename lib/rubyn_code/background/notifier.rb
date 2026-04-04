@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "thread"
-
 module RubynCode
   module Background
     # Thread-safe notification queue for background job completions.

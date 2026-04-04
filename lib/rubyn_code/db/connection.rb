@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "sqlite3"
-require "monitor"
-require "fileutils"
+require 'sqlite3'
+require 'monitor'
+require 'fileutils'
 
 module RubynCode
   module DB
@@ -52,8 +52,8 @@ module RubynCode
         #
         # @yield the block to execute within the transaction
         # @return [Object] the return value of the block
-        def transaction(&block)
-          instance.transaction(&block)
+        def transaction(&)
+          instance.transaction(&)
         end
 
         # Tears down the singleton instance. Intended for test cleanup.
@@ -118,14 +118,14 @@ module RubynCode
           begin
             result = yield
             if @transaction_depth == 1
-              @db.execute("COMMIT")
+              @db.execute('COMMIT')
             else
               @db.execute("RELEASE SAVEPOINT sp_#{@transaction_depth}")
             end
             result
           rescue StandardError => e
             if @transaction_depth == 1
-              @db.execute("ROLLBACK")
+              @db.execute('ROLLBACK')
             else
               @db.execute("ROLLBACK TO SAVEPOINT sp_#{@transaction_depth}")
               @db.execute("RELEASE SAVEPOINT sp_#{@transaction_depth}")
@@ -157,15 +157,15 @@ module RubynCode
 
       def configure_connection
         @db.results_as_hash = true
-        @db.execute("PRAGMA journal_mode = WAL")
-        @db.execute("PRAGMA foreign_keys = ON")
-        @db.execute("PRAGMA busy_timeout = 5000")
-        @db.execute("PRAGMA synchronous = NORMAL")
-        @db.execute("PRAGMA cache_size = -20000") # 20 MB
+        @db.execute('PRAGMA journal_mode = WAL')
+        @db.execute('PRAGMA foreign_keys = ON')
+        @db.execute('PRAGMA busy_timeout = 5000')
+        @db.execute('PRAGMA synchronous = NORMAL')
+        @db.execute('PRAGMA cache_size = -20000') # 20 MB
       end
 
       def begin_top_level_transaction
-        @db.execute("BEGIN IMMEDIATE")
+        @db.execute('BEGIN IMMEDIATE')
       end
 
       def begin_savepoint

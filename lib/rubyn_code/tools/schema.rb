@@ -4,17 +4,17 @@ module RubynCode
   module Tools
     module Schema
       TYPE_MAP = {
-        string: "string",
-        integer: "integer",
-        number: "number",
-        boolean: "boolean",
-        array: "array",
-        object: "object"
+        string: 'string',
+        integer: 'integer',
+        number: 'number',
+        boolean: 'boolean',
+        array: 'array',
+        object: 'object'
       }.freeze
 
       class << self
         def build(params_hash)
-          return { type: "object", properties: {}, required: [] } if params_hash.empty?
+          return { type: 'object', properties: {}, required: [] } if params_hash.empty?
 
           properties = {}
           required = []
@@ -28,7 +28,7 @@ module RubynCode
           end
 
           schema = {
-            type: "object",
+            type: 'object',
             properties: properties
           }
           schema[:required] = required unless required.empty?
@@ -47,9 +47,7 @@ module RubynCode
           prop[:default] = spec[:default] if spec.key?(:default)
           prop[:enum] = spec[:enum] if spec[:enum]
 
-          if spec[:items]
-            prop[:items] = build_property(spec[:items])
-          end
+          prop[:items] = build_property(spec[:items]) if spec[:items]
 
           prop
         end

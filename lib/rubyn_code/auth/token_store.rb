@@ -1,15 +1,15 @@
 # frozen_string_literal: true
 
-require "yaml"
-require "fileutils"
-require "json"
-require "time"
+require 'yaml'
+require 'fileutils'
+require 'json'
+require 'time'
 
 module RubynCode
   module Auth
     module TokenStore
       EXPIRY_BUFFER_SECONDS = 300 # 5 minutes
-      KEYCHAIN_SERVICE = "Claude Code-credentials"
+      KEYCHAIN_SERVICE = 'Claude Code-credentials'
 
       class << self
         # Load tokens with fallback chain:
@@ -24,9 +24,9 @@ module RubynCode
           ensure_directory!
 
           data = {
-            "access_token" => access_token,
-            "refresh_token" => refresh_token,
-            "expires_at" => expires_at.is_a?(Time) ? expires_at.iso8601 : expires_at.to_s
+            'access_token' => access_token,
+            'refresh_token' => refresh_token,
+            'expires_at' => expires_at.is_a?(Time) ? expires_at.iso8601 : expires_at.to_s
           }
 
           File.write(tokens_path, YAML.dump(data))
@@ -35,7 +35,7 @@ module RubynCode
         end
 
         def clear!
-          File.delete(tokens_path) if File.exist?(tokens_path)
+          FileUtils.rm_f(tokens_path)
           true
         end
 
@@ -71,22 +71,22 @@ module RubynCode
 
         # Read Claude Code's OAuth token from macOS Keychain
         def load_from_keychain
-          return nil unless RUBY_PLATFORM.include?("darwin")
+          return nil unless RUBY_PLATFORM.include?('darwin')
 
           output = `security find-generic-password -s "#{KEYCHAIN_SERVICE}" -w 2>/dev/null`.strip
           return nil if output.empty?
 
           data = JSON.parse(output)
-          oauth = data["claudeAiOauth"]
-          return nil unless oauth && oauth["accessToken"]
+          oauth = data['claudeAiOauth']
+          return nil unless oauth && oauth['accessToken']
 
-          expires_at = if oauth["expiresAt"]
-                         Time.at(oauth["expiresAt"] / 1000.0) # milliseconds to seconds
+          expires_at = if oauth['expiresAt']
+                         Time.at(oauth['expiresAt'] / 1000.0) # milliseconds to seconds
                        end
 
           {
-            access_token: oauth["accessToken"],
-            refresh_token: oauth["refreshToken"],
+            access_token: oauth['accessToken'],
+            refresh_token: oauth['refreshToken'],
             expires_at: expires_at,
             type: :oauth,
             source: :keychain
@@ -101,12 +101,12 @@ module RubynCode
 
           data = YAML.safe_load_file(tokens_path, permitted_classes: [Time])
           return nil unless data.is_a?(Hash)
-          return nil unless data["access_token"]
+          return nil unless data['access_token']
 
           {
-            access_token: data["access_token"],
-            refresh_token: data["refresh_token"],
-            expires_at: parse_time(data["expires_at"]),
+            access_token: data['access_token'],
+            refresh_token: data['refresh_token'],
+            expires_at: parse_time(data['expires_at']),
             type: :oauth,
             source: :file
           }
@@ -116,7 +116,7 @@ module RubynCode
 
         # Fall back to ANTHROPIC_API_KEY environment variable
         def load_from_env
-          api_key = ENV["ANTHROPIC_API_KEY"]
+          api_key = ENV.fetch('ANTHROPIC_API_KEY', nil)
           return nil unless api_key && !api_key.empty?
 
           {
@@ -134,7 +134,7 @@ module RubynCode
 
         def ensure_directory!
           dir = File.dirname(tokens_path)
-          FileUtils.mkdir_p(dir) unless Dir.exist?(dir)
+          FileUtils.mkdir_p(dir)
           File.chmod(0o700, dir)
         end
 
