@@ -501,7 +501,7 @@ module RubynCode
 
         @hook_runner.fire(:pre_tool_use, tool_name: tool_name, tool_input: tool_input)
 
-        result = @tool_executor.execute(tool_name, **symbolize_keys(tool_input))
+        result = @tool_executor.execute(tool_name, symbolize_keys(tool_input))
         @hook_runner.fire(:post_tool_use, tool_name: tool_name, tool_input: tool_input, result: result)
 
         [result.to_s, false]
@@ -696,7 +696,10 @@ module RubynCode
 
         input_tokens = usage.respond_to?(:input_tokens) ? usage.input_tokens : usage[:input_tokens]
         output_tokens = usage.respond_to?(:output_tokens) ? usage.output_tokens : usage[:output_tokens]
-        RubynCode::Debug.token("in=#{input_tokens} out=#{output_tokens}")
+        cache_create = usage.respond_to?(:cache_creation_input_tokens) ? usage.cache_creation_input_tokens.to_i : 0
+        cache_read = usage.respond_to?(:cache_read_input_tokens) ? usage.cache_read_input_tokens.to_i : 0
+        cache_info = cache_create > 0 || cache_read > 0 ? " cache_create=#{cache_create} cache_read=#{cache_read}" : ""
+        RubynCode::Debug.token("in=#{input_tokens} out=#{output_tokens}#{cache_info}")
 
         @context_manager.track_usage(usage)
       rescue NoMethodError

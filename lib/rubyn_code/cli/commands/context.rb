@@ -20,21 +20,20 @@ module RubynCode
         :session_persistence,
         :background_worker,
         :permission_tier,
-        :plan_mode
+        :plan_mode,
+        :message_handler
       ) do
-        # Convenience: send a message through the agent loop as if
-        # the user typed it. Used by commands like /review that
-        # delegate to the LLM.
+        # Convenience: return a new Context with a message handler attached.
+        # Used by commands like /review that delegate to the LLM.
         #
         # @param handler [Proc] the REPL's handle_message proc
         def with_message_handler(handler)
-          @message_handler = handler
-          self
+          with(message_handler: handler)
         end
 
         # @param text [String] message to send through the agent loop
         def send_message(text)
-          @message_handler&.call(text)
+          message_handler&.call(text)
         end
 
         # @return [Boolean]
