@@ -26,10 +26,33 @@ module DBHelpers
   end
 
   def setup_test_db
-    db = SQLite3::Database.new(":memory:")
+    db = SQLite3::Database.new(':memory:')
     db.results_as_hash = true
-    db.execute("PRAGMA foreign_keys = ON")
+    db.execute('PRAGMA foreign_keys = ON')
     TestDBWrapper.new(db)
+  end
+
+  # Sets up a test DB with real schema tables for integration-level specs.
+  # Runs all .sql migrations from db/migrations/ in order.
+  def setup_test_db_with_tables
+    wrapper = setup_test_db
+    migrations_dir = File.expand_path('../../db/migrations', __dir__)
+
+    Dir.glob(File.join(migrations_dir, '*.sql')).sort.each do |path|
+      sql = File.read(path)
+      sql.split(';').each do |stmt|
+        stmt = stmt.strip
+        next if stmt.empty?
+
+        wrapper.execute(stmt)
+      rescue SQLite3::SQLException
+        # Some statements (FTS virtual tables, triggers) may not work in
+        # all SQLite builds — skip them in tests.
+        nil
+      end
+    end
+
+    wrapper
   end
 end
 

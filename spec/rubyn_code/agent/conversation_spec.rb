@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
-require "spec_helper"
+require 'spec_helper'
+
+# Ensure LLM data classes are loaded (they live behind autoload)
+RubynCode::LLM::MessageBuilder
 
 RSpec.describe RubynCode::Agent::Conversation do
   subject(:conversation) { described_class.new }
@@ -106,6 +109,162 @@ RSpec.describe RubynCode::Agent::Conversation do
       conversation.add_user_message("x")
       conversation.clear!
       expect(conversation.length).to eq(0)
+    end
+  end
+
+  describe '#to_api_format' do
+    it 'repairs orphaned tool_use blocks by adding interrupted results' do
+      # An assistant message with a tool_use that has no corresponding tool_result
+      conversation.add_user_message('do something')
+      conversation.add_assistant_message(
+        'Calling tool...',
+        tool_calls: [
+          { type: 'tool_use', id: 'toolu_orphan', name: 'bash', input: { command: 'ls' } }
+        ]
+      )
+      # No tool_result added — it's orphaned
+
+      formatted = conversation.to_api_format
+
+      # Should have a synthetic tool_result for the orphan
+      last_msg = formatted.last
+      expect(last_msg[:role]).to eq('user')
+      expect(last_msg[:content]).to be_an(Array)
+      result_block = last_msg[:content].find { |b| b[:type] == 'tool_result' }
+      expect(result_block[:tool_use_id]).to eq('toolu_orphan')
+      expect(result_block[:content]).to include('[interrupted]')
+      expect(result_block[:is_error]).to be true
+    end
+  end
+
+  describe '#replace!' do
+    it 'replaces all messages with the new array' do
+      conversation.add_user_message('old message')
+      conversation.add_assistant_message('old reply')
+
+      new_messages = [
+        { role: 'user', content: 'compacted question' },
+        { role: 'assistant', content: [{ type: 'text', text: 'compacted answer' }] }
+      ]
+
+      conversation.replace!(new_messages)
+
+      expect(conversation.length).to eq(2)
+      expect(conversation.messages.first[:content]).to eq('compacted question')
+      expect(conversation.messages.last[:content]).to eq([{ type: 'text', text: 'compacted answer' }])
+    end
+  end
+
+  describe 'content normalization' do
+    it 'passes through string content as a text block' do
+      conversation.add_assistant_message('simple string')
+      blocks = conversation.messages.last[:content]
+      expect(blocks).to eq([{ type: 'text', text: 'simple string' }])
+    end
+
+    it 'converts block content that responds to .type into a hash' do
+      text_block = RubynCode::LLM::TextBlock.new(text: 'from object')
+      conversation.add_assistant_message([text_block])
+      blocks = conversation.messages.last[:content]
+      expect(blocks.first).to eq({ type: 'text', text: 'from object' })
+    end
+
+    it 'converts a single content object that responds to .type (non-Array, non-String)' do
+      text_block = RubynCode::LLM::TextBlock.new(text: 'single object')
+      conversation.add_assistant_message(text_block)
+      blocks = conversation.messages.last[:content]
+      expect(blocks.first).to eq({ type: 'text', text: 'single object' })
+    end
+
+    it 'passes through Hash content directly' do
+      hash_content = { type: 'text', text: 'hash passthrough' }
+      conversation.add_assistant_message(hash_content)
+      blocks = conversation.messages.last[:content]
+      expect(blocks.first).to eq({ type: 'text', text: 'hash passthrough' })
+    end
+  end
+
+  describe 'block_to_hash' do
+    it 'handles tool_result blocks with is_error flag' do
+      tool_result = RubynCode::LLM::ToolResultBlock.new(
+        tool_use_id: 'tu_123',
+        content: 'error output',
+        is_error: true
+      )
+      conversation.add_assistant_message([tool_result])
+      block = conversation.messages.last[:content].first
+
+      expect(block[:type]).to eq('tool_result')
+      expect(block[:tool_use_id]).to eq('tu_123')
+      expect(block[:content]).to eq('error output')
+      expect(block[:is_error]).to be true
+    end
+
+    it 'handles tool_result blocks without is_error' do
+      tool_result = RubynCode::LLM::ToolResultBlock.new(
+        tool_use_id: 'tu_456',
+        content: 'success output'
+      )
+      conversation.add_assistant_message([tool_result])
+      block = conversation.messages.last[:content].first
+
+      expect(block[:type]).to eq('tool_result')
+      expect(block).not_to have_key(:is_error)
+    end
+
+    it 'handles unknown block types with to_h' do
+      unknown_block = Struct.new(:type, :data, keyword_init: true) do
+        def to_h
+          { type: type.to_s, data: data }
+        end
+      end.new(type: 'custom', data: 'value')
+
+      conversation.add_assistant_message([unknown_block])
+      block = conversation.messages.last[:content].first
+
+      expect(block).to eq({ type: 'custom', data: 'value' })
+    end
+
+    it 'passes through unknown objects without to_h as-is' do
+      plain_object = Struct.new(:type, keyword_init: true).new(type: 'opaque')
+      # Remove to_h if present (Struct has it by default), test the passthrough
+      # Actually Struct responds to to_h, so let's use a minimal object
+      opaque = Object.new
+      def opaque.type; 'opaque'; end
+
+      conversation.add_assistant_message([opaque])
+      block = conversation.messages.last[:content].first
+      expect(block).to eq(opaque)
+    end
+
+    it 'passes through Hash blocks unchanged' do
+      hash_block = { type: 'tool_use', id: 'tu_789', name: 'bash', input: { command: 'ls' } }
+      conversation.add_assistant_message([hash_block])
+      block = conversation.messages.last[:content].first
+
+      expect(block).to eq(hash_block)
+    end
+  end
+
+  describe 'extract_text' do
+    it 'returns nil for nil content' do
+      # extract_text is private, test through last_assistant_text
+      # Add an assistant message with nil content blocks
+      conversation.instance_variable_get(:@messages) << { role: 'assistant', content: nil }
+      expect(conversation.last_assistant_text).to be_nil
+    end
+
+    it 'returns the string directly for string content' do
+      conversation.instance_variable_get(:@messages) << { role: 'assistant', content: 'direct string' }
+      expect(conversation.last_assistant_text).to eq('direct string')
+    end
+
+    it 'returns nil for array content with no text blocks' do
+      conversation.instance_variable_get(:@messages) << {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 'tu_1', name: 'bash', input: {} }]
+      }
+      expect(conversation.last_assistant_text).to be_nil
     end
   end
 end

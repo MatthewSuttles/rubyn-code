@@ -79,12 +79,118 @@ RSpec.describe RubynCode::LLM::Client do
         .to raise_error(RubynCode::LLM::Client::AuthExpiredError)
     end
 
-    it "raises PromptTooLongError on 413" do
-      stub_request(:post, "https://api.anthropic.com/v1/messages")
+    it 'raises PromptTooLongError on 413' do
+      stub_request(:post, 'https://api.anthropic.com/v1/messages')
         .to_return(status: 413, body: '{"error":{"type":"invalid_request_error","message":"prompt is too long"}}')
 
-      expect { client.chat(messages: [{ role: "user", content: "Hi" }]) }
+      expect { client.chat(messages: [{ role: 'user', content: 'Hi' }]) }
         .to raise_error(RubynCode::LLM::Client::PromptTooLongError)
+    end
+
+    it 'retries on 429 rate limit' do
+      stub_request(:post, 'https://api.anthropic.com/v1/messages')
+        .to_return(status: 429, body: '{"error":{"type":"rate_limit","message":"slow down"}}')
+        .then.to_return(
+          status: 200,
+          body: JSON.generate({
+            'id' => 'msg_retry', 'content' => [{ 'type' => 'text', 'text' => 'Retried!' }],
+            'stop_reason' => 'end_turn', 'usage' => { 'input_tokens' => 10, 'output_tokens' => 5 }
+          })
+        )
+
+      allow(client).to receive(:sleep) # Don't actually sleep in tests
+
+      response = client.chat(messages: [{ role: 'user', content: 'Hi' }])
+      expect(response.text).to eq('Retried!')
+    end
+
+    it 'calls on_text callback with text content for non-streaming (API key auth)' do
+      # Use a non-oat token so streaming is disabled, but on_text still fires
+      allow(RubynCode::Auth::TokenStore).to receive(:load).and_return({
+        access_token: 'sk-ant-api01-test-key', expires_at: Time.now + 3600, source: :env
+      })
+
+      stub_request(:post, 'https://api.anthropic.com/v1/messages')
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+            'id' => 'msg_cb', 'content' => [{ 'type' => 'text', 'text' => 'Callback text' }],
+            'stop_reason' => 'end_turn', 'usage' => { 'input_tokens' => 10, 'output_tokens' => 5 }
+          })
+        )
+
+      received = nil
+      on_text = ->(text) { received = text }
+      client.chat(messages: [{ role: 'user', content: 'Hi' }], on_text: on_text)
+      expect(received).to eq('Callback text')
+    end
+
+    it 'applies cache_control to the last message block' do
+      stub_request(:post, 'https://api.anthropic.com/v1/messages')
+        .with { |req|
+          body = JSON.parse(req.body)
+          msgs = body['messages']
+          last = msgs.last
+          content = last['content']
+          content.is_a?(Array) && content.last['cache_control'] == { 'type' => 'ephemeral' }
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+            'id' => 'msg_cache', 'content' => [{ 'type' => 'text', 'text' => 'OK' }],
+            'stop_reason' => 'end_turn', 'usage' => { 'input_tokens' => 10, 'output_tokens' => 5 }
+          })
+        )
+
+      client.chat(messages: [{ role: 'user', content: [{ type: 'text', text: 'Hi' }] }])
+    end
+
+    it 'includes system as cached block when provided' do
+      stub_request(:post, 'https://api.anthropic.com/v1/messages')
+        .with { |req|
+          body = JSON.parse(req.body)
+          system = body['system']
+          system.is_a?(Array) && system.any? { |b| b['cache_control'] }
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+            'id' => 'msg_sys', 'content' => [{ 'type' => 'text', 'text' => 'OK' }],
+            'stop_reason' => 'end_turn', 'usage' => { 'input_tokens' => 10, 'output_tokens' => 5 }
+          })
+        )
+
+      client.chat(messages: [{ role: 'user', content: 'Hi' }], system: 'Be helpful.')
+    end
+
+    it 'parses tool_use blocks from the response' do
+      stub_request(:post, 'https://api.anthropic.com/v1/messages')
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+            'id' => 'msg_tool', 'stop_reason' => 'tool_use',
+            'content' => [
+              { 'type' => 'text', 'text' => 'Reading file...' },
+              { 'type' => 'tool_use', 'id' => 'toolu_1', 'name' => 'read_file', 'input' => { 'path' => 'foo.rb' } }
+            ],
+            'usage' => { 'input_tokens' => 10, 'output_tokens' => 15 }
+          })
+        )
+
+      response = client.chat(messages: [{ role: 'user', content: 'Read foo.rb' }])
+      tool_blocks = response.content.select { |b| b.is_a?(RubynCode::LLM::ToolUseBlock) }
+      expect(tool_blocks.size).to eq(1)
+      expect(tool_blocks.first.name).to eq('read_file')
+      expect(tool_blocks.first.input).to eq({ 'path' => 'foo.rb' })
+    end
+  end
+
+  describe '#ensure_valid_token! with expired OAuth' do
+    it 'raises AuthExpiredError when no valid auth exists' do
+      allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(false)
+
+      expect { client.chat(messages: [{ role: 'user', content: 'Hi' }]) }
+        .to raise_error(RubynCode::LLM::Client::AuthExpiredError, /No valid authentication/)
     end
   end
 end

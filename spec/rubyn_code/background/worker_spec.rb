@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "spec_helper"
+require 'spec_helper'
 
 RSpec.describe RubynCode::Background::Worker do
   let(:notifier) { RubynCode::Background::Notifier.new }
@@ -9,8 +9,10 @@ RSpec.describe RubynCode::Background::Worker do
     described_class.new(project_root: Dir.tmpdir, notifier: notifier)
   end
 
-  describe "#run" do
-    it "returns a job ID and completes the job" do
+  describe '#run' do
+    after { worker.shutdown!(timeout: 5) }
+
+    it 'returns a job ID and completes the job' do
       job_id = worker.run('echo hello', timeout: 5)
       expect(job_id).to be_a(String)
       expect(job_id).not_to be_empty
@@ -21,15 +23,17 @@ RSpec.describe RubynCode::Background::Worker do
     end
   end
 
-  describe "#status" do
-    it "returns nil for unknown job ID" do
-      expect(worker.status("nonexistent")).to be_nil
+  describe '#status' do
+    it 'returns nil for unknown job ID' do
+      expect(worker.status('nonexistent')).to be_nil
     end
   end
 
-  describe "#drain_notifications" do
-    it "returns completed job notifications" do
-      worker.run("echo done", timeout: 5)
+  describe '#drain_notifications' do
+    after { worker.shutdown!(timeout: 5) }
+
+    it 'returns completed job notifications' do
+      worker.run('echo done', timeout: 5)
       worker.shutdown!(timeout: 5)
       notifications = worker.drain_notifications
       expect(notifications).not_to be_empty
@@ -37,16 +41,29 @@ RSpec.describe RubynCode::Background::Worker do
     end
   end
 
-  describe "concurrent job cap" do
-    it "raises when MAX_CONCURRENT jobs are running" do
-      stubs = []
-      RubynCode::Background::Worker::MAX_CONCURRENT.times do
-        stubs << worker.run("sleep 10", timeout: 15)
+  describe 'concurrent job cap' do
+    it 'raises when MAX_CONCURRENT jobs are running' do
+      # The concurrency check counts @jobs with :running status inside a mutex.
+      # We can pre-fill the jobs hash to simulate MAX_CONCURRENT running jobs
+      # without spawning any real processes — testing the guard, not the threads.
+      jobs = worker.instance_variable_get(:@jobs)
+      mutex = worker.instance_variable_get(:@mutex)
+
+      mutex.synchronize do
+        described_class::MAX_CONCURRENT.times do |i|
+          jobs["fake-#{i}"] = RubynCode::Background::Job.new(
+            id: "fake-#{i}",
+            command: 'fake',
+            status: :running,
+            result: nil,
+            started_at: Time.now,
+            completed_at: nil
+          )
+        end
       end
 
-      expect { worker.run("echo overflow") }.to raise_error(RuntimeError, /Concurrency limit/)
-
-      worker.shutdown!(timeout: 2)
+      expect { worker.run('echo overflow') }
+        .to raise_error(RuntimeError, /Concurrency limit/)
     end
   end
 end

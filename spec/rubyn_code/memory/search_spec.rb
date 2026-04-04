@@ -1,50 +1,84 @@
 # frozen_string_literal: true
 
-require "spec_helper"
+require 'spec_helper'
 
 RSpec.describe RubynCode::Memory::Search do
-  let(:db) { setup_test_db }
-  let(:store) { RubynCode::Memory::Store.new(db, project_path: "/proj") }
-  let(:search) { described_class.new(db, project_path: "/proj") }
+  let(:db) { setup_test_db_with_tables }
+  let(:project_path) { '/test/project' }
+  let(:store) { RubynCode::Memory::Store.new(db, project_path: project_path) }
+
+  subject(:search) { described_class.new(db, project_path: project_path) }
 
   before do
-    store.write(content: "Rails migration patterns", tier: "long", category: "code_pattern")
-    store.write(content: "Prefer RSpec over Minitest", tier: "short", category: "user_preference")
-    store.write(content: "Error handling with rescue", tier: "medium", category: "error_resolution")
+    store.write(content: 'Ruby guard clauses are great', tier: 'long', category: 'code_pattern')
+    store.write(content: 'Use frozen_string_literal', tier: 'medium', category: 'project_convention')
+    store.write(content: 'Rails uses MVC pattern', tier: 'short', category: 'code_pattern')
   end
 
-  describe "#search" do
-    it "finds memories matching a query" do
-      results = search.search("Rails migration")
-      expect(results.size).to be >= 1
-      expect(results.first.content).to include("Rails")
-    end
-  end
+  describe '#search' do
+    it 'finds memories matching the query' do
+      results = search.search('guard clauses')
 
-  describe "#recent" do
-    it "returns memories ordered by creation time" do
-      results = search.recent(limit: 10)
-      expect(results.size).to eq(3)
-    end
-  end
-
-  describe "#by_category" do
-    it "filters by category" do
-      results = search.by_category("user_preference")
       expect(results.size).to eq(1)
-      expect(results.first.content).to include("RSpec")
+      expect(results.first.content).to include('guard clauses')
+    end
+
+    it 'returns empty array when nothing matches' do
+      results = search.search('nonexistent unicorn')
+      expect(results).to be_empty
+    end
+
+    it 'filters by tier' do
+      results = search.search('Ruby', tier: 'long')
+
+      expect(results.size).to eq(1)
+      expect(results.first.tier).to eq('long')
+    end
+
+    it 'filters by category' do
+      results = search.search('pattern', category: 'code_pattern')
+
+      contents = results.map(&:content)
+      expect(contents).to all(include('pattern').or include('clauses'))
+    end
+
+    it 'respects limit' do
+      results = search.search('', limit: 1)
+      expect(results.size).to eq(1)
+    end
+
+    it 'updates access_count on returned records' do
+      results = search.search('frozen_string_literal')
+      record_id = results.first.id
+
+      row = db.query('SELECT access_count FROM memories WHERE id = ?', [record_id]).first
+      expect(row['access_count']).to eq(1)
     end
   end
 
-  describe "#by_tier" do
-    it "filters by tier" do
-      results = search.by_tier("long")
-      expect(results.size).to eq(1)
-      expect(results.first.content).to include("Rails")
-    end
+  describe '#recent' do
+    it 'returns most recent memories' do
+      results = search.recent(limit: 2)
 
-    it "returns empty for tier with no matches" do
-      expect(search.by_tier("long", limit: 10).first.tier).to eq("long")
+      expect(results.size).to eq(2)
+    end
+  end
+
+  describe '#by_category' do
+    it 'returns memories in the given category' do
+      results = search.by_category('code_pattern')
+
+      expect(results.size).to eq(2)
+      expect(results.map(&:category)).to all(eq('code_pattern'))
+    end
+  end
+
+  describe '#by_tier' do
+    it 'returns memories in the given tier' do
+      results = search.by_tier('medium')
+
+      expect(results.size).to eq(1)
+      expect(results.first.tier).to eq('medium')
     end
   end
 end
