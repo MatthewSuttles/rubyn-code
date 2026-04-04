@@ -22,7 +22,7 @@ module RubynCode
         symbolized = params.transform_keys(&:to_sym)
         # Filter to only params the tool's execute method accepts — LLM may send extra keys
         allowed = tool.method(:execute).parameters
-                      .slice(:key, :keyreq)
+                      .select { |type, _| %i[key keyreq].include?(type) }
                       .map(&:last)
         filtered = allowed.empty? ? symbolized : symbolized.slice(*allowed)
         result = tool.execute(**filtered)
