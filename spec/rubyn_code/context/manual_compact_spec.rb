@@ -3,7 +3,7 @@
 require 'spec_helper'
 
 RSpec.describe RubynCode::Context::ManualCompact do
-  let(:llm_client) { double('llm_client') } # rubocop:disable RSpec/VerifiedDoubles
+  let(:llm_client) { double('llm_client') }
   let(:messages) do
     [
       { role: 'user', content: 'Hello' },

@@ -3,8 +3,8 @@
 RSpec.describe RubynCode::Context::Manager do
   subject(:manager) { described_class.new(threshold: 500) }
 
-  describe "#track_usage" do
-    it "accumulates input and output tokens" do
+  describe '#track_usage' do
+    it 'accumulates input and output tokens' do
       usage = double(input_tokens: 100, output_tokens: 50)
       manager.track_usage(usage)
       manager.track_usage(usage)
@@ -14,30 +14,30 @@ RSpec.describe RubynCode::Context::Manager do
     end
   end
 
-  describe "#estimated_tokens" do
-    it "returns a reasonable estimate based on JSON character length" do
-      messages = [{ role: "user", content: "a" * 400 }]
+  describe '#estimated_tokens' do
+    it 'returns a reasonable estimate based on JSON character length' do
+      messages = [{ role: 'user', content: 'a' * 400 }]
       estimate = manager.estimated_tokens(messages)
 
       expect(estimate).to be > 100
       expect(estimate).to be < 200
     end
 
-    it "returns a positive integer for simple messages" do
-      messages = [{ role: "user", content: "hello world" }]
+    it 'returns a positive integer for simple messages' do
+      messages = [{ role: 'user', content: 'hello world' }]
       expect(manager.estimated_tokens(messages)).to be_a(Integer)
       expect(manager.estimated_tokens(messages)).to be > 0
     end
   end
 
-  describe "#needs_compaction?" do
-    it "returns false when under threshold" do
-      messages = [{ role: "user", content: "short" }]
+  describe '#needs_compaction?' do
+    it 'returns false when under threshold' do
+      messages = [{ role: 'user', content: 'short' }]
       expect(manager.needs_compaction?(messages)).to be false
     end
 
-    it "returns true when over threshold" do
-      messages = [{ role: "user", content: "x" * 5000 }]
+    it 'returns true when over threshold' do
+      messages = [{ role: 'user', content: 'x' * 5000 }]
       expect(manager.needs_compaction?(messages)).to be true
     end
   end

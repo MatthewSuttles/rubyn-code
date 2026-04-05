@@ -102,7 +102,7 @@ RSpec.describe RubynCode::Memory::Store do
       # Backdate the last_accessed_at
       db.execute(
         'UPDATE memories SET last_accessed_at = ? WHERE id = ?',
-        [(Time.now.utc - 86_400 * 2).strftime('%Y-%m-%d %H:%M:%S'), record.id]
+        [(Time.now.utc - (86_400 * 2)).strftime('%Y-%m-%d %H:%M:%S'), record.id]
       )
 
       store.decay!(decay_rate: 0.5)

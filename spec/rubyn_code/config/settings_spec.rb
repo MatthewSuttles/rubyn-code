@@ -95,7 +95,7 @@ RSpec.describe RubynCode::Config::Settings do
 
       settings.save!
 
-      written = YAML.safe_load(File.read(config_path))
+      written = YAML.safe_load_file(config_path)
       expect(written['model']).to eq('claude-haiku')
       expect(written['max_iterations']).to eq(100)
     end
@@ -126,7 +126,7 @@ RSpec.describe RubynCode::Config::Settings do
       settings.save!
 
       # Modify the file externally
-      data = YAML.safe_load(File.read(config_path))
+      data = YAML.safe_load_file(config_path)
       data['model'] = 'claude-opus'
       File.write(config_path, YAML.dump(data))
 

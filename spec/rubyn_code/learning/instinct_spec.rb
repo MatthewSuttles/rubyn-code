@@ -133,8 +133,14 @@ RSpec.describe RubynCode::Learning::InstinctMethods do
     it 'updates confidence and counters for helpful reinforcement' do
       db = setup_test_db_with_tables
       now = Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+      sql = <<~SQL.tr("\n", ' ').strip
+        INSERT INTO instincts
+          (id, project_path, pattern, confidence, times_applied,
+           times_helpful, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      SQL
       db.execute(
-        'INSERT INTO instincts (id, project_path, pattern, confidence, times_applied, times_helpful, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        sql,
         ['inst-1', '/test', 'test pattern', 0.5, 2, 1, now, now]
       )
 
@@ -149,8 +155,14 @@ RSpec.describe RubynCode::Learning::InstinctMethods do
     it 'decreases confidence for unhelpful reinforcement' do
       db = setup_test_db_with_tables
       now = Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+      sql = <<~SQL.tr("\n", ' ').strip
+        INSERT INTO instincts
+          (id, project_path, pattern, confidence, times_applied,
+           times_helpful, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      SQL
       db.execute(
-        'INSERT INTO instincts (id, project_path, pattern, confidence, times_applied, times_helpful, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        sql,
         ['inst-2', '/test', 'test pattern', 0.8, 5, 3, now, now]
       )
 
@@ -168,8 +180,14 @@ RSpec.describe RubynCode::Learning::InstinctMethods do
       db = setup_test_db_with_tables
       old = (Time.now.utc - (86_400 * 365)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
+      sql = <<~SQL.tr("\n", ' ').strip
+        INSERT INTO instincts
+          (id, project_path, pattern, confidence, decay_rate,
+           created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      SQL
       db.execute(
-        'INSERT INTO instincts (id, project_path, pattern, confidence, decay_rate, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        sql,
         ['stale', '/test', 'stale pattern', 0.06, 1.0, old, old]
       )
 
@@ -183,8 +201,14 @@ RSpec.describe RubynCode::Learning::InstinctMethods do
       db = setup_test_db_with_tables
       now = Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
 
+      sql = <<~SQL.tr("\n", ' ').strip
+        INSERT INTO instincts
+          (id, project_path, pattern, confidence, decay_rate,
+           created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      SQL
       db.execute(
-        'INSERT INTO instincts (id, project_path, pattern, confidence, decay_rate, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        sql,
         ['strong', '/test', 'strong pattern', 0.9, 0.01, now, now]
       )
 

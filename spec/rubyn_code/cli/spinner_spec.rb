@@ -60,7 +60,7 @@ RSpec.describe RubynCode::CLI::Spinner do
       spinner.start_sub_agent(0)
 
       expect(TTY::Spinner).to have_received(:new).with(
-        a_string_matching(%r{\[:spinner\] [^(]+$}),
+        a_string_matching(/\[:spinner\] [^(]+$/),
         anything
       )
     end

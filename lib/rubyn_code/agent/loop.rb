@@ -219,6 +219,8 @@ module RubynCode
         - HOWEVER: always respect patterns already established in the codebase. If the project uses a specific convention (e.g. service objects, a particular test style, a custom base class), follow that convention even if it differs from the skill doc. Consistency with the codebase beats textbook best practice. Only break from established patterns if they are genuinely harmful (security issues, major performance problems, or bugs).
         - Keep responses concise. Code speaks louder than paragraphs.
         - Use spawn_agent sparingly — only for tasks that require reading many files (10+) or deep exploration. For simple reads or edits, use tools directly. Don't spawn a sub-agent when a single read_file or grep will do.
+        - NEVER chase lint/rubocop fixes in a loop. Run autocorrect ONCE, report what's left, and stop. Do not manually fix lint issues one file at a time — that's what rubocop --autocorrect is for.
+        - If you find yourself editing the same file more than twice, STOP. Tell the user what you're stuck on and ask how to proceed.
         - IMPORTANT: You can call MULTIPLE tools in a single response. When you need to read several files, search multiple patterns, or perform independent operations, return all tool_use blocks at once rather than one at a time. This is dramatically faster and cheaper. For example, if you need to read 5 files, emit 5 read_file tool calls in one response — don't read them one by one across 5 turns.
 
         ## Memory

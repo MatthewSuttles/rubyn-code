@@ -2,10 +2,10 @@
 
 require 'spec_helper'
 
+MemoryWriteTestRecord = Struct.new(:id, :tier, :category)
+
 RSpec.describe RubynCode::Tools::MemoryWrite do
   let(:project_root) { '/tmp/test_project' }
-
-  WriteRecord = Struct.new(:id, :tier, :category, keyword_init: true)
 
   def build_tool(store:)
     described_class.new(project_root: project_root, memory_store: store)
@@ -13,13 +13,13 @@ RSpec.describe RubynCode::Tools::MemoryWrite do
 
   def make_store(record)
     store = Object.new
-    store.define_singleton_method(:write) { |content:, tier:, category:| record }
+    store.define_singleton_method(:write) { |**_kwargs| record }
     store
   end
 
   describe '#execute' do
     context 'when writing succeeds' do
-      let(:record) { WriteRecord.new(id: 'mem-abc', tier: 'medium', category: 'code_pattern') }
+      let(:record) { MemoryWriteTestRecord.new(id: 'mem-abc', tier: 'medium', category: 'code_pattern') }
 
       it 'writes to store and returns confirmation' do
         tool = build_tool(store: make_store(record))
@@ -51,7 +51,7 @@ RSpec.describe RubynCode::Tools::MemoryWrite do
     end
 
     context 'when category is nil' do
-      let(:record) { WriteRecord.new(id: 'mem-xyz', tier: 'short', category: nil) }
+      let(:record) { MemoryWriteTestRecord.new(id: 'mem-xyz', tier: 'short', category: nil) }
 
       it 'returns confirmation without category' do
         tool = build_tool(store: make_store(record))
@@ -67,11 +67,11 @@ RSpec.describe RubynCode::Tools::MemoryWrite do
       it 'passes tier and category through to store' do
         received_params = {}
         store = Object.new
-        store.define_singleton_method(:write) do |content:, tier:, category:|
-          received_params[:content] = content
-          received_params[:tier] = tier
-          received_params[:category] = category
-          WriteRecord.new(id: 'mem-1', tier: tier, category: category)
+        store.define_singleton_method(:write) do |**kwargs|
+          received_params[:content] = kwargs[:content]
+          received_params[:tier] = kwargs[:tier]
+          received_params[:category] = kwargs[:category]
+          MemoryWriteTestRecord.new(id: 'mem-1', tier: kwargs[:tier], category: kwargs[:category])
         end
 
         tool = build_tool(store: store)

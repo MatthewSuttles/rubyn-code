@@ -12,7 +12,7 @@ RSpec.describe RubynCode::Tools::SendMessage do
 
   def make_mailbox(message_id = 'msg-001')
     mailbox = Object.new
-    mailbox.define_singleton_method(:send) { |from:, to:, content:, message_type:| message_id }
+    mailbox.define_singleton_method(:send) { |**_kwargs| message_id }
     mailbox
   end
 
@@ -30,8 +30,8 @@ RSpec.describe RubynCode::Tools::SendMessage do
       it 'passes sender_name as from' do
         received_from = nil
         mailbox = Object.new
-        mailbox.define_singleton_method(:send) do |from:, to:, content:, message_type:|
-          received_from = from
+        mailbox.define_singleton_method(:send) do |**kwargs|
+          received_from = kwargs[:from]
           'msg-1'
         end
 
@@ -78,8 +78,8 @@ RSpec.describe RubynCode::Tools::SendMessage do
       it 'passes message_type through to mailbox' do
         received_type = nil
         mailbox = Object.new
-        mailbox.define_singleton_method(:send) do |from:, to:, content:, message_type:|
-          received_type = message_type
+        mailbox.define_singleton_method(:send) do |**kwargs|
+          received_type = kwargs[:message_type]
           'msg-1'
         end
 
@@ -99,8 +99,8 @@ RSpec.describe RubynCode::Tools::SendMessage do
       it 'defaults message_type to message' do
         received_type = nil
         mailbox = Object.new
-        mailbox.define_singleton_method(:send) do |from:, to:, content:, message_type:|
-          received_type = message_type
+        mailbox.define_singleton_method(:send) do |**kwargs|
+          received_type = kwargs[:message_type]
           'msg-1'
         end
 

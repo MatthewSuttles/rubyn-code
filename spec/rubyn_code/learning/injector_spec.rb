@@ -7,11 +7,21 @@ RSpec.describe RubynCode::Learning::Injector do
   let(:db) { setup_test_db_with_tables }
   let(:project_path) { '/test/project' }
 
-  def insert_instinct(id:, pattern:, confidence: 0.7, tags: [], decay_rate: 0.01, updated_at: nil)
+  def insert_instinct(id:, pattern:, confidence: 0.7, **opts)
+    tags = opts.fetch(:tags, [])
+    decay_rate = opts.fetch(:decay_rate, 0.01)
+    updated_at = opts[:updated_at]
     now = (updated_at || Time.now).utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+    sql = <<~SQL.tr("\n", ' ').strip
+      INSERT INTO instincts
+        (id, project_path, pattern, context_tags, confidence,
+         decay_rate, times_applied, times_helpful, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    SQL
     db.execute(
-      'INSERT INTO instincts (id, project_path, pattern, context_tags, confidence, decay_rate, times_applied, times_helpful, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, project_path, pattern, JSON.generate(tags), confidence, decay_rate, 0, 0, now, now]
+      sql,
+      [id, project_path, pattern, JSON.generate(tags),
+       confidence, decay_rate, 0, 0, now, now]
     )
   end
 
@@ -58,7 +68,7 @@ RSpec.describe RubynCode::Learning::Injector do
 
       result = described_class.call(db: db, project_path: project_path, max_instincts: 2)
 
-      expect(result.scan(/Pattern/).size).to eq(2)
+      expect(result.scan('Pattern').size).to eq(2)
     end
 
     it 'filters by context_tags when provided' do
@@ -93,6 +103,52 @@ RSpec.describe RubynCode::Learning::Injector do
       result = described_class.call(db: db, project_path: '/different/project')
 
       expect(result).to eq('')
+    end
+
+    it 'handles comma-separated tags stored as plain string' do
+      now = Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+      sql = <<~SQL.tr("\n", ' ').strip
+        INSERT INTO instincts
+          (id, project_path, pattern, context_tags, confidence,
+           decay_rate, times_applied, times_helpful, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      SQL
+      db.execute(
+        sql,
+        ['csv-tags', project_path, 'CSV pattern', 'ruby, style',
+         0.8, 0.01, 0, 0, now, now]
+      )
+
+      result = described_class.call(db: db, project_path: project_path, context_tags: ['ruby'])
+      expect(result).to include('CSV pattern')
+    end
+
+    it 'handles nil/empty context_tags gracefully' do
+      now = Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+      sql = <<~SQL.tr("\n", ' ').strip
+        INSERT INTO instincts
+          (id, project_path, pattern, context_tags, confidence,
+           decay_rate, times_applied, times_helpful, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      SQL
+      db.execute(
+        sql,
+        ['no-tags', project_path, 'No tags pattern', nil,
+         0.8, 0.01, 0, 0, now, now]
+      )
+
+      result = described_class.call(db: db, project_path: project_path)
+      expect(result).to include('No tags pattern')
+    end
+
+    it 'includes confidence label in output' do
+      insert_instinct(id: 'labeled', pattern: 'Near certain pattern', confidence: 0.95, tags: %w[project_specific])
+
+      result = described_class.call(db: db, project_path: project_path)
+
+      expect(result).to include('near-certain')
+      expect(result).to include('0.95')
+      expect(result).to include('Near certain pattern')
     end
   end
 end

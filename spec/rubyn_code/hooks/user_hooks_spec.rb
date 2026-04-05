@@ -5,10 +5,8 @@ require 'spec_helper'
 RSpec.describe RubynCode::Hooks::UserHooks do
   let(:registry) { RubynCode::Hooks::Registry.new }
 
-  def with_temp_project
-    Dir.mktmpdir('rubyn_test_') do |dir|
-      yield dir
-    end
+  def with_temp_project(&block)
+    Dir.mktmpdir('rubyn_test_', &block)
   end
 
   def write_hooks_yml(dir, content, global: false)

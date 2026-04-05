@@ -26,7 +26,7 @@ RSpec.describe RubynCode::Tools::BackgroundRun do
     context 'when background_worker is available' do
       let(:worker) do
         obj = Object.new
-        def obj.run(command, timeout: 300)
+        def obj.run(_command, **_opts)
           'job-abc-123'
         end
         obj

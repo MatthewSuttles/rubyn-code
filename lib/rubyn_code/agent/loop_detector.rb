@@ -7,10 +7,16 @@ module RubynCode
     class LoopDetector
       # @param window [Integer] number of recent calls to keep in the sliding window
       # @param threshold [Integer] number of identical signatures that indicate a stall
-      def initialize(window: 5, threshold: 3)
-        @window    = window
-        @threshold = threshold
-        @history   = []
+      # @param name_window [Integer] larger window for tool name repetition detection
+      # @param name_threshold [Integer] how many times the same tool name in name_window triggers stall
+      def initialize(window: 5, threshold: 3, name_window: 12, name_threshold: 6)
+        @window         = window
+        @threshold      = threshold
+        @name_window    = name_window
+        @name_threshold = name_threshold
+        @history        = []
+        @name_history   = []
+        @file_edits     = Hash.new(0)
       end
 
       # Record a tool invocation. The signature is derived from the tool name
@@ -24,6 +30,16 @@ module RubynCode
         sig = signature(tool_name, tool_input)
         @history << sig
         @history.shift while @history.length > @window
+
+        # Track tool name frequency separately
+        @name_history << tool_name.to_s
+        @name_history.shift while @name_history.length > @name_window
+
+        # Track file edit frequency
+        if %w[edit_file write_file].include?(tool_name.to_s) && tool_input.is_a?(Hash)
+          path = tool_input[:path] || tool_input['path']
+          @file_edits[path.to_s] += 1 if path
+        end
       end
 
       # Returns true when the same tool call signature appears at least
@@ -31,10 +47,22 @@ module RubynCode
       #
       # @return [Boolean]
       def stalled?
-        return false if @history.length < @threshold
+        # Check 1: Exact same tool call repeated
+        if @history.length >= @threshold
+          counts = @history.tally
+          return true if counts.any? { |_sig, count| count >= @threshold }
+        end
 
-        counts = @history.tally
-        counts.any? { |_sig, count| count >= @threshold }
+        # Check 2: Same tool NAME called too frequently (even with different inputs)
+        if @name_history.length >= @name_threshold
+          name_counts = @name_history.tally
+          return true if name_counts.any? { |_name, count| count >= @name_threshold }
+        end
+
+        # Check 3: Same file edited 3+ times
+        return true if @file_edits.any? { |_path, count| count >= 3 }
+
+        false
       end
 
       # Clear recorded history.
@@ -42,6 +70,8 @@ module RubynCode
       # @return [void]
       def reset!
         @history.clear
+        @name_history.clear
+        @file_edits.clear
       end
 
       # A system-level nudge message to inject when a stall is detected.

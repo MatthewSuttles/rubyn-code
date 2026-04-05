@@ -39,7 +39,7 @@ RSpec.describe RubynCode::Memory::Search do
       results = search.search('pattern', category: 'code_pattern')
 
       contents = results.map(&:content)
-      expect(contents).to all(include('pattern').or include('clauses'))
+      expect(contents).to all(include('pattern').or(include('clauses')))
     end
 
     it 'respects limit' do

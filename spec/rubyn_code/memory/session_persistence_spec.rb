@@ -28,8 +28,10 @@ RSpec.describe RubynCode::Memory::SessionPersistence do
     end
 
     it 'upserts on duplicate session_id' do
-      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: [{ role: 'user', content: 'v1' }], model: 'claude-sonnet')
-      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: [{ role: 'user', content: 'v2' }], model: 'claude-sonnet')
+      persistence.save_session(session_id: 'sess-1', project_path: '/test',
+                               messages: [{ role: 'user', content: 'v1' }], model: 'claude-sonnet')
+      persistence.save_session(session_id: 'sess-1', project_path: '/test',
+                               messages: [{ role: 'user', content: 'v2' }], model: 'claude-sonnet')
 
       session = persistence.load_session('sess-1')
       expect(session[:messages]).to eq([{ role: 'user', content: 'v2' }])
@@ -39,7 +41,7 @@ RSpec.describe RubynCode::Memory::SessionPersistence do
       persistence.save_session(
         session_id: 'sess-1',
         project_path: '/test',
-        messages: [], model: "claude-sonnet",
+        messages: [], model: 'claude-sonnet',
         metadata: { cost: 0.05, tokens: 1000 }
       )
 
@@ -54,24 +56,69 @@ RSpec.describe RubynCode::Memory::SessionPersistence do
     end
 
     it 'handles malformed JSON gracefully' do
-      # Ensure table exists (persistence constructor calls ensure_table)
       persistence
+      sql = <<~SQL.tr("\n", ' ').strip
+        INSERT INTO sessions
+          (id, project_path, messages, metadata, status,
+           created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      SQL
       db.execute(
-        'INSERT INTO sessions (id, project_path, messages, metadata, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        ['bad', '/test', '{bad json', '{also bad', 'active', '2024-01-01', '2024-01-01']
+        sql,
+        ['bad', '/test', '{bad json', '{also bad',
+         'active', '2024-01-01', '2024-01-01']
       )
 
       session = persistence.load_session('bad')
       expect(session[:messages]).to eq([])
       expect(session[:metadata]).to eq({})
     end
+
+    it 'handles empty string messages and metadata' do
+      persistence
+      sql = <<~SQL.tr("\n", ' ').strip
+        INSERT INTO sessions
+          (id, project_path, messages, metadata, status,
+           created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      SQL
+      db.execute(
+        sql,
+        ['empty-data', '/test', '', '',
+         'active', '2024-01-01', '2024-01-01']
+      )
+
+      session = persistence.load_session('empty-data')
+      expect(session[:messages]).to eq([])
+      expect(session[:metadata]).to eq({})
+    end
+
+    it 'handles non-array JSON messages gracefully' do
+      persistence
+      sql = <<~SQL.tr("\n", ' ').strip
+        INSERT INTO sessions
+          (id, project_path, messages, metadata, status,
+           created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      SQL
+      db.execute(
+        sql,
+        ['obj-data', '/test', '{"not": "an array"}',
+         '{"still": "ok"}', 'active', '2024-01-01', '2024-01-01']
+      )
+
+      session = persistence.load_session('obj-data')
+      # metadata parses as hash, messages may be hash or wrapped
+      expect(session[:metadata]).to include(still: 'ok')
+      expect(session[:messages]).not_to be_nil
+    end
   end
 
   describe '#list_sessions' do
     before do
-      persistence.save_session(session_id: 's1', project_path: '/a', messages: [], model: "claude-sonnet", title: 'A')
-      persistence.save_session(session_id: 's2', project_path: '/a', messages: [], model: "claude-sonnet", title: 'B')
-      persistence.save_session(session_id: 's3', project_path: '/b', messages: [], model: "claude-sonnet", title: 'C')
+      persistence.save_session(session_id: 's1', project_path: '/a', messages: [], model: 'claude-sonnet', title: 'A')
+      persistence.save_session(session_id: 's2', project_path: '/a', messages: [], model: 'claude-sonnet', title: 'B')
+      persistence.save_session(session_id: 's3', project_path: '/b', messages: [], model: 'claude-sonnet', title: 'C')
     end
 
     it 'lists all sessions' do
@@ -106,13 +153,20 @@ RSpec.describe RubynCode::Memory::SessionPersistence do
 
   describe '#update_session' do
     before do
-      persistence.save_session(session_id: 's1', project_path: '/test', messages: [], model: "claude-sonnet", title: 'Original')
+      persistence.save_session(session_id: 's1', project_path: '/test', messages: [], model: 'claude-sonnet',
+                               title: 'Original')
     end
 
     it 'updates title' do
       persistence.update_session('s1', title: 'New Title')
       session = persistence.load_session('s1')
       expect(session[:title]).to eq('New Title')
+    end
+
+    it 'updates model' do
+      persistence.update_session('s1', model: 'claude-opus')
+      session = persistence.load_session('s1')
+      expect(session[:model]).to eq('claude-opus')
     end
 
     it 'updates status' do
@@ -141,7 +195,7 @@ RSpec.describe RubynCode::Memory::SessionPersistence do
 
   describe '#delete_session' do
     it 'permanently removes the session' do
-      persistence.save_session(session_id: 's1', project_path: '/test', messages: [], model: "claude-sonnet")
+      persistence.save_session(session_id: 's1', project_path: '/test', messages: [], model: 'claude-sonnet')
       persistence.delete_session('s1')
       expect(persistence.load_session('s1')).to be_nil
     end

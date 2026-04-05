@@ -3,40 +3,39 @@
 require 'spec_helper'
 
 # Ensure LLM data classes are loaded (they live behind autoload)
-RubynCode::LLM::MessageBuilder
 
 RSpec.describe RubynCode::Learning::Extractor do
-  let(:llm_client) { instance_double("RubynCode::LLM::Client") }
-  let(:messages) { [{ role: "user", content: "Fix the migration" }] }
+  let(:llm_client) { instance_double('RubynCode::LLM::Client') }
+  let(:messages) { [{ role: 'user', content: 'Fix the migration' }] }
 
-  describe ".call" do
-    it "returns extracted patterns from LLM response" do
+  describe '.call' do
+    it 'returns extracted patterns from LLM response' do
       json_array = JSON.generate([{
-        "type" => "error_resolution",
-        "pattern" => "Check index before migration",
-        "context_tags" => ["rails"],
-        "confidence" => 0.6
-      }])
+                                   'type' => 'error_resolution',
+                                   'pattern' => 'Check index before migration',
+                                   'context_tags' => ['rails'],
+                                   'confidence' => 0.6
+                                 }])
 
       response = RubynCode::LLM::Response.new(
-        id: "msg_1",
+        id: 'msg_1',
         content: [RubynCode::LLM::TextBlock.new(text: json_array)],
-        stop_reason: "end_turn",
+        stop_reason: 'end_turn',
         usage: RubynCode::LLM::Usage.new(input_tokens: 50, output_tokens: 50)
       )
       allow(llm_client).to receive(:chat).and_return(response)
 
-      results = described_class.call(messages, llm_client: llm_client, project_path: "/proj")
+      results = described_class.call(messages, llm_client: llm_client, project_path: '/proj')
 
       expect(results.size).to eq(1)
-      expect(results.first[:pattern]).to include("error_resolution")
+      expect(results.first[:pattern]).to include('error_resolution')
       expect(results.first[:confidence]).to be_between(0.3, 0.8)
     end
 
-    it "returns empty array when LLM fails" do
-      allow(llm_client).to receive(:chat).and_raise(StandardError, "timeout")
+    it 'returns empty array when LLM fails' do
+      allow(llm_client).to receive(:chat).and_raise(StandardError, 'timeout')
 
-      results = described_class.call(messages, llm_client: llm_client, project_path: "/proj")
+      results = described_class.call(messages, llm_client: llm_client, project_path: '/proj')
       expect(results).to eq([])
     end
 
@@ -53,11 +52,11 @@ RSpec.describe RubynCode::Learning::Extractor do
       ]
 
       json_array = JSON.generate([{
-        'type' => 'error_resolution',
-        'pattern' => 'Array content pattern',
-        'context_tags' => ['test'],
-        'confidence' => 0.5
-      }])
+                                   'type' => 'error_resolution',
+                                   'pattern' => 'Array content pattern',
+                                   'context_tags' => ['test'],
+                                   'confidence' => 0.5
+                                 }])
 
       response = RubynCode::LLM::Response.new(
         id: 'msg_arr',
@@ -79,11 +78,11 @@ RSpec.describe RubynCode::Learning::Extractor do
       ]
 
       json_array = JSON.generate([{
-        'type' => 'debugging_technique',
-        'pattern' => 'Object content pattern',
-        'context_tags' => ['debug'],
-        'confidence' => 0.6
-      }])
+                                   'type' => 'debugging_technique',
+                                   'pattern' => 'Object content pattern',
+                                   'context_tags' => ['debug'],
+                                   'confidence' => 0.6
+                                 }])
 
       response = RubynCode::LLM::Response.new(
         id: 'msg_obj',
@@ -102,11 +101,11 @@ RSpec.describe RubynCode::Learning::Extractor do
   describe 'save_instincts! failure handling' do
     it 'logs the error and swallows it' do
       json_array = JSON.generate([{
-        'type' => 'error_resolution',
-        'pattern' => 'Save failure test',
-        'context_tags' => ['test'],
-        'confidence' => 0.5
-      }])
+                                   'type' => 'error_resolution',
+                                   'pattern' => 'Save failure test',
+                                   'context_tags' => ['test'],
+                                   'confidence' => 0.5
+                                 }])
 
       response = RubynCode::LLM::Response.new(
         id: 'msg_save_fail',
@@ -121,10 +120,10 @@ RSpec.describe RubynCode::Learning::Extractor do
       allow(RubynCode::DB::Connection).to receive(:instance).and_return(fake_db)
       allow(fake_db).to receive(:execute).and_raise(StandardError, 'DB write failed')
 
-      expect {
+      expect do
         results = described_class.call(messages, llm_client: llm_client, project_path: '/proj')
         expect(results.size).to eq(1)
-      }.to output(/Failed to save instincts/).to_stderr
+      end.to output(/Failed to save instincts/).to_stderr
     end
   end
 
@@ -151,10 +150,10 @@ RSpec.describe RubynCode::Learning::Extractor do
       )
       allow(llm_client).to receive(:chat).and_return(response)
 
-      expect {
+      expect do
         results = described_class.call(messages, llm_client: llm_client, project_path: '/proj')
         expect(results).to eq([])
-      }.to output(/Failed to parse extraction response/).to_stderr
+      end.to output(/Failed to parse extraction response/).to_stderr
     end
   end
 

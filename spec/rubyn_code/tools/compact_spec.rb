@@ -34,7 +34,7 @@ RSpec.describe RubynCode::Tools::Compact do
     context 'when context_manager supports compaction' do
       let(:manager) do
         obj = Object.new
-        def obj.compact(focus: nil)
+        def obj.compact(**_opts)
           { before: 100, after: 20, tokens_saved: 5000 }
         end
         obj
@@ -60,7 +60,7 @@ RSpec.describe RubynCode::Tools::Compact do
     context 'when focus is provided' do
       let(:manager) do
         obj = Object.new
-        def obj.compact(focus: nil)
+        def obj.compact(**_opts)
           { before: 50, after: 10, tokens_saved: 2000 }
         end
         obj
@@ -77,7 +77,7 @@ RSpec.describe RubynCode::Tools::Compact do
     context 'when compact returns a non-hash result' do
       let(:manager) do
         obj = Object.new
-        def obj.compact(focus: nil)
+        def obj.compact(**_opts)
           'done'
         end
         obj

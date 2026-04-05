@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "sqlite3"
+require 'sqlite3'
 
 module DBHelpers
   # Lightweight wrapper around a raw SQLite3::Database that mirrors the
@@ -20,8 +20,8 @@ module DBHelpers
       @db.execute(sql, params)
     end
 
-    def transaction(&block)
-      @db.transaction(&block)
+    def transaction(&)
+      @db.transaction(&)
     end
   end
 
@@ -38,7 +38,7 @@ module DBHelpers
     wrapper = setup_test_db
     migrations_dir = File.expand_path('../../db/migrations', __dir__)
 
-    Dir.glob(File.join(migrations_dir, '*.sql')).sort.each do |path|
+    Dir.glob(File.join(migrations_dir, '*.sql')).each do |path|
       sql = File.read(path)
       sql.split(';').each do |stmt|
         stmt = stmt.strip
