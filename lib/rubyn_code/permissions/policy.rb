@@ -15,7 +15,7 @@ module RubynCode
       ALWAYS_ALLOW = %w[
         read_file glob grep git_status git_diff git_log
         memory_search memory_write load_skill compact
-        task web_search web_fetch
+        task web_search web_fetch ask_user
       ].to_set.freeze
 
       def self.check(tool_name:, tool_input:, tier:, deny_list:)

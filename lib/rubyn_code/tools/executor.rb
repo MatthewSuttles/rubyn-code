@@ -4,7 +4,7 @@ module RubynCode
   module Tools
     class Executor
       attr_reader :project_root
-      attr_accessor :llm_client, :background_worker, :on_agent_status, :db
+      attr_accessor :llm_client, :background_worker, :on_agent_status, :db, :ask_user_callback
 
       def initialize(project_root:)
         @project_root = File.expand_path(project_root)
@@ -56,6 +56,8 @@ module RubynCode
           tool.db = @db if tool.respond_to?(:db=)
         when 'background_run'
           tool.background_worker = @background_worker if tool.respond_to?(:background_worker=)
+        when 'ask_user'
+          tool.prompt_callback = @ask_user_callback if tool.respond_to?(:prompt_callback=)
         end
       end
 

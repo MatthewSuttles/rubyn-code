@@ -86,6 +86,15 @@ module RubynCode
         @tool_executor.llm_client = @llm_client
         @tool_executor.background_worker = @background_worker
         @tool_executor.db = @db
+        @tool_executor.ask_user_callback = ->(question) {
+          @spinner.stop
+          @renderer.warning("Rubyn is asking:")
+          puts "  #{question}"
+          print "  > "
+          $stdout.flush
+          answer = Reline.readline('', false)&.strip
+          answer.nil? || answer.empty? ? '[no response]' : answer
+        }
         @sub_agent_tool_count = 0
         @in_sub_agent = false
         @tool_executor.on_agent_status = lambda { |type, msg|

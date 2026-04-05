@@ -72,6 +72,7 @@ module RubynCode
     autoload :BackgroundRun, 'rubyn_code/tools/background_run'
     autoload :WebSearch, 'rubyn_code/tools/web_search'
     autoload :WebFetch, 'rubyn_code/tools/web_fetch'
+    autoload :AskUser, 'rubyn_code/tools/ask_user'
     autoload :GitCommit, 'rubyn_code/tools/git_commit'
     autoload :GitDiff, 'rubyn_code/tools/git_diff'
     autoload :GitLog, 'rubyn_code/tools/git_log'

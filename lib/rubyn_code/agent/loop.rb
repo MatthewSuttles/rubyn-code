@@ -219,7 +219,8 @@ module RubynCode
         - HOWEVER: always respect patterns already established in the codebase. If the project uses a specific convention (e.g. service objects, a particular test style, a custom base class), follow that convention even if it differs from the skill doc. Consistency with the codebase beats textbook best practice. Only break from established patterns if they are genuinely harmful (security issues, major performance problems, or bugs).
         - Keep responses concise. Code speaks louder than paragraphs.
         - Use spawn_agent sparingly — only for tasks that require reading many files (10+) or deep exploration. For simple reads or edits, use tools directly. Don't spawn a sub-agent when a single read_file or grep will do.
-        - If an approach fails, diagnose WHY before switching tactics. Read the error, check your assumptions, try a focused fix. Don't retry the identical action blindly, but don't abandon a viable approach after a single failure either. When you're genuinely stuck after investigation, tell the user and ask how to proceed.
+        - If an approach fails, diagnose WHY before switching tactics. Read the error, check your assumptions, try a focused fix. Don't retry the identical action blindly, but don't abandon a viable approach after a single failure either.
+        - When you're genuinely stuck after investigation, use the ask_user tool to ask for clarification or guidance. Don't spin your wheels — ask.
         - NEVER chase lint/rubocop fixes in a loop. Run `rubocop --autocorrect-all` ONCE. For remaining manual fixes, read ALL the offenses, then fix ALL of them in ONE pass across all files before re-checking. Never do fix-one-check-fix-one-check.
         - Batch your work. If you need to edit 5 files, edit all 5, THEN verify. Don't edit-verify-edit-verify for each one.
         - If you find yourself editing the same file more than twice, STOP. Tell the user what you're stuck on and ask how to proceed.
