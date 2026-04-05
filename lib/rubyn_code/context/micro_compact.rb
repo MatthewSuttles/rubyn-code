@@ -22,22 +22,27 @@ module RubynCode
 
         tool_name_index = build_tool_name_index(messages)
         candidates = tool_result_refs[0..-(keep_recent + 1)]
+        compact_candidates(candidates, tool_name_index, preserve_tools)
+      end
+
+      def self.compact_candidates(candidates, tool_name_index, preserve_tools)
         compacted = 0
-
         candidates.each do |ref|
-          block = ref[:block]
-          content = extract_content(block)
-          next if content.nil? || content.length < MIN_CONTENT_LENGTH
-
-          tool_name = resolve_tool_name(block, tool_name_index)
-          next if preserve_tools.include?(tool_name)
-
-          placeholder = format(PLACEHOLDER_TEMPLATE, tool_name: tool_name || 'tool')
-          replace_content!(block, placeholder)
-          compacted += 1
+          compacted += 1 if compact_single_ref(ref, tool_name_index, preserve_tools)
         end
-
         compacted
+      end
+
+      def self.compact_single_ref(ref, tool_name_index, preserve_tools) # rubocop:disable Naming/PredicateMethod -- returns boolean but is an action method
+        block = ref[:block]
+        content = extract_content(block)
+        return false if content.nil? || content.length < MIN_CONTENT_LENGTH
+
+        tool_name = resolve_tool_name(block, tool_name_index)
+        return false if preserve_tools.include?(tool_name)
+
+        replace_content!(block, format(PLACEHOLDER_TEMPLATE, tool_name: tool_name || 'tool'))
+        true
       end
 
       # Collects all tool_result content blocks across user messages, preserving
@@ -70,17 +75,21 @@ module RubynCode
         messages.each do |msg|
           next unless msg[:role] == 'assistant' && msg[:content].is_a?(Array)
 
-          msg[:content].each do |block|
-            case block
-            when Hash
-              index[block[:id] || block['id']] = block[:name] || block['name'] if block_type(block) == 'tool_use'
-            when LLM::ToolUseBlock
-              index[block.id] = block.name
-            end
-          end
+          msg[:content].each { |block| index_tool_use(index, block) }
         end
 
         index
+      end
+
+      def self.index_tool_use(index, block)
+        case block
+        when Hash
+          return unless block_type(block) == 'tool_use'
+
+          index[block[:id] || block['id']] = block[:name] || block['name']
+        when LLM::ToolUseBlock
+          index[block.id] = block.name
+        end
       end
 
       def self.tool_result_block?(block)
@@ -128,6 +137,7 @@ module RubynCode
       end
 
       private_class_method :collect_tool_results, :build_tool_name_index,
+                           :index_tool_use, :compact_candidates, :compact_single_ref,
                            :tool_result_block?, :block_type, :extract_content,
                            :resolve_tool_name, :replace_content!
     end

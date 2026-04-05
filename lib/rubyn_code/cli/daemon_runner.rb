@@ -18,14 +18,9 @@ module RubynCode
       end
 
       def run
-        ensure_home_dir!
-        ensure_auth!
-        setup_database!
-        display_banner!
-
+        bootstrap!
         daemon = build_daemon
         daemon.start!
-
         display_shutdown_summary(daemon)
       rescue Interrupt
         @renderer.info("\nShutting down daemon...")
@@ -37,6 +32,13 @@ module RubynCode
       end
 
       private
+
+      def bootstrap!
+        ensure_home_dir!
+        ensure_auth!
+        setup_database!
+        display_banner!
+      end
 
       def build_daemon
         Autonomous::Daemon.new(
@@ -96,9 +98,18 @@ module RubynCode
       end
 
       def display_banner!
+        display_banner_header!
+        display_banner_details!
+        display_banner_footer!
+      end
+
+      def display_banner_header!
         @renderer.info('╔══════════════════════════════════════╗')
         @renderer.info('║        GOLEM Daemon Starting         ║')
         @renderer.info('╚══════════════════════════════════════╝')
+      end
+
+      def display_banner_details!
         @renderer.info("  Agent:        #{@daemon_opts[:agent_name]}")
         @renderer.info("  Role:         #{@daemon_opts[:role]}")
         @renderer.info("  Project:      #{@project_root}")
@@ -106,6 +117,9 @@ module RubynCode
         @renderer.info("  Max cost:     $#{@daemon_opts[:max_cost]}")
         @renderer.info("  Idle timeout: #{@daemon_opts[:idle_timeout]}s")
         @renderer.info("  Poll interval: #{@daemon_opts[:poll_interval]}s")
+      end
+
+      def display_banner_footer!
         @renderer.info('')
         @renderer.info('Waiting for tasks... (Ctrl-C to stop)')
         @renderer.info('Seed tasks via the REPL: /tasks or the task tool.')
@@ -122,7 +136,7 @@ module RubynCode
         @renderer.info('╚══════════════════════════════════════╝')
         @renderer.info("  Final state:    #{status[:state]}")
         @renderer.info("  Tasks completed: #{status[:runs_completed]}")
-        @renderer.info("  Total cost:     $#{'%.4f' % status[:total_cost]}")
+        @renderer.info(format('  Total cost:     $%.4f', status[:total_cost]))
       end
     end
   end

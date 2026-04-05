@@ -27,19 +27,9 @@ module RubynCode
       # @param tool_input [Hash, String, nil]
       # @return [void]
       def record(tool_name, tool_input)
-        sig = signature(tool_name, tool_input)
-        @history << sig
-        @history.shift while @history.length > @window
-
-        # Track tool name frequency separately
-        @name_history << tool_name.to_s
-        @name_history.shift while @name_history.length > @name_window
-
-        # Track file edit frequency
-        return unless %w[edit_file write_file].include?(tool_name.to_s) && tool_input.is_a?(Hash)
-
-        path = tool_input[:path] || tool_input['path']
-        @file_edits[path.to_s] += 1 if path
+        record_signature(tool_name, tool_input)
+        record_tool_name(tool_name)
+        record_file_edit(tool_name, tool_input)
       end
 
       # Returns true when the same tool call signature appears at least
@@ -47,22 +37,7 @@ module RubynCode
       #
       # @return [Boolean]
       def stalled?
-        # Check 1: Exact same tool call repeated
-        if @history.length >= @threshold
-          counts = @history.tally
-          return true if counts.any? { |_sig, count| count >= @threshold }
-        end
-
-        # Check 2: Same tool NAME called too frequently (even with different inputs)
-        if @name_history.length >= @name_threshold
-          name_counts = @name_history.tally
-          return true if name_counts.any? { |_name, count| count >= @name_threshold }
-        end
-
-        # Check 3: Same file edited 3+ times
-        return true if @file_edits.any? { |_path, count| count >= 3 }
-
-        false
+        exact_call_repeated? || tool_name_repeated? || file_over_edited?
       end
 
       # Clear recorded history.
@@ -85,6 +60,40 @@ module RubynCode
       end
 
       private
+
+      def record_signature(tool_name, tool_input)
+        sig = signature(tool_name, tool_input)
+        @history << sig
+        @history.shift while @history.length > @window
+      end
+
+      def record_tool_name(tool_name)
+        @name_history << tool_name.to_s
+        @name_history.shift while @name_history.length > @name_window
+      end
+
+      def record_file_edit(tool_name, tool_input)
+        return unless %w[edit_file write_file].include?(tool_name.to_s) && tool_input.is_a?(Hash)
+
+        path = tool_input[:path] || tool_input['path']
+        @file_edits[path.to_s] += 1 if path
+      end
+
+      def exact_call_repeated?
+        return false if @history.length < @threshold
+
+        @history.tally.any? { |_sig, count| count >= @threshold }
+      end
+
+      def tool_name_repeated?
+        return false if @name_history.length < @name_threshold
+
+        @name_history.tally.any? { |_name, count| count >= @name_threshold }
+      end
+
+      def file_over_edited?
+        @file_edits.any? { |_path, count| count >= 3 }
+      end
 
       def signature(tool_name, tool_input)
         input_str = case tool_input

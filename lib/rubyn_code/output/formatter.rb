@@ -55,18 +55,18 @@ module RubynCode
       end
 
       def diff(text)
-        lines = text.each_line.map do |line|
-          case line
-          when /\A\+{3}\s/  then pastel.bold(line)
-          when /\A-{3}\s/   then pastel.bold(line)
-          when /\A@@/        then pastel.cyan(line)
-          when /\A\+/        then pastel.green(line)
-          when /\A-/         then pastel.red(line)
-          else                    pastel.dim(line)
-          end
-        end
-
+        lines = text.each_line.map { |line| colorize_diff_line(line) }
         output lines.join
+      end
+
+      def colorize_diff_line(line)
+        case line
+        when /\A[+-]{3}\s/ then pastel.bold(line)
+        when /\A@@/        then pastel.cyan(line)
+        when /\A\+/        then pastel.green(line)
+        when /\A-/         then pastel.red(line)
+        else                    pastel.dim(line)
+        end
       end
 
       def tool_call(tool_name, arguments = {})

@@ -37,8 +37,7 @@ module RubynCode
         truncated = output.to_s[0...300]
         lines = truncated.lines
         if lines.length > 6
-          puts @pastel.dim("    #{lines[0..4].map(&:strip).join("\n    ")}")
-          puts @pastel.dim("    ... (#{lines.length - 5} more lines)")
+          render_truncated_result(lines)
         else
           puts @pastel.dim("    #{truncated.strip.gsub("\n", "\n    ")}")
         end
@@ -80,8 +79,8 @@ module RubynCode
 
       def cost_summary(session_cost:, daily_cost:, tokens:)
         puts @pastel.bold('Cost Summary:')
-        puts "  Session: $#{'%.4f' % session_cost}"
-        puts "  Today:   $#{'%.4f' % daily_cost}"
+        puts format('  Session: $%.4f', session_cost)
+        puts format('  Today:   $%.4f', daily_cost)
         puts "  Tokens:  #{tokens[:input]} in / #{tokens[:output]} out"
       end
 
@@ -95,37 +94,57 @@ module RubynCode
 
       private
 
+      def render_truncated_result(lines)
+        puts @pastel.dim("    #{lines[0..4].map(&:strip).join("\n    ")}")
+        puts @pastel.dim("    ... (#{lines.length - 5} more lines)")
+      end
+
       def render_markdown(text)
         lines = text.lines
         result = []
-
         in_code_block = false
         code_lang = nil
         code_buffer = []
 
         lines.each do |line|
-          if line.strip.match?(/\A```(\w*)/)
-            if in_code_block
-              result << render_code_block(code_buffer.join, code_lang)
-              code_buffer = []
-              in_code_block = false
-              code_lang = nil
-            else
-              in_code_block = true
-              code_lang = line.strip.match(/\A```(\w*)/)[1]
-              code_lang = 'ruby' if code_lang.empty?
-            end
-          elsif in_code_block
-            code_buffer << line
-          else
-            result << render_line(line)
-          end
+          in_code_block, code_lang, code_buffer = process_markdown_line(
+            line, in_code_block, code_lang, code_buffer, result
+          )
         end
 
         # Flush any unclosed code block
-        result << render_code_block(code_buffer.join, code_lang || 'ruby') unless code_buffer.empty?
+        flush_code_buffer(code_buffer, code_lang, result)
 
         result.join
+      end
+
+      def process_markdown_line(line, in_code_block, code_lang, code_buffer, result)
+        if line.strip.match?(/\A```(\w*)/)
+          handle_code_fence(line, in_code_block, code_lang, code_buffer, result)
+        elsif in_code_block
+          code_buffer << line
+          [in_code_block, code_lang, code_buffer]
+        else
+          result << render_line(line)
+          [in_code_block, code_lang, code_buffer]
+        end
+      end
+
+      def handle_code_fence(line, in_code_block, code_lang, code_buffer, result)
+        if in_code_block
+          result << render_code_block(code_buffer.join, code_lang)
+          [false, nil, []]
+        else
+          lang = line.strip.match(/\A```(\w*)/)[1]
+          lang = 'ruby' if lang.empty?
+          [true, lang, []]
+        end
+      end
+
+      def flush_code_buffer(code_buffer, code_lang, result)
+        return if code_buffer.empty?
+
+        result << render_code_block(code_buffer.join, code_lang || 'ruby')
       end
 
       def render_code_block(code, lang)
@@ -139,35 +158,36 @@ module RubynCode
       end
 
       def render_line(line)
-        # Headers
-        if line.match?(/\A\s*\#{1,6}\s/)
-          level = line.match(/\A\s*(\#{1,6})\s/)[1].length
-          text = line.sub(/\A\s*\#{1,6}\s+/, '').rstrip
-          case level
-          when 1 then "#{@pastel.bold.underline(text)}\n"
-          when 2 then "#{@pastel.bold(text)}\n"
-          else "#{@pastel.bold(text)}\n"
-          end
-        # Bullet lists
-        elsif line.match?(/\A\s*[-*]\s/)
-          indent = line.match(/\A(\s*)/)[1]
-          content = line.sub(/\A\s*[-*]\s+/, '')
-          "#{indent}  #{@pastel.cyan('•')} #{render_inline(content)}"
-        # Numbered lists
-        elsif line.match?(/\A\s*\d+\.\s/)
-          indent = line.match(/\A(\s*)/)[1]
-          num = line.match(/(\d+)\./)[1]
-          content = line.sub(/\A\s*\d+\.\s+/, '')
-          "#{indent}  #{@pastel.cyan("#{num}.")} #{render_inline(content)}"
-        # Horizontal rules
-        elsif line.strip.match?(/\A-{3,}\z/)
-          "#{@pastel.dim('─' * [terminal_width - 4, 40].min)}\n"
-        # Table rows
-        elsif line.include?('|')
-          render_table_row(line)
-        else
-          render_inline(line)
+        case line
+        when /\A\s*\#{1,6}\s/   then render_header(line)
+        when /\A\s*[-*]\s/      then render_bullet(line)
+        when /\A\s*\d+\.\s/     then render_numbered_item(line)
+        when ->(l) { l.strip.match?(/\A-{3,}\z/) } then "#{@pastel.dim('─' * [terminal_width - 4, 40].min)}\n"
+        when /\|/ then render_table_row(line)
+        else render_inline(line)
         end
+      end
+
+      def render_header(line)
+        level = line.match(/\A\s*(\#{1,6})\s/)[1].length
+        text = line.sub(/\A\s*\#{1,6}\s+/, '').rstrip
+        case level
+        when 1 then "#{@pastel.bold.underline(text)}\n"
+        else "#{@pastel.bold(text)}\n"
+        end
+      end
+
+      def render_bullet(line)
+        indent = line.match(/\A(\s*)/)[1]
+        content = line.sub(/\A\s*[-*]\s+/, '')
+        "#{indent}  #{@pastel.cyan('•')} #{render_inline(content)}"
+      end
+
+      def render_numbered_item(line)
+        indent = line.match(/\A(\s*)/)[1]
+        num = line.match(/(\d+)\./)[1]
+        content = line.sub(/\A\s*\d+\.\s+/, '')
+        "#{indent}  #{@pastel.cyan("#{num}.")} #{render_inline(content)}"
       end
 
       def render_inline(text)

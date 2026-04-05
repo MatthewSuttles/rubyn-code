@@ -140,29 +140,27 @@ module RubynCode
       def read_response(expected_id)
         Timeout.timeout(@timeout, TimeoutError, "MCP server did not respond within #{@timeout}s") do
           loop do
-            line = @stdout.gets
-            raise TransportError, 'MCP server closed stdout unexpectedly' if line.nil?
+            message = read_next_message
+            next unless message&.key?('id') && message['id'] == expected_id
 
-            line = line.strip
-            next if line.empty?
-
-            message = parse_json(line)
-            next unless message
-
-            # Skip notifications (no id field)
-            next unless message.key?('id')
-
-            # Skip responses for other requests
-            next unless message['id'] == expected_id
-
-            if message.key?('error')
-              err = message['error']
-              raise TransportError, "MCP error (#{err['code']}): #{err['message']}"
-            end
-
+            raise_mcp_error(message['error']) if message.key?('error')
             return message['result']
           end
         end
+      end
+
+      def read_next_message
+        line = @stdout.gets
+        raise TransportError, 'MCP server closed stdout unexpectedly' if line.nil?
+
+        stripped = line.strip
+        return nil if stripped.empty?
+
+        parse_json(stripped)
+      end
+
+      def raise_mcp_error(err)
+        raise TransportError, "MCP error (#{err['code']}): #{err['message']}"
       end
 
       def parse_json(line)

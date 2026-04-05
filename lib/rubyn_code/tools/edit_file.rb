@@ -28,7 +28,8 @@ module RubynCode
 
         if !replace_all && occurrences > 1
           raise Error,
-                "old_text found #{occurrences} times in #{path}. Use replace_all: true to replace all, or provide a more specific old_text."
+                "old_text found #{occurrences} times in #{path}. " \
+                'Use replace_all: true to replace all, or provide a more specific old_text.'
         end
 
         new_content = if replace_all

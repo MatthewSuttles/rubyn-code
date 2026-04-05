@@ -18,26 +18,28 @@ module RubynCode
 
       def execute(count: 20, branch: nil)
         validate_git_repo!
+        stdout = run_git_log(count.to_i.clamp(1, 200), branch)
+        format_log_output(stdout, branch)
+      end
 
-        count = [[count.to_i, 1].max, 200].min
+      private
 
+      def run_git_log(count, branch)
         cmd = ['git', 'log', '--oneline', "-#{count}"]
         cmd << branch unless branch.nil? || branch.strip.empty?
 
         stdout, stderr, status = safe_capture3(*cmd, chdir: project_root)
-
         raise Error, "git log failed: #{stderr.strip}" unless status.success?
 
-        if stdout.strip.empty?
-          'No commits found.'
-        else
-          current = current_branch
-          header = "Commit history#{branch ? " (#{branch})" : " (#{current})"}:\n\n"
-          truncate("#{header}#{stdout}", max: 50_000)
-        end
+        stdout
       end
 
-      private
+      def format_log_output(stdout, branch)
+        return 'No commits found.' if stdout.strip.empty?
+
+        display_branch = branch || current_branch
+        truncate("Commit history (#{display_branch}):\n\n#{stdout}", max: 50_000)
+      end
 
       def validate_git_repo!
         _, _, status = safe_capture3('git', 'rev-parse', '--is-inside-work-tree', chdir: project_root)

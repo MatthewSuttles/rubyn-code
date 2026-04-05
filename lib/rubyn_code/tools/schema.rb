@@ -35,20 +35,14 @@ module RubynCode
           schema
         end
 
+        OPTIONAL_PROP_KEYS = %i[description default enum].freeze
+
         private
 
         def build_property(spec)
-          prop = {}
-
-          type = spec[:type] || :string
-          prop[:type] = TYPE_MAP.fetch(type, type.to_s)
-
-          prop[:description] = spec[:description] if spec[:description]
-          prop[:default] = spec[:default] if spec.key?(:default)
-          prop[:enum] = spec[:enum] if spec[:enum]
-
+          prop = { type: TYPE_MAP.fetch(spec[:type] || :string, (spec[:type] || :string).to_s) }
+          OPTIONAL_PROP_KEYS.each { |key| prop[key] = spec[key] if spec.key?(key) && spec[key] }
           prop[:items] = build_property(spec[:items]) if spec[:items]
-
           prop
         end
       end

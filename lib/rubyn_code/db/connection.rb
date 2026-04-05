@@ -106,34 +106,11 @@ module RubynCode
       #
       # @yield the block to execute
       # @return [Object] the block's return value
-      def transaction
+      def transaction(&block)
         synchronize do
-          if @transaction_depth.zero?
-            begin_top_level_transaction
-          else
-            begin_savepoint
-          end
-
+          @transaction_depth.zero? ? begin_top_level_transaction : begin_savepoint
           @transaction_depth += 1
-          begin
-            result = yield
-            if @transaction_depth == 1
-              @db.execute('COMMIT')
-            else
-              @db.execute("RELEASE SAVEPOINT sp_#{@transaction_depth}")
-            end
-            result
-          rescue StandardError => e
-            if @transaction_depth == 1
-              @db.execute('ROLLBACK')
-            else
-              @db.execute("ROLLBACK TO SAVEPOINT sp_#{@transaction_depth}")
-              @db.execute("RELEASE SAVEPOINT sp_#{@transaction_depth}")
-            end
-            raise e
-          ensure
-            @transaction_depth -= 1
-          end
+          execute_transaction_body(&block)
         end
       end
 
@@ -170,6 +147,34 @@ module RubynCode
 
       def begin_savepoint
         @db.execute("SAVEPOINT sp_#{@transaction_depth + 1}")
+      end
+
+      def execute_transaction_body
+        result = yield
+        commit_or_release
+        result
+      rescue StandardError => e
+        rollback_or_release
+        raise e
+      ensure
+        @transaction_depth -= 1
+      end
+
+      def commit_or_release
+        if @transaction_depth == 1
+          @db.execute('COMMIT')
+        else
+          @db.execute("RELEASE SAVEPOINT sp_#{@transaction_depth}")
+        end
+      end
+
+      def rollback_or_release
+        if @transaction_depth == 1
+          @db.execute('ROLLBACK')
+        else
+          @db.execute("ROLLBACK TO SAVEPOINT sp_#{@transaction_depth}")
+          @db.execute("RELEASE SAVEPOINT sp_#{@transaction_depth}")
+        end
       end
     end
   end

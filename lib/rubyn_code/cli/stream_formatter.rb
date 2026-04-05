@@ -58,85 +58,92 @@ module RubynCode
       def process_line(line)
         stripped = line.rstrip
 
-        # Code block toggle
         if stripped.match?(/\A\s*```/)
-          if @in_code_block
-            # Closing fence — render the buffered code
-            render_code_block
-            @in_code_block = false
-            @code_lang = nil
-          else
-            # Opening fence
-            @in_code_block = true
-            @code_lang = stripped.match(/```(\w*)/)[1]
-            @code_lang = 'ruby' if @code_lang.empty?
-            @code_buffer = +''
-            $stdout.puts @pastel.dim("  ┌─ #{@code_lang}")
-          end
-          return
-        end
-
-        if @in_code_block
+          toggle_code_block(stripped)
+        elsif @in_code_block
           @code_buffer << line
-          return
+        else
+          $stdout.print format_line(line)
+          $stdout.flush
         end
+      end
 
-        # Regular line — format and print
-        $stdout.print format_line(line)
-        $stdout.flush
+      def toggle_code_block(stripped)
+        if @in_code_block
+          render_code_block
+          @in_code_block = false
+          @code_lang = nil
+        else
+          open_code_block(stripped)
+        end
+      end
+
+      def open_code_block(stripped)
+        @in_code_block = true
+        @code_lang = stripped.match(/```(\w*)/)[1]
+        @code_lang = 'ruby' if @code_lang.empty?
+        @code_buffer = +''
+        $stdout.puts @pastel.dim("  ┌─ #{@code_lang}")
       end
 
       def render_code_block
         return if @code_buffer.empty?
 
-        lexer = Rouge::Lexer.find(@code_lang || 'ruby') || Rouge::Lexers::PlainText.new
-        highlighted = @rouge_formatter.format(lexer.lex(@code_buffer))
-        border = @pastel.dim('  │ ')
-
-        highlighted.each_line do |l|
-          $stdout.print "#{border}#{l}"
-        end
-        $stdout.puts @pastel.dim('  └─')
-        $stdout.flush
-
+        output_highlighted_code
         @code_buffer = +''
       rescue StandardError
-        # Fallback: print unformatted
         @code_buffer.each_line { |l| $stdout.print "  #{l}" }
         $stdout.puts
         @code_buffer = +''
       end
 
+      def output_highlighted_code
+        lexer = Rouge::Lexer.find(@code_lang || 'ruby') || Rouge::Lexers::PlainText.new
+        highlighted = @rouge_formatter.format(lexer.lex(@code_buffer))
+        border = @pastel.dim('  │ ')
+        highlighted.each_line { |l| $stdout.print "#{border}#{l}" }
+        $stdout.puts @pastel.dim('  └─')
+        $stdout.flush
+      end
+
       def format_line(line)
         stripped = line.rstrip
 
-        # Headers
         case stripped
         when /\A\#{1,6}\s/
-          level = stripped.match(/\A(\#{1,6})\s/)[1].length
-          text = stripped.sub(/\A\#{1,6}\s+/, '')
-          case level
-          when 1 then "#{@pastel.bold.underline(text)}\n"
-          when 2 then "\n#{@pastel.bold(text)}\n"
-          else "#{@pastel.bold(text)}\n"
-          end
-        # Bullet lists
+          format_header(stripped)
         when /\A\s*[-*]\s/
-          indent = stripped.match(/\A(\s*)/)[1]
-          content = stripped.sub(/\A\s*[-*]\s+/, '')
-          "#{indent}  #{@pastel.cyan('•')} #{format_inline(content)}\n"
-        # Numbered lists
+          format_bullet(stripped)
         when /\A\s*\d+\.\s/
-          indent = stripped.match(/\A(\s*)/)[1]
-          num = stripped.match(/(\d+)\./)[1]
-          content = stripped.sub(/\A\s*\d+\.\s+/, '')
-          "#{indent}  #{@pastel.cyan("#{num}.")} #{format_inline(content)}\n"
-        # Horizontal rules
+          format_numbered_item(stripped)
         when /\A-{3,}\z/
           "#{@pastel.dim('─' * 40)}\n"
         else
           "#{format_inline(line.chomp)}\n"
         end
+      end
+
+      def format_header(stripped)
+        level = stripped.match(/\A(\#{1,6})\s/)[1].length
+        text = stripped.sub(/\A\#{1,6}\s+/, '')
+        case level
+        when 1 then "#{@pastel.bold.underline(text)}\n"
+        when 2 then "\n#{@pastel.bold(text)}\n"
+        else "#{@pastel.bold(text)}\n"
+        end
+      end
+
+      def format_bullet(stripped)
+        indent = stripped.match(/\A(\s*)/)[1]
+        content = stripped.sub(/\A\s*[-*]\s+/, '')
+        "#{indent}  #{@pastel.cyan('•')} #{format_inline(content)}\n"
+      end
+
+      def format_numbered_item(stripped)
+        indent = stripped.match(/\A(\s*)/)[1]
+        num = stripped.match(/(\d+)\./)[1]
+        content = stripped.sub(/\A\s*\d+\.\s+/, '')
+        "#{indent}  #{@pastel.cyan("#{num}.")} #{format_inline(content)}\n"
       end
 
       def format_inline(text)

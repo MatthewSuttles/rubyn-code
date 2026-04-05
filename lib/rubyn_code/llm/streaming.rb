@@ -39,6 +39,16 @@ module RubynCode
         )
       end
 
+      HANDLERS = {
+        'message_start' => :handle_message_start,
+        'content_block_start' => :handle_content_block_start,
+        'content_block_delta' => :handle_content_block_delta,
+        'content_block_stop' => :handle_content_block_stop,
+        'message_delta' => :handle_message_delta,
+        'message_stop' => :handle_message_stop,
+        'error' => :handle_error
+      }.freeze
+
       private
 
       def consume_events
@@ -55,40 +65,22 @@ module RubynCode
         raw.each_line do |line|
           line = line.chomp
           case line
-          when /\Aevent:\s*(.+)/
-            event_type = ::Regexp.last_match(1).strip
-          when /\Adata:\s*(.*)/
-            data_lines << ::Regexp.last_match(1)
+          when /\Aevent:\s*(.+)/ then event_type = ::Regexp.last_match(1).strip
+          when /\Adata:\s*(.*)/ then data_lines << ::Regexp.last_match(1)
           end
         end
 
         return if data_lines.empty? && event_type.nil?
 
         data_str = data_lines.join("\n")
-        data = data_str.empty? ? {} : parse_json(data_str)
-
-        dispatch(event_type, data)
+        dispatch(event_type, data_str.empty? ? {} : parse_json(data_str))
       end
 
       def dispatch(event_type, data)
-        case event_type
-        when 'message_start'
-          handle_message_start(data)
-        when 'content_block_start'
-          handle_content_block_start(data)
-        when 'content_block_delta'
-          handle_content_block_delta(data)
-        when 'content_block_stop'
-          handle_content_block_stop(data)
-        when 'message_delta'
-          handle_message_delta(data)
-        when 'message_stop'
-          handle_message_stop
-        when 'ping'
-          # ignore
-        when 'error'
-          handle_error(data)
-        end
+        handler = HANDLERS[event_type]
+        return unless handler
+
+        method(handler).arity.zero? ? send(handler) : send(handler, data)
       end
 
       def handle_message_start(data)
@@ -164,17 +156,17 @@ module RubynCode
       def handle_message_delta(data)
         delta = data['delta'] || {}
         @stop_reason = delta['stop_reason'] if delta['stop_reason']
-
-        if (u = data['usage'])
-          @usage = Usage.new(
-            input_tokens: @usage&.input_tokens || 0,
-            output_tokens: u['output_tokens'].to_i,
-            cache_creation_input_tokens: @usage&.cache_creation_input_tokens || 0,
-            cache_read_input_tokens: @usage&.cache_read_input_tokens || 0
-          )
-        end
-
+        update_usage_from_delta(data['usage']) if data['usage']
         emit(:message_delta, data)
+      end
+
+      def update_usage_from_delta(usage_data)
+        @usage = Usage.new(
+          input_tokens: @usage&.input_tokens || 0,
+          output_tokens: usage_data['output_tokens'].to_i,
+          cache_creation_input_tokens: @usage&.cache_creation_input_tokens || 0,
+          cache_read_input_tokens: @usage&.cache_read_input_tokens || 0
+        )
       end
 
       def handle_message_stop

@@ -56,35 +56,32 @@ module RubynCode
 
       def handle_callback(req, res, server)
         params = parse_query(req.query_string)
-        code = params['code']
-        state = params['state']
 
-        if code
-          @mutex.synchronize do
-            @result = { code: code, state: state }
-            @condvar.signal
-          end
-
-          res.status = 200
-          res.content_type = 'text/html; charset=utf-8'
-          res.body = success_html
+        if params['code']
+          handle_success_callback(params, res)
         else
-          error = params['error'] || 'unknown'
-          description = params['error_description'] || 'No authorization code received'
-
-          res.status = 400
-          res.content_type = 'text/html; charset=utf-8'
-          res.body = error_html(error, description)
-
-          @mutex.synchronize do
-            @condvar.signal
-          end
+          handle_error_callback(params, res)
         end
 
-        Thread.new do
-          sleep(0.5)
-          server.shutdown
+        Thread.new { sleep(0.5) && server.shutdown }
+      end
+
+      def handle_success_callback(params, res)
+        @mutex.synchronize do
+          @result = { code: params['code'], state: params['state'] }
+          @condvar.signal
         end
+        res.status = 200
+        res.content_type = 'text/html; charset=utf-8'
+        res.body = success_html
+      end
+
+      def handle_error_callback(params, res)
+        res.status = 400
+        res.content_type = 'text/html; charset=utf-8'
+        res.body = error_html(params['error'] || 'unknown',
+                              params['error_description'] || 'No authorization code received')
+        @mutex.synchronize { @condvar.signal }
       end
 
       def parse_query(query_string)

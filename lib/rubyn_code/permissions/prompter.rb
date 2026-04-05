@@ -33,21 +33,20 @@ module RubynCode
       # @param tool_input [Hash]
       # @return [Boolean] true if the user approved
       def self.confirm_destructive(tool_name, tool_input)
-        prompt = build_prompt
         pastel = Pastel.new
+        display_destructive_warning(pastel, tool_name, tool_input)
 
+        answer = build_prompt.ask(pastel.red.bold('Type "yes" to confirm this destructive action:'))
+        answer&.strip&.downcase == 'yes'
+      rescue TTY::Prompt::Reader::InputInterrupt
+        false
+      end
+
+      def self.display_destructive_warning(pastel, tool_name, tool_input)
         $stdout.puts pastel.red.bold('WARNING: Destructive operation requested')
         $stdout.puts pastel.red('=' * 50)
         display_tool_summary(pastel, tool_name, tool_input)
         $stdout.puts pastel.red('=' * 50)
-
-        answer = prompt.ask(
-          pastel.red.bold('Type "yes" to confirm this destructive action:')
-        )
-
-        answer&.strip&.downcase == 'yes'
-      rescue TTY::Prompt::Reader::InputInterrupt
-        false
       end
 
       # @api private

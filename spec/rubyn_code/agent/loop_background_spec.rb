@@ -124,7 +124,7 @@ RSpec.describe RubynCode::Agent::Loop, "background job integration" do
     it "keeps the loop running when jobs are still active" do
       # Stub pending checks: active for first two calls, then done
       pending_calls = 0
-      allow(agent_loop).to receive(:has_pending_background_jobs?) do
+      allow(agent_loop).to receive(:pending_background_jobs?) do
         pending_calls += 1
         pending_calls <= 2
       end

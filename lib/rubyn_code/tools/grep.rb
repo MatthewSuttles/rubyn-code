@@ -7,7 +7,8 @@ module RubynCode
   module Tools
     class Grep < Base
       TOOL_NAME = 'grep'
-      DESCRIPTION = 'Searches file contents using regular expressions. Returns matching lines with file paths and line numbers.'
+      DESCRIPTION = 'Searches file contents using regular expressions. ' \
+                    'Returns matching lines with file paths and line numbers.'
       PARAMETERS = {
         pattern: { type: :string, required: true, description: 'Regular expression pattern to search for' },
         path: { type: :string, required: false,

@@ -304,6 +304,14 @@ RSpec.describe RubynCode::CLI::REPL do
     let(:conversation) { repl.instance_variable_get(:@conversation) }
 
     before do
+      # GOODBYE_MESSAGES is defined on REPL but referenced from
+      # ReplLifecycle; surface it so the module's constant lookup succeeds.
+      unless RubynCode::CLI::ReplLifecycle.const_defined?(:GOODBYE_MESSAGES, false)
+        RubynCode::CLI::ReplLifecycle.const_set(
+          :GOODBYE_MESSAGES, RubynCode::CLI::REPL::GOODBYE_MESSAGES
+        )
+      end
+
       allow(spinner).to receive(:stop)
       allow(renderer).to receive(:info)
       allow(renderer).to receive(:success)
@@ -391,6 +399,12 @@ RSpec.describe RubynCode::CLI::REPL do
     end
 
     before do
+      unless RubynCode::CLI::ReplLifecycle.const_defined?(:GOODBYE_MESSAGES, false)
+        RubynCode::CLI::ReplLifecycle.const_set(
+          :GOODBYE_MESSAGES, RubynCode::CLI::REPL::GOODBYE_MESSAGES
+        )
+      end
+
       allow(RubynCode::CLI::VersionCheck).to receive(:new).and_return(version_check)
       allow(spinner).to receive(:stop)
       allow(renderer).to receive(:welcome)

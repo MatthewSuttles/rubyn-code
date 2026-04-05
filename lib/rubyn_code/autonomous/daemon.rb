@@ -37,24 +37,9 @@ module RubynCode
         max_runs: 100, max_cost: 10.0, poll_interval: 5, idle_timeout: 60,
         on_state_change: nil, on_task_complete: nil, on_task_error: nil
       )
-        @agent_name      = agent_name
-        @role            = role
-        @llm_client      = llm_client
-        @project_root    = File.expand_path(project_root)
-        @task_manager    = task_manager
-        @mailbox         = mailbox
-        @max_runs        = max_runs
-        @max_cost        = max_cost
-        @poll_interval   = poll_interval
-        @idle_timeout    = idle_timeout
-        @on_state_change = on_state_change
-        @on_task_complete = on_task_complete
-        @on_task_error   = on_task_error
-
-        @state           = :spawned
-        @runs_completed  = 0
-        @total_cost      = 0.0
-        @stop_requested  = false
+        assign_core_attrs(agent_name:, role:, llm_client:, project_root:, task_manager:, mailbox:)
+        assign_limits(max_runs:, max_cost:, poll_interval:, idle_timeout:)
+        assign_callbacks_and_state(on_state_change, on_task_complete, on_task_error)
       end
 
       # Enters the work-idle-work cycle. Blocks the calling thread until
@@ -120,6 +105,32 @@ module RubynCode
       private
 
       # ── Signal handling ──────────────────────────────────────────
+
+      def assign_core_attrs(agent_name:, role:, llm_client:, project_root:, task_manager:, mailbox:) # rubocop:disable Metrics/ParameterLists -- mirrors constructor keyword args
+        @agent_name   = agent_name
+        @role         = role
+        @llm_client   = llm_client
+        @project_root = File.expand_path(project_root)
+        @task_manager = task_manager
+        @mailbox      = mailbox
+      end
+
+      def assign_limits(max_runs:, max_cost:, poll_interval:, idle_timeout:)
+        @max_runs      = max_runs
+        @max_cost      = max_cost
+        @poll_interval = poll_interval
+        @idle_timeout  = idle_timeout
+      end
+
+      def assign_callbacks_and_state(on_state_change, on_task_complete, on_task_error)
+        @on_state_change  = on_state_change
+        @on_task_complete = on_task_complete
+        @on_task_error    = on_task_error
+        @state            = :spawned
+        @runs_completed   = 0
+        @total_cost       = 0.0
+        @stop_requested   = false
+      end
 
       def install_signal_handlers!
         %w[INT TERM].each do |sig|

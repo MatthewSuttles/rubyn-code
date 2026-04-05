@@ -19,17 +19,22 @@ module RubynCode
 
       def execute(path:, offset: nil, limit: nil)
         resolved = read_file_safely(path)
-
         lines = File.readlines(resolved)
+        start_line, end_line = compute_range(offset, limit, lines.length)
+        format_lines(lines[start_line...end_line] || [], start_line)
+      end
 
+      private
+
+      def compute_range(offset, limit, total)
         start_line = offset ? [offset.to_i - 1, 0].max : 0
-        end_line = limit ? start_line + limit.to_i : lines.length
+        end_line = limit ? start_line + limit.to_i : total
+        [start_line, end_line]
+      end
 
-        selected = lines[start_line...end_line] || []
-
+      def format_lines(selected, start_line)
         selected.each_with_index.map do |line, idx|
-          line_num = start_line + idx + 1
-          "#{line_num.to_s.rjust(6)}\t#{line}"
+          "#{(start_line + idx + 1).to_s.rjust(6)}\t#{line}"
         end.join
       end
     end

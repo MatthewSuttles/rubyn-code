@@ -28,26 +28,21 @@ module RubynCode
           rows = fetch_instincts(db, project_path)
           return '' if rows.empty?
 
-          instincts = rows.map { |row| row_to_instinct(row) }
-
-          # Apply time-based decay to get current confidence
-          now = Time.now
-          instincts = instincts.map { |inst| InstinctMethods.apply_decay(inst, now) }
-
-          # Filter below minimum confidence
-          instincts = instincts.select { |inst| inst.confidence >= MIN_CONFIDENCE }
-
-          # Filter by context tags if provided
-          instincts = filter_by_tags(instincts, context_tags) unless context_tags.empty?
-
-          # Sort by confidence descending and take top N
-          instincts = instincts
-                      .sort_by { |inst| -inst.confidence }
-                      .first(max_instincts)
-
+          instincts = build_and_filter(rows, context_tags, max_instincts)
           return '' if instincts.empty?
 
           format_instincts(instincts)
+        end
+
+        def build_and_filter(rows, context_tags, max_instincts)
+          now = Time.now
+          instincts = rows
+                      .map { |row| InstinctMethods.apply_decay(row_to_instinct(row), now) }
+                      .select { |inst| inst.confidence >= MIN_CONFIDENCE }
+
+          instincts = filter_by_tags(instincts, context_tags) unless context_tags.empty?
+
+          instincts.sort_by { |inst| -inst.confidence }.first(max_instincts)
         end
 
         private
@@ -64,17 +59,21 @@ module RubynCode
 
         def row_to_instinct(row)
           Instinct.new(
-            id: row['id'],
-            project_path: row['project_path'],
-            pattern: row['pattern'],
-            context_tags: parse_tags(row['context_tags']),
-            confidence: row['confidence'].to_f,
-            decay_rate: row['decay_rate'].to_f,
-            times_applied: row['times_applied'].to_i,
-            times_helpful: row['times_helpful'].to_i,
+            **core_instinct_attrs(row),
+            **numeric_instinct_attrs(row),
             created_at: parse_time(row['created_at']),
             updated_at: parse_time(row['updated_at'])
           )
+        end
+
+        def core_instinct_attrs(row)
+          { id: row['id'], project_path: row['project_path'],
+            pattern: row['pattern'], context_tags: parse_tags(row['context_tags']) }
+        end
+
+        def numeric_instinct_attrs(row)
+          { confidence: row['confidence'].to_f, decay_rate: row['decay_rate'].to_f,
+            times_applied: row['times_applied'].to_i, times_helpful: row['times_helpful'].to_i }
         end
 
         def parse_tags(tags)

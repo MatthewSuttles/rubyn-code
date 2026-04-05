@@ -14,71 +14,120 @@ module RubynCode
 
       def run
         RubynCode::Debug.enable! if @options[:debug]
-
-        case @options[:command]
-        when :version
-          puts "rubyn-code #{RubynCode::VERSION}"
-        when :auth
-          run_auth
-        when :setup
-          run_setup
-        when :help
-          display_help
-        when :run
-          run_single_prompt(@options[:prompt])
-        when :daemon
-          run_daemon
-        when :repl
-          run_repl
-        end
+        dispatch_command(@options[:command])
       end
+
+      HELP_TEXT = <<~HELP
+        rubyn-code - Ruby & Rails Agentic Coding Assistant
+
+        Usage:
+          rubyn-code                    Start interactive REPL
+          rubyn-code -p "prompt"        Run a single prompt and exit
+          rubyn-code --resume [ID]      Resume a previous session
+          rubyn-code --setup            Pin rubyn-code to bypass rbenv/rvm
+          rubyn-code --auth             Authenticate with Claude
+          rubyn-code --version          Show version
+          rubyn-code --help             Show this help
+
+        Daemon Mode:
+          rubyn-code daemon             Start autonomous daemon (GOLEM)
+          rubyn-code daemon --name NAME Agent name (default: golem-<random>)
+          rubyn-code daemon --role ROLE Agent role description
+          rubyn-code daemon --max-runs N     Max tasks before shutdown (default: 100)
+          rubyn-code daemon --max-cost N     Max USD spend before shutdown (default: 10.0)
+          rubyn-code daemon --idle-timeout N Seconds idle before shutdown (default: 60)
+          rubyn-code daemon --poll-interval N Seconds between polls (default: 5)
+
+        Interactive Commands:
+          /help          Show available commands
+          /quit          Exit
+          /compact       Compress context
+          /cost          Show usage costs
+          /tasks         List tasks
+          /skill [name]  Load or list skills
+
+        Environment:
+          Config:  ~/.rubyn-code/config.yml
+          Data:    ~/.rubyn-code/rubyn_code.db
+          Tokens:  ~/.rubyn-code/tokens.yml
+      HELP
+
+      SIMPLE_FLAGS = {
+        '--version' => :version, '-v' => :version,
+        '--help' => :help, '-h' => :help,
+        '--auth' => :auth, '--setup' => :setup
+      }.freeze
+      BOOLEAN_FLAGS = { '--yolo' => :yolo, '--debug' => :debug }.freeze
+      DAEMON_INT_FLAGS = { '--max-runs' => :max_runs, '--idle-timeout' => :idle_timeout,
+                           '--poll-interval' => :poll_interval }.freeze
+      DAEMON_STR_FLAGS = { '--name' => :agent_name, '--role' => :role }.freeze
 
       private
 
-      def parse_options(argv) # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
-        options = { command: :repl }
-
-        i = 0
-        while i < argv.length
-          case argv[i]
-          when '--version', '-v'
-            options[:command] = :version
-          when '--help', '-h'
-            options[:command] = :help
-          when '--auth'
-            options[:command] = :auth
-          when '--resume', '-r'
-            options[:session_id] = argv[i + 1]
-            i += 1
-          when '-p', '--prompt'
-            options[:command] = :run
-            options[:prompt] = argv[i + 1]
-            i += 1
-          when '--yolo'
-            options[:yolo] = true
-          when '--debug'
-            options[:debug] = true
-          when '--setup'
-            options[:command] = :setup
-          when 'daemon'
-            options[:command] = :daemon
-            parse_daemon_options!(argv, i + 1, options)
-            break
-          end
-          i += 1
+      def dispatch_command(command) # rubocop:disable Metrics/CyclomaticComplexity -- unavoidable dispatch switch
+        case command
+        when :version then puts "rubyn-code #{RubynCode::VERSION}"
+        when :auth    then run_auth
+        when :setup   then run_setup
+        when :help    then display_help
+        when :run     then run_single_prompt(@options[:prompt])
+        when :daemon  then run_daemon
+        when :repl    then run_repl
         end
+      end
 
+      def parse_options(argv)
+        options = { command: :repl }
+        idx = 0
+        while idx < argv.length
+          idx = parse_single_option(argv, idx, options)
+          idx += 1
+        end
         options
       end
 
-      # Parses daemon-specific flags from the argv starting at the given index.
-      #
-      # @param argv [Array<String>]
-      # @param start [Integer]
-      # @param options [Hash]
-      # @return [void]
-      def parse_daemon_options!(argv, start, options) # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
-        options[:daemon] = {
+      # -- option parser
+      def parse_single_option(argv, idx, options)
+        arg = argv[idx]
+        if SIMPLE_FLAGS.key?(arg)
+          options[:command] = SIMPLE_FLAGS[arg]
+        elsif BOOLEAN_FLAGS.key?(arg)
+          options[BOOLEAN_FLAGS[arg]] = true
+        else
+          idx = parse_value_option(argv, idx, options)
+        end
+        idx
+      end
+
+      def parse_value_option(argv, idx, options)
+        case argv[idx]
+        when '--resume', '-r'
+          options[:session_id] = argv[idx + 1]
+          idx + 1
+        when '-p', '--prompt'
+          options[:command] = :run
+          options[:prompt] = argv[idx + 1]
+          idx + 1
+        when 'daemon'
+          options[:command] = :daemon
+          parse_daemon_options!(argv, idx + 1, options)
+          argv.length - 1
+        else
+          idx
+        end
+      end
+
+      def parse_daemon_options!(argv, start, options)
+        options[:daemon] = default_daemon_options
+        idx = start
+        while idx < argv.length
+          idx = parse_single_daemon_option(argv, idx, options)
+          idx += 1
+        end
+      end
+
+      def default_daemon_options
+        {
           max_runs: 100,
           max_cost: 10.0,
           idle_timeout: 60,
@@ -86,33 +135,31 @@ module RubynCode
           agent_name: "golem-#{SecureRandom.hex(4)}",
           role: 'autonomous coding agent'
         }
+      end
 
-        i = start
-        while i < argv.length
-          case argv[i]
-          when '--max-runs'
-            options[:daemon][:max_runs] = argv[i + 1].to_i
-            i += 1
-          when '--max-cost'
-            options[:daemon][:max_cost] = argv[i + 1].to_f
-            i += 1
-          when '--idle-timeout'
-            options[:daemon][:idle_timeout] = argv[i + 1].to_i
-            i += 1
-          when '--poll-interval'
-            options[:daemon][:poll_interval] = argv[i + 1].to_i
-            i += 1
-          when '--name'
-            options[:daemon][:agent_name] = argv[i + 1]
-            i += 1
-          when '--role'
-            options[:daemon][:role] = argv[i + 1]
-            i += 1
-          when '--debug'
-            options[:debug] = true
-          end
-          i += 1
+      def parse_single_daemon_option(argv, idx, options)
+        case argv[idx]
+        when '--debug'
+          options[:debug] = true
+        else
+          idx = parse_daemon_value_option(argv, idx, options)
         end
+        idx
+      end
+
+      def parse_daemon_value_option(argv, idx, options) # rubocop:disable Metrics/AbcSize -- option dispatch with hash lookup
+        arg = argv[idx]
+        daemon = options[:daemon]
+        if DAEMON_INT_FLAGS.key?(arg)
+          daemon[DAEMON_INT_FLAGS[arg]] = argv[idx + 1].to_i
+        elsif arg == '--max-cost'
+          daemon[:max_cost] = argv[idx + 1].to_f
+        elsif DAEMON_STR_FLAGS.key?(arg)
+          daemon[DAEMON_STR_FLAGS[arg]] = argv[idx + 1]
+        else
+          return idx
+        end
+        idx + 1
       end
 
       def run_auth
@@ -154,40 +201,7 @@ module RubynCode
       end
 
       def display_help
-        puts <<~HELP
-          rubyn-code - Ruby & Rails Agentic Coding Assistant
-
-          Usage:
-            rubyn-code                    Start interactive REPL
-            rubyn-code -p "prompt"        Run a single prompt and exit
-            rubyn-code --resume [ID]      Resume a previous session
-            rubyn-code --setup            Pin rubyn-code to bypass rbenv/rvm
-            rubyn-code --auth             Authenticate with Claude
-            rubyn-code --version          Show version
-            rubyn-code --help             Show this help
-
-          Daemon Mode:
-            rubyn-code daemon             Start autonomous daemon (GOLEM)
-            rubyn-code daemon --name NAME Agent name (default: golem-<random>)
-            rubyn-code daemon --role ROLE Agent role description
-            rubyn-code daemon --max-runs N     Max tasks before shutdown (default: 100)
-            rubyn-code daemon --max-cost N     Max USD spend before shutdown (default: 10.0)
-            rubyn-code daemon --idle-timeout N Seconds idle before shutdown (default: 60)
-            rubyn-code daemon --poll-interval N Seconds between polls (default: 5)
-
-          Interactive Commands:
-            /help          Show available commands
-            /quit          Exit
-            /compact       Compress context
-            /cost          Show usage costs
-            /tasks         List tasks
-            /skill [name]  Load or list skills
-
-          Environment:
-            Config:  ~/.rubyn-code/config.yml
-            Data:    ~/.rubyn-code/rubyn_code.db
-            Tokens:  ~/.rubyn-code/tokens.yml
-        HELP
+        puts HELP_TEXT
       end
     end
   end

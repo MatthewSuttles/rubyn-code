@@ -25,19 +25,23 @@ module RubynCode
           usage = response[:usage] || response['usage']
           return unless usage
 
-          model          = response[:model] || response['model'] || 'unknown'
-          input_tokens   = usage[:input_tokens] || usage['input_tokens'] || 0
-          output_tokens  = usage[:output_tokens] || usage['output_tokens'] || 0
-          cache_read     = usage[:cache_read_input_tokens] || usage['cache_read_input_tokens'] || 0
-          cache_write    = usage[:cache_creation_input_tokens] || usage['cache_creation_input_tokens'] || 0
+          record_usage(response, usage)
+        end
 
+        private
+
+        def record_usage(response, usage)
           @budget_enforcer.record!(
-            model: model,
-            input_tokens: input_tokens,
-            output_tokens: output_tokens,
-            cache_read_tokens: cache_read,
-            cache_write_tokens: cache_write
+            model: fetch_value(response, :model, 'unknown'),
+            input_tokens: fetch_value(usage, :input_tokens, 0),
+            output_tokens: fetch_value(usage, :output_tokens, 0),
+            cache_read_tokens: fetch_value(usage, :cache_read_input_tokens, 0),
+            cache_write_tokens: fetch_value(usage, :cache_creation_input_tokens, 0)
           )
+        end
+
+        def fetch_value(hash, sym_key, default)
+          hash[sym_key] || hash[sym_key.to_s] || default
         end
       end
 

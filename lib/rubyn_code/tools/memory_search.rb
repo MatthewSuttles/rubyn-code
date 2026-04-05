@@ -14,7 +14,8 @@ module RubynCode
         query: { type: :string, required: true, description: 'Search query for finding relevant memories' },
         tier: { type: :string, required: false, description: 'Filter by memory tier: short, medium, or long' },
         category: { type: :string, required: false,
-                    description: 'Filter by category: code_pattern, user_preference, project_convention, error_resolution, or decision' },
+                    description: 'Filter by category: code_pattern, user_preference, ' \
+                                 'project_convention, error_resolution, or decision' },
         limit: { type: :integer, required: false, description: 'Maximum number of results to return (default 10)' }
       }.freeze
       RISK_LEVEL = :read
@@ -49,19 +50,19 @@ module RubynCode
       # @return [String]
       def format_results(records)
         lines = ["Found #{records.size} memor#{records.size == 1 ? 'y' : 'ies'}:\n"]
-
-        records.each_with_index do |record, idx|
-          lines << "--- Memory #{idx + 1} ---"
-          lines << "ID: #{record.id}"
-          lines << "Tier: #{record.tier} | Category: #{record.category || 'none'}"
-          lines << "Relevance: #{format('%.2f', record.relevance_score)} | Accessed: #{record.access_count} times"
-          lines << "Created: #{record.created_at}"
-          lines << ''
-          lines << record.content
-          lines << ''
-        end
-
+        records.each_with_index { |record, idx| lines.concat(format_single_memory(record, idx)) }
         lines.join("\n")
+      end
+
+      def format_single_memory(record, idx)
+        [
+          "--- Memory #{idx + 1} ---",
+          "ID: #{record.id}",
+          "Tier: #{record.tier} | Category: #{record.category || 'none'}",
+          "Relevance: #{format('%.2f', record.relevance_score)} | Accessed: #{record.access_count} times",
+          "Created: #{record.created_at}",
+          '', record.content, ''
+        ]
       end
 
       # Lazily resolves a Memory::Search instance from the project root.

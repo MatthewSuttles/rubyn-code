@@ -124,7 +124,9 @@ module RubynCode
           req.body = JSON.generate(request)
         end
 
-        raise TransportError, "MCP server returned HTTP #{response.status}: #{response.body}" unless response.success?
+        return if response.success?
+
+        raise TransportError, "MCP server returned HTTP #{response.status}: #{response.body}"
       rescue Faraday::Error => e
         raise TransportError, "Failed to send request to MCP server: #{e.message}"
       end
@@ -148,16 +150,10 @@ module RubynCode
       end
 
       def run_sse_listener
-        sse_connection = Faraday.new(url: base_url) do |f|
-          f.options.timeout = nil # Keep-alive
-          f.options.open_timeout = @timeout
-          f.headers['Accept'] = 'text/event-stream'
-          f.adapter Faraday.default_adapter
-        end
-
+        conn = build_sse_connection
         buffer = +''
 
-        sse_connection.get(@url) do |req|
+        conn.get(@url) do |req|
           req.options.on_data = proc do |chunk, _bytes, _env|
             buffer << chunk
             process_sse_buffer(buffer)
@@ -166,6 +162,15 @@ module RubynCode
       rescue Faraday::Error => e
         @connected = false
         warn "[MCP::SSETransport] SSE connection lost: #{e.message}"
+      end
+
+      def build_sse_connection
+        Faraday.new(url: base_url) do |f|
+          f.options.timeout = nil
+          f.options.open_timeout = @timeout
+          f.headers['Accept'] = 'text/event-stream'
+          f.adapter Faraday.default_adapter
+        end
       end
 
       def process_sse_buffer(buffer)
@@ -195,11 +200,8 @@ module RubynCode
       end
 
       def handle_sse_event(event)
-        case event[:type]
-        when 'endpoint'
+        if event[:type] == 'endpoint'
           @post_endpoint = event[:data]
-        when 'message'
-          dispatch_message(event[:data])
         else
           dispatch_message(event[:data])
         end

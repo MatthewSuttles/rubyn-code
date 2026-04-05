@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
                        'featuring a 16-layer agentic architecture, local SQLite persistence, and Claude OAuth.'
   spec.homepage      = 'https://rubyn.dev'
   spec.license       = 'MIT'
-  spec.required_ruby_version = '>= 4.0'
+  spec.required_ruby_version = '>= 4.0' # rubocop:disable Gemspec/RequiredRubyVersion
 
   spec.files         = Dir['lib/**/*', 'exe/*', 'skills/**/*', 'db/**/*', 'LICENSE', 'README.md']
   spec.bindir        = 'exe'

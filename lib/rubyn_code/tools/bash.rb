@@ -9,7 +9,8 @@ module RubynCode
   module Tools
     class Bash < Base
       TOOL_NAME = 'bash'
-      DESCRIPTION = 'Runs a shell command in the project directory. Blocks dangerous patterns and scrubs sensitive environment variables.'
+      DESCRIPTION = 'Runs a shell command in the project directory. Blocks dangerous patterns ' \
+                    'and scrubs sensitive environment variables.'
       PARAMETERS = {
         command: { type: :string, required: true, description: 'The shell command to execute' },
         timeout: { type: :integer, required: false, default: 120, description: 'Timeout in seconds (default: 120)' }

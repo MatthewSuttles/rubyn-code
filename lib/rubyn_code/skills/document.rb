@@ -19,30 +19,30 @@ module RubynCode
       class << self
         def parse(content, filename: nil)
           match = FRONTMATTER_PATTERN.match(content)
+          match ? parse_with_frontmatter(match) : parse_without_frontmatter(content, filename)
+        end
 
-          if match
-            frontmatter = YAML.safe_load(match[1], permitted_classes: [Symbol]) || {}
-            body = match[2].to_s.strip
+        def parse_with_frontmatter(match)
+          frontmatter = YAML.safe_load(match[1], permitted_classes: [Symbol]) || {}
+          new(
+            name: frontmatter['name'].to_s,
+            description: frontmatter['description'].to_s,
+            tags: Array(frontmatter['tags']),
+            body: match[2].to_s.strip
+          )
+        end
 
-            new(
-              name: frontmatter['name'].to_s,
-              description: frontmatter['description'].to_s,
-              tags: Array(frontmatter['tags']),
-              body: body
-            )
-          else
-            body = content.to_s.strip
-            title = extract_title(body)
-            derived_name = filename ? File.basename(filename, '.*').tr('_', '-') : title_to_name(title)
-            tags = derive_tags(derived_name, body)
+        def parse_without_frontmatter(content, filename)
+          body = content.to_s.strip
+          title = extract_title(body)
+          derived_name = filename ? File.basename(filename, '.*').tr('_', '-') : title_to_name(title)
 
-            new(
-              name: derived_name,
-              description: title,
-              tags: tags,
-              body: body
-            )
-          end
+          new(
+            name: derived_name,
+            description: title,
+            tags: derive_tags(derived_name, body),
+            body: body
+          )
         end
 
         def parse_file(path)
@@ -52,6 +52,15 @@ module RubynCode
           content = File.read(path, encoding: 'UTF-8')
           parse(content, filename: path)
         end
+
+        TAG_RULES = [
+          ['ruby',        /\bruby\b/i],
+          ['rails',       /\brails\b/i],
+          ['rspec',       /\brspec\b/i],
+          ['testing',     /\b(?:test|spec|minitest)\b/i],
+          ['patterns',    /\b(?:pattern|design|solid)\b/i],
+          ['refactoring', /\brefactor/i]
+        ].freeze
 
         private
 
@@ -65,14 +74,9 @@ module RubynCode
         end
 
         def derive_tags(name, body)
-          tags = []
-          tags << 'ruby' if body.match?(/\bruby\b/i) || name.include?('ruby')
-          tags << 'rails' if body.match?(/\brails\b/i) || name.include?('rails')
-          tags << 'rspec' if body.match?(/\brspec\b/i) || name.include?('rspec')
-          tags << 'testing' if body.match?(/\b(test|spec|minitest)\b/i)
-          tags << 'patterns' if body.match?(/\b(pattern|design|solid)\b/i)
-          tags << 'refactoring' if body.match?(/\brefactor/i)
-          tags.uniq
+          TAG_RULES.each_with_object([]) do |(tag, pattern), tags|
+            tags << tag if body.match?(pattern) || name.include?(tag)
+          end.uniq
         end
       end
     end
