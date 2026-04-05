@@ -43,6 +43,7 @@ module RubynCode
         @config_path = config_path
         @data = {}
         ensure_home_directory!
+        seed_config! unless File.exist?(@config_path)
         load!
       end
 
@@ -105,6 +106,21 @@ module RubynCode
         providers.transform_keys(&:to_s)
       end
 
+      # Add or update a provider in the config and persist to disk.
+      #
+      # @param name [String] provider name (e.g., 'groq')
+      # @param base_url [String] API base URL
+      # @param env_key [String, nil] environment variable for the API key
+      # @param models [Array<String>] available model names
+      # @param pricing [Hash] model => [input_rate, output_rate]
+      def add_provider(name, base_url:, env_key: nil, models: [], pricing: {})
+        @data['providers'] ||= {}
+        @data['providers'][name.to_s] = build_provider_hash(
+          base_url: base_url, env_key: env_key, models: models, pricing: pricing
+        )
+        save!
+      end
+
       # Returns all user-configured pricing as { model => [input, output] }
       def custom_pricing
         providers = @data['providers']
@@ -116,6 +132,30 @@ module RubynCode
       end
 
       private
+
+      def seed_config!
+        @data = {
+          'provider' => Defaults::DEFAULT_PROVIDER,
+          'model' => Defaults::DEFAULT_MODEL,
+          'providers' => {
+            'anthropic' => {
+              'env_key' => 'ANTHROPIC_API_KEY'
+            },
+            'openai' => {
+              'env_key' => 'OPENAI_API_KEY'
+            }
+          }
+        }
+        save!
+      end
+
+      def build_provider_hash(base_url:, env_key:, models:, pricing:)
+        hash = { 'base_url' => base_url }
+        hash['env_key'] = env_key if env_key
+        hash['models'] = models unless models.empty?
+        hash['pricing'] = pricing unless pricing.empty?
+        hash
+      end
 
       def merge_provider_pricing(cfg, acc)
         return unless cfg.is_a?(Hash) && cfg['pricing'].is_a?(Hash)
