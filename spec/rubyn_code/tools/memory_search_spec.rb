@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-MemorySearchTestRecord = Struct.new(:id, :tier, :category, :relevance_score, :access_count, :created_at, :content)
+MemorySearchTestRecord = Struct.new(:id, :tier, :category, :relevance_score, :access_count, :created_at, :content, keyword_init: true)
 
 RSpec.describe RubynCode::Tools::MemorySearch do
   let(:project_root) { '/tmp/test_project' }

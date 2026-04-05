@@ -29,7 +29,7 @@ module RubynCode
           # Fallback: use stdin directly
           $stdout.puts
           $stdout.puts "  #{question}"
-          $stdout.print "  > "
+          $stdout.print '  > '
           $stdout.flush
           $stdin.gets&.strip || '[no response]'
         end

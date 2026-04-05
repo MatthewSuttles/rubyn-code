@@ -69,6 +69,7 @@ RSpec.describe RubynCode::CLI::REPL do
         'background_worker=': nil,
         'db=': nil,
         'on_agent_status=': nil,
+        'ask_user_callback=': nil,
         tool_definitions: []
       )
     )
