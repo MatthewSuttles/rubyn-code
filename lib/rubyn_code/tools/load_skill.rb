@@ -34,10 +34,11 @@ module RubynCode
 
       def default_loader
         skills_dirs = [
-          File.join(project_root, '.rubyn', 'skills'),
-          File.join(Dir.home, '.rubyn', 'skills')
+          File.expand_path('../../../skills', __dir__), # bundled gem skills
+          File.join(project_root, '.rubyn-code', 'skills'), # project skills
+          File.join(Dir.home, '.rubyn-code', 'skills') # global user skills
         ]
-        catalog = Skills::Catalog.new(skills_dirs)
+        catalog = Skills::Catalog.new(skills_dirs.select { |d| Dir.exist?(d) })
         Skills::Loader.new(catalog)
       end
     end
