@@ -81,9 +81,24 @@ module RubynCode
         return nil unless File.exist?(CACHE_FILE)
         return nil if (Time.now - File.mtime(CACHE_FILE)) > CACHE_TTL
 
-        File.read(CACHE_FILE).strip
+        cached = File.read(CACHE_FILE).strip
+        return nil unless valid_version?(cached)
+
+        cached
       rescue StandardError
         nil
+      end
+
+      def valid_version?(version)
+        return false unless version&.match?(/\A\d+\.\d+/)
+        return false unless Gem::Version.correct?(version)
+
+        # Sanity: remote shouldn't be more than 10 major versions ahead
+        remote = Gem::Version.new(version)
+        local = Gem::Version.new(RubynCode::VERSION)
+        (remote.segments.first - local.segments.first).abs < 10
+      rescue StandardError
+        false
       end
 
       def write_cache(version)
