@@ -142,7 +142,7 @@ Agent finished (23 tool calls).
 This is a Rails 7.1 e-commerce app with...
 ```
 
-## 28 Built-in Tools
+## 29 Built-in Tools
 
 | Category | Tools |
 |----------|-------|
@@ -157,6 +157,7 @@ This is a Rails 7.1 e-commerce app with...
 | **Context** | `compact`, `load_skill`, `task` |
 | **Memory** | `memory_search`, `memory_write` |
 | **Teams** | `send_message`, `read_inbox` |
+| **Interactive** | `ask_user` (ask clarifying questions mid-task) |
 
 ## 112 Best Practice Skills
 
@@ -362,7 +363,7 @@ Works with Claude Pro, Max, Team, and Enterprise. Default model: **Claude Opus 4
 │  Layer 5:  Skills (112 best practice docs, on-demand loading) │
 │  Layer 4:  Context Management (3-layer compression pipeline)  │
 │  Layer 3:  Permissions (tiered access + deny lists + hooks)   │
-│  Layer 2:  Tool System (28 tools, dispatch map registry)      │
+│  Layer 2:  Tool System (29 tools, dispatch map registry)      │
 │  Layer 1:  THE AGENT LOOP (while tool_use → execute → repeat) │
 └──────────────────────────────────────────────────────────────┘
 ```
