@@ -52,6 +52,7 @@ module RubynCode
       def send_message(user_input)
         check_user_feedback(user_input)
         drain_background_notifications
+        inject_skill_listing unless @skills_injected
         @conversation.add_user_message(user_input)
         reset_iteration_state
 
@@ -93,6 +94,7 @@ module RubynCode
         @on_tool_call   = opts[:on_tool_call]
         @on_tool_result = opts[:on_tool_result]
         @on_text        = opts[:on_text]
+        @skills_injected = false
       end
 
       def reset_iteration_state

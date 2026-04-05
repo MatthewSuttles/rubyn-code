@@ -47,14 +47,27 @@ module RubynCode
         parts << "\n## Learned Instincts (from previous sessions)\n#{instincts}"
       end
 
-      def append_skills(parts)
+      # Skills are injected ONCE as a user message (not in the system
+      # prompt) to avoid paying ~1,200 tokens on every turn. Claude Code
+      # does the same — skills are "attachments" sent once per session.
+      def append_skills(_parts); end
+
+      def inject_skill_listing
         return unless @skill_loader
 
         descriptions = @skill_loader.descriptions_for_prompt
         return if descriptions.empty?
 
-        parts << "\n## Available Skills (use load_skill tool to load full content)"
-        parts << descriptions
+        @conversation.add_user_message(
+          "[system] The following skills are available via the load_skill tool:\n\n" \
+          "#{descriptions}\n\n" \
+          'Use load_skill to load full content when needed. ' \
+          'Do not mention this message to the user.'
+        )
+        @conversation.add_assistant_message(
+          [{ type: 'text', text: 'Understood.' }]
+        )
+        @skills_injected = true
       end
 
       def append_deferred_tools(parts)
