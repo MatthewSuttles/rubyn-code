@@ -63,44 +63,23 @@ module RubynCode
         @model = model if model
       end
 
-      COMPATIBLE_BASE_URLS = {
-        'groq' => 'https://api.groq.com/openai/v1',
-        'together' => 'https://api.together.xyz/v1',
-        'ollama' => 'http://localhost:11434/v1'
-      }.freeze
-
       private
 
       # Builds the appropriate adapter for a given provider name.
-      #
-      # @param provider [String]
-      # @return [Adapters::Base]
       def resolve_adapter(provider)
         case provider
         when 'anthropic' then Adapters::Anthropic.new
         when 'openai' then Adapters::OpenAI.new
         else
-          build_compatible_adapter(provider)
-        end
-      end
-
-      # Builds an OpenAI-compatible adapter for third-party providers.
-      #
-      # @param provider [String]
-      # @return [Adapters::OpenAICompatible]
-      def build_compatible_adapter(provider)
-        base_url = provider_base_url(provider)
-        Adapters::OpenAICompatible.new(provider: provider, base_url: base_url)
-      end
-
-      def provider_base_url(provider)
-        COMPATIBLE_BASE_URLS.fetch(provider) do
           config = Config::Settings.new.provider_config(provider)
-          url = config&.fetch('base_url', nil)
-          break url if url
+          base_url = config&.fetch('base_url', nil)
 
-          raise ConfigError,
-                "Unknown provider '#{provider}'. Add it to config.yml under providers.#{provider}.base_url"
+          unless base_url
+            raise ConfigError,
+                  "Unknown provider '#{provider}'. Add base_url to config.yml under providers.#{provider}"
+          end
+
+          Adapters::OpenAICompatible.new(provider: provider, base_url: base_url)
         end
       end
     end

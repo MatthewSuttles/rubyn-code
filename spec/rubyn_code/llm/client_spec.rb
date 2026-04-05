@@ -37,13 +37,19 @@ RSpec.describe RubynCode::LLM::Client do
       expect(openai_client.adapter).to be_a(RubynCode::LLM::Adapters::OpenAI)
     end
 
-    it 'resolves compatible providers' do
+    it 'resolves providers configured in config.yml' do
+      settings = instance_double(
+        RubynCode::Config::Settings,
+        provider_config: { 'base_url' => 'https://api.groq.com/openai/v1' }
+      )
+      allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+
       groq_client = described_class.new(provider: 'groq')
       expect(groq_client.provider_name).to eq('groq')
       expect(groq_client.adapter).to be_a(RubynCode::LLM::Adapters::OpenAICompatible)
     end
 
-    it 'raises ConfigError for unknown providers without base_url' do
+    it 'raises ConfigError when provider has no config' do
       settings = instance_double(RubynCode::Config::Settings, provider_config: nil)
       allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
 
@@ -51,16 +57,15 @@ RSpec.describe RubynCode::LLM::Client do
         .to raise_error(RubynCode::ConfigError, /Unknown provider/)
     end
 
-    it 'resolves custom providers from config' do
+    it 'raises ConfigError when provider config has no base_url' do
       settings = instance_double(
         RubynCode::Config::Settings,
-        provider_config: { 'base_url' => 'https://api.minimax.chat/v1' }
+        provider_config: { 'models' => ['some-model'] }
       )
       allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
 
-      minimax_client = described_class.new(provider: 'minimax')
-      expect(minimax_client.provider_name).to eq('minimax')
-      expect(minimax_client.adapter).to be_a(RubynCode::LLM::Adapters::OpenAICompatible)
+      expect { described_class.new(provider: 'incomplete') }
+        .to raise_error(RubynCode::ConfigError, /Unknown provider/)
     end
   end
 
