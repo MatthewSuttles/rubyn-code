@@ -21,7 +21,7 @@ module RubynCode
           Commands::Version, Commands::Review, Commands::Resume,
           Commands::Spawn, Commands::Doctor, Commands::Tokens,
           Commands::Plan, Commands::ContextInfo, Commands::Diff,
-          Commands::Model
+          Commands::Model, Commands::NewSession
         ].each { |cmd| @command_registry.register(cmd) }
       end
 
@@ -80,9 +80,17 @@ module RubynCode
           apply_model(model)
         in { action: :spawn_teammate, name: String => name, role: String => role }
           spawn_teammate(name, role)
+        in { action: :new_session, session_id: String => sid }
+          start_new_session(sid)
         else
           # Unknown result hash — ignore
         end
+      end
+
+      def start_new_session(new_id)
+        @session_id = new_id
+        @skills_injected = false # re-inject skills on next message
+        system('clear')
       end
 
       def apply_budget(amount)

@@ -105,6 +105,7 @@ module RubynCode
 
       def run_iteration(iteration)
         log_iteration(iteration)
+        compact_if_needed # ensure context is under threshold before LLM call
         response   = call_llm
         tool_calls = extract_tool_calls(response)
         log_response(response, tool_calls)
@@ -149,6 +150,11 @@ module RubynCode
         return handle_empty_response if text.strip.empty?
 
         @conversation.add_assistant_message(response_content(response))
+
+        # Compact after the response if context is over threshold —
+        # like Claude Code, pause for compaction before the next turn
+        compact_if_needed
+
         text
       end
 
@@ -183,6 +189,24 @@ module RubynCode
         drain_background_notifications
         run_maintenance(iteration)
         nil
+      end
+
+      # Check if context needs compaction. Runs before LLM calls and
+      # after text responses — mirrors Claude Code's "pause for compaction"
+      # behavior that keeps context manageable in long sessions.
+      def compact_if_needed
+        return unless @context_manager.needs_compaction?(@conversation.messages)
+
+        est = @context_manager.estimated_tokens(@conversation.messages)
+        RubynCode::Debug.token(
+          "Context over threshold (#{est}) — running compaction"
+        )
+        @context_manager.check_compaction!(@conversation)
+
+        after = @context_manager.estimated_tokens(@conversation.messages)
+        RubynCode::Debug.token("Compacted: #{est} → #{after} tokens")
+      rescue StandardError => e
+        RubynCode::Debug.warn("Compaction failed: #{e.message}")
       end
 
       def escalate_max_tokens

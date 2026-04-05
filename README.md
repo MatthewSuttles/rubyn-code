@@ -324,6 +324,7 @@ rubyn-code --help             # Show help
 |---------|---------|
 | `/help` | Show help |
 | `/quit` | Exit (saves session + extracts learnings) |
+| `/new` | Save session and start a fresh conversation |
 | `/review [base]` | PR review against best practices |
 | `/spawn name role` | Spawn a persistent teammate |
 | `/compact` | Compress conversation context |
