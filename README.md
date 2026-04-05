@@ -80,7 +80,7 @@ bundle exec ruby -Ilib exe/rubyn-code
 
 </details>
 
-**Authentication:** Rubyn Code reads your Claude Code OAuth token from the macOS Keychain automatically. Just make sure you've logged into Claude Code once (`claude` in your terminal). Also supports `ANTHROPIC_API_KEY` env var.
+**Authentication:** Rubyn Code reads your Claude Code OAuth token from the macOS Keychain automatically. Just make sure you've logged into Claude Code once (`claude` in your terminal). Also supports `ANTHROPIC_API_KEY` env var. See [Authentication](#authentication) for OpenAI and other providers.
 
 ## Quick Start
 
@@ -336,6 +336,8 @@ rubyn-code --help             # Show help
 
 ## Authentication
 
+### Anthropic (default)
+
 | Priority | Source | Setup |
 |----------|--------|-------|
 | 1 | macOS Keychain | Log into Claude Code once: `claude` |
@@ -343,6 +345,24 @@ rubyn-code --help             # Show help
 | 3 | Environment | `export ANTHROPIC_API_KEY=sk-ant-...` |
 
 Works with Claude Pro, Max, Team, and Enterprise. Default model: **Claude Opus 4.6**.
+
+### OpenAI
+
+```bash
+export OPENAI_API_KEY=sk-...
+```
+
+Available models: `gpt-4o`, `gpt-4o-mini`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `o3`, `o4-mini`
+
+### OpenAI-Compatible Providers (Groq, Together, Ollama, etc.)
+
+Set the provider-specific API key and configure via `config.yml`:
+
+```bash
+export GROQ_API_KEY=gsk-...
+```
+
+Local providers (Ollama, LM Studio) running on `localhost`/`127.0.0.1` don't require an API key.
 
 ## Architecture
 
@@ -381,6 +401,20 @@ daily_budget: 10.00
 # .rubyn-code/config.yml (project — overrides global)
 model: claude-sonnet-4-6
 permission_mode: autonomous
+
+# Use OpenAI instead of Anthropic
+# provider: openai
+# model: gpt-4o
+
+# Use an OpenAI-compatible provider
+# provider: groq
+# provider_base_url: https://api.groq.com/openai/v1
+# model: llama-3.3-70b
+
+# Local Ollama (no API key needed)
+# provider: ollama
+# provider_base_url: http://localhost:11434/v1
+# model: llama3
 ```
 
 ## Development

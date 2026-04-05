@@ -41,6 +41,10 @@ module RubynCode
       autoload :PromptCaching, 'rubyn_code/llm/adapters/prompt_caching'
       autoload :Anthropic, 'rubyn_code/llm/adapters/anthropic'
       autoload :AnthropicStreaming, 'rubyn_code/llm/adapters/anthropic_streaming'
+      autoload :OpenAI, 'rubyn_code/llm/adapters/openai'
+      autoload :OpenAIStreaming, 'rubyn_code/llm/adapters/openai_streaming'
+      autoload :OpenAICompatible, 'rubyn_code/llm/adapters/openai_compatible'
+      autoload :OpenAIMessageTranslator, 'rubyn_code/llm/adapters/openai_message_translator'
     end
 
     # Backward-compat: LLM::Streaming → Adapters::AnthropicStreaming

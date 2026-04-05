@@ -5,7 +5,8 @@
 ## What Is This?
 
 `rubyn-code` (v0.1.0) — an AI-powered CLI coding assistant for Ruby and Rails.
-Ships as a gem with an executable at `exe/rubyn-code`. Talks to Claude via OAuth or API key.
+Ships as a gem with an executable at `exe/rubyn-code`. Multi-provider: Anthropic (default),
+OpenAI, and any OpenAI-compatible API (Groq, Together, Ollama, etc.).
 
 - **Homepage:** https://rubyn.dev
 - **License:** MIT
@@ -19,18 +20,21 @@ User input → CLI::REPL
                 │                                      ↓
                 │                              (optional action hash → REPL state change)
                 │
-                └── message → Agent::Loop → LLM::Client (Claude)
+                └── message → Agent::Loop → LLM::Client (facade)
+                                   ↕                    ↓
+                             Tools::Executor    Adapters::Anthropic / OpenAI / OpenAICompatible
                                    ↕
-                             Tools::Executor → Tool#execute
                                    ↕
                           Context::Manager (compaction if needed)
                                    ↕
                        Observability::BudgetEnforcer (cost check)
 ```
 
-The `Agent::Loop` is the heartbeat. It sends messages to Claude, receives tool_use blocks,
-dispatches them through `Tools::Executor` (which checks `Permissions::Policy` first),
-appends results, and loops until Claude responds with plain text or the budget is exhausted.
+The `Agent::Loop` is the heartbeat. It sends messages to the LLM (via the adapter layer),
+receives tool_use blocks, dispatches them through `Tools::Executor` (which checks
+`Permissions::Policy` first), appends results, and loops until the LLM responds with
+plain text or the budget is exhausted. The loop also guards against empty responses
+(retries automatically) and waits for background jobs before finalizing.
 
 Slash commands (`/help`, `/plan`, `/doctor`, etc.) are handled locally by the
 `Commands::Registry` — they never hit the LLM. See `cli/commands/RUBYN.md`.
@@ -102,7 +106,7 @@ dispatch with tab-completion. Infrastructure: `Base` (abstract), `Registry` (dis
 | `/plan` | Toggle plan mode (reason without executing) |
 | `/context` | Visual context window usage bar |
 | `/diff` | Quick git diff |
-| `/model` | Show/switch Claude model |
+| `/model` | Show/switch model (supports provider:model syntax) |
 | `/review` | PR review against best practices |
 | `/skill` | Load/list skills |
 | `/tasks` | List active tasks |
@@ -134,6 +138,39 @@ Commands return optional **action hashes** for state changes the REPL processes
 3. Implement `execute(params)` — return a string result
 4. Add autoload entry in `lib/rubyn_code.rb` under `module Tools`
 5. Register in `Tools::Registry`
+
+## Adding a New LLM Adapter
+
+1. Create `lib/rubyn_code/llm/adapters/my_provider.rb` inheriting `Adapters::Base`
+2. Implement `#chat(messages:, model:, max_tokens:, tools:, system:, on_text:, task_budget:)`,
+   `#provider_name`, and `#models`
+3. `#chat` must return `LLM::Response` with normalized `TextBlock` / `ToolUseBlock` / `Usage`
+4. Stop reasons must be normalized: `'end_turn'`, `'tool_use'`, `'max_tokens'`
+5. Add autoload entry in `lib/rubyn_code.rb` under `module Adapters`
+6. Add spec in `spec/rubyn_code/llm/adapters/` — include `it_behaves_like 'an LLM adapter'`
+
+**Key files in the adapter layer:**
+- `adapters/base.rb` — abstract contract (chat, provider_name, models)
+- `adapters/anthropic.rb` — Anthropic Claude (OAuth + API key, prompt caching, SSE streaming)
+- `adapters/openai.rb` — OpenAI Chat Completions (Bearer auth, function calling, SSE streaming)
+- `adapters/openai_compatible.rb` — inherits OpenAI, overrides base_url/provider/models/auth
+- `adapters/openai_message_translator.rb` — translates Anthropic-format messages to OpenAI format
+- `adapters/openai_streaming.rb` — SSE parser for OpenAI `choices[0].delta` format
+- `adapters/anthropic_streaming.rb` — SSE parser for Anthropic `content_block_delta` format
+- `adapters/json_parsing.rb` — shared safe JSON parsing
+- `adapters/prompt_caching.rb` — Anthropic-only cache_control injection
+- `shared_examples.rb` (in spec) — adapter contract shared examples
+
+**Important patterns:**
+- All adapters return the same `LLM::Response` / `TextBlock` / `ToolUseBlock` / `Usage` types
+- `TextBlock`, `ToolUseBlock`, `Response`, `Usage` are `Data.define` objects in `message_builder.rb`
+- Any file referencing these types needs `require_relative '../message_builder'`
+- `STOP_REASON_MAP` lives in `OpenAIStreaming` — the OpenAI adapter references it from there
+- `OpenAICompatible` passes `base_url` to `OpenAI`; `api_url` appends `/chat/completions`
+- Local providers (localhost/127.0.0.1) skip API key requirement via `local_provider?`
+- Tool schemas: Anthropic uses `input_schema`, OpenAI wraps in `{ type: "function", function: { parameters: ... } }`
+- Message format: Anthropic tool_results are `role: "user"` with `type: "tool_result"` blocks;
+  OpenAI uses `role: "tool"` with `tool_call_id`. The translator handles this.
 
 ## Adding a New Skill
 
