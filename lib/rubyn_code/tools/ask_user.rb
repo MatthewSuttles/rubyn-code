@@ -25,13 +25,16 @@ module RubynCode
       def execute(question:)
         if @prompt_callback
           @prompt_callback.call(question)
-        else
-          # Fallback: use stdin directly
+        elsif $stdin.respond_to?(:tty?) && $stdin.tty?
+          # Interactive fallback: prompt on stdin
           $stdout.puts
           $stdout.puts "  #{question}"
           $stdout.print '  > '
           $stdout.flush
           $stdin.gets&.strip || '[no response]'
+        else
+          # Non-interactive (piped input, -p mode, daemon) — can't ask
+          '[non-interactive session — cannot ask user. Make your best judgment and proceed.]'
         end
       end
     end
