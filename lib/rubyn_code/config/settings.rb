@@ -10,7 +10,7 @@ module RubynCode
       class LoadError < StandardError; end
 
       CONFIGURABLE_KEYS = %i[
-        model max_iterations max_sub_agent_iterations max_output_chars
+        provider model max_iterations max_sub_agent_iterations max_output_chars
         context_threshold_tokens micro_compact_keep_recent
         poll_interval idle_timeout
         session_budget_usd daily_budget_usd
@@ -19,6 +19,7 @@ module RubynCode
       ].freeze
 
       DEFAULT_MAP = {
+        provider: Defaults::DEFAULT_PROVIDER,
         model: Defaults::DEFAULT_MODEL,
         max_iterations: Defaults::MAX_ITERATIONS,
         max_sub_agent_iterations: Defaults::MAX_SUB_AGENT_ITERATIONS,
@@ -92,7 +93,38 @@ module RubynCode
       def dangerous_patterns = Defaults::DANGEROUS_PATTERNS
       def scrub_env_vars = Defaults::SCRUB_ENV_VARS
 
+      # Returns config hash for a custom provider, or nil if not configured.
+      # Reads from `providers.<name>` in config.yml.
+      #
+      # Expected keys: base_url, env_key, models, pricing
+      # pricing is a hash of model_name => [input_rate, output_rate]
+      def provider_config(name)
+        providers = @data.dig('providers', name.to_s)
+        return nil unless providers.is_a?(Hash)
+
+        providers.transform_keys(&:to_s)
+      end
+
+      # Returns all user-configured pricing as { model => [input, output] }
+      def custom_pricing
+        providers = @data['providers']
+        return {} unless providers.is_a?(Hash)
+
+        providers.each_with_object({}) do |(_, cfg), acc|
+          merge_provider_pricing(cfg, acc)
+        end
+      end
+
       private
+
+      def merge_provider_pricing(cfg, acc)
+        return unless cfg.is_a?(Hash) && cfg['pricing'].is_a?(Hash)
+
+        cfg['pricing'].each do |model, rates|
+          pair = Array(rates)
+          acc[model.to_s] = pair.map(&:to_f) if pair.size == 2
+        end
+      end
 
       def ensure_home_directory!
         dir = File.dirname(@config_path)

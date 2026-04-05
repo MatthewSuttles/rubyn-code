@@ -59,4 +59,32 @@ RSpec.describe RubynCode::Auth::TokenStore do
       expect(described_class.exists?).to be false
     end
   end
+
+  describe '.load_for_provider' do
+    it 'delegates to .load for anthropic' do
+      described_class.save(access_token: 'abc', refresh_token: 'xyz', expires_at: Time.now + 3600)
+      tokens = described_class.load_for_provider('anthropic')
+      expect(tokens[:access_token]).to eq('abc')
+    end
+
+    it 'reads OPENAI_API_KEY for openai provider' do
+      allow(ENV).to receive(:fetch).with('OPENAI_API_KEY', nil).and_return('sk-openai-test')
+      tokens = described_class.load_for_provider('openai')
+      expect(tokens[:access_token]).to eq('sk-openai-test')
+      expect(tokens[:type]).to eq(:api_key)
+      expect(tokens[:source]).to eq(:env)
+    end
+
+    it 'returns nil when provider env var is not set' do
+      allow(ENV).to receive(:fetch).with('OPENAI_API_KEY', nil).and_return(nil)
+      tokens = described_class.load_for_provider('openai')
+      expect(tokens).to be_nil
+    end
+
+    it 'constructs env key from provider name for unknown providers' do
+      allow(ENV).to receive(:fetch).with('MYAI_API_KEY', nil).and_return('key-123')
+      tokens = described_class.load_for_provider('myai')
+      expect(tokens[:access_token]).to eq('key-123')
+    end
+  end
 end

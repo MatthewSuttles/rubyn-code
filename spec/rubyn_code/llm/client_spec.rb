@@ -16,6 +16,93 @@ RSpec.describe RubynCode::LLM::Client do
     )
   end
 
+  describe '#initialize' do
+    it 'defaults to anthropic provider' do
+      expect(client.provider_name).to eq('anthropic')
+    end
+
+    it 'defaults to the configured model' do
+      expect(client.model).to eq('claude-sonnet-4-20250514')
+    end
+
+    it 'accepts a custom adapter' do
+      adapter = instance_double(RubynCode::LLM::Adapters::Base, provider_name: 'test')
+      custom_client = described_class.new(adapter: adapter)
+      expect(custom_client.provider_name).to eq('test')
+    end
+
+    it 'resolves openai provider' do
+      openai_client = described_class.new(provider: 'openai')
+      expect(openai_client.provider_name).to eq('openai')
+      expect(openai_client.adapter).to be_a(RubynCode::LLM::Adapters::OpenAI)
+    end
+
+    it 'resolves compatible providers' do
+      groq_client = described_class.new(provider: 'groq')
+      expect(groq_client.provider_name).to eq('groq')
+      expect(groq_client.adapter).to be_a(RubynCode::LLM::Adapters::OpenAICompatible)
+    end
+
+    it 'raises ConfigError for unknown providers without base_url' do
+      settings = instance_double(RubynCode::Config::Settings, provider_config: nil)
+      allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+
+      expect { described_class.new(provider: 'martian-ai') }
+        .to raise_error(RubynCode::ConfigError, /Unknown provider/)
+    end
+
+    it 'resolves custom providers from config' do
+      settings = instance_double(
+        RubynCode::Config::Settings,
+        provider_config: { 'base_url' => 'https://api.minimax.chat/v1' }
+      )
+      allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+
+      minimax_client = described_class.new(provider: 'minimax')
+      expect(minimax_client.provider_name).to eq('minimax')
+      expect(minimax_client.adapter).to be_a(RubynCode::LLM::Adapters::OpenAICompatible)
+    end
+  end
+
+  describe '#model=' do
+    it 'allows changing the model at runtime' do
+      client.model = 'claude-opus-4-20250514'
+      expect(client.model).to eq('claude-opus-4-20250514')
+    end
+  end
+
+  describe '#switch_provider!' do
+    it 'swaps to OpenAI adapter' do
+      client.switch_provider!('openai', model: 'gpt-4o')
+      expect(client.provider_name).to eq('openai')
+      expect(client.model).to eq('gpt-4o')
+      expect(client.adapter).to be_a(RubynCode::LLM::Adapters::OpenAI)
+    end
+
+    it 'swaps back to Anthropic' do
+      client.switch_provider!('openai')
+      client.switch_provider!('anthropic', model: 'claude-sonnet-4-20250514')
+      expect(client.provider_name).to eq('anthropic')
+      expect(client.adapter).to be_a(RubynCode::LLM::Adapters::Anthropic)
+    end
+
+    it 'keeps existing model when no model given' do
+      client.switch_provider!('openai')
+      expect(client.model).to eq('claude-sonnet-4-20250514')
+    end
+  end
+
+  describe '#models' do
+    it 'returns anthropic models by default' do
+      expect(client.models).to include('claude-sonnet-4-20250514')
+    end
+
+    it 'returns openai models after provider switch' do
+      client.switch_provider!('openai')
+      expect(client.models).to include('gpt-4o')
+    end
+  end
+
   describe '#chat' do
     it 'sends a proper OAuth request and parses the response' do
       stub_request(:post, 'https://api.anthropic.com/v1/messages')
@@ -109,7 +196,6 @@ RSpec.describe RubynCode::LLM::Client do
     end
 
     it 'calls on_text callback with text content for non-streaming (API key auth)' do
-      # Use a non-oat token so streaming is disabled, but on_text still fires
       allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(
         {
           access_token: 'sk-ant-api01-test-key',

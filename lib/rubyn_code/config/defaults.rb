@@ -10,6 +10,7 @@ module RubynCode
       SESSIONS_DIR = File.join(HOME_DIR, 'sessions')
       MEMORIES_DIR = File.join(HOME_DIR, 'memories')
 
+      DEFAULT_PROVIDER = 'anthropic'
       DEFAULT_MODEL = 'claude-opus-4-6'
       MAX_ITERATIONS = 200
       MAX_SUB_AGENT_ITERATIONS = 200
@@ -37,6 +38,15 @@ module RubynCode
       OAUTH_AUTHORIZE_URL = 'https://claude.ai/oauth/authorize'
       OAUTH_TOKEN_URL = 'https://claude.ai/oauth/token'
       OAUTH_SCOPES = 'user:read model:read model:write'
+
+      # Known provider configurations: provider name → { env_key:, base_url: (if not default) }
+      PROVIDER_ENV_KEYS = {
+        'anthropic' => 'ANTHROPIC_API_KEY',
+        'openai' => 'OPENAI_API_KEY',
+        'groq' => 'GROQ_API_KEY',
+        'together' => 'TOGETHER_API_KEY',
+        'ollama' => 'OLLAMA_API_KEY'
+      }.freeze
 
       DANGEROUS_PATTERNS = [
         'rm -rf /', 'sudo rm', 'shutdown', 'reboot',

@@ -115,9 +115,11 @@ module RubynCode
       end
 
       def ensure_auth!
-        if Auth::TokenStore.valid?
-          tokens = Auth::TokenStore.load
-          source = tokens&.fetch(:source, :unknown)
+        provider = Config::Defaults::DEFAULT_PROVIDER
+        tokens = Auth::TokenStore.load_for_provider(provider)
+
+        if tokens
+          source = tokens.fetch(:source, :unknown)
           @renderer.info("Authenticated via #{source}") if source == :keychain
           return true
         end

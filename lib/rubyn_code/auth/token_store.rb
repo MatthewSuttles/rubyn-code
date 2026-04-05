@@ -20,6 +20,15 @@ module RubynCode
           load_from_keychain || load_from_file || load_from_env
         end
 
+        # Load API key for a given provider. Anthropic uses the full fallback chain.
+        def load_for_provider(provider)
+          return load if provider == 'anthropic'
+
+          env_key = resolve_env_key(provider)
+          api_key = ENV.fetch(env_key, nil)
+          api_key&.empty? == false ? { access_token: api_key, type: :api_key, source: :env } : nil
+        end
+
         def save(access_token:, refresh_token:, expires_at:)
           ensure_directory!
 
@@ -41,26 +50,24 @@ module RubynCode
 
         def valid?
           tokens = self.load
-          return false unless tokens
-          return false unless tokens[:access_token]
-
-          # API keys don't expire
+          return false unless tokens&.fetch(:access_token, nil)
           return true if tokens[:type] == :api_key
-
-          # OAuth tokens need expiry check
           return true unless tokens[:expires_at]
 
           tokens[:expires_at] > Time.now + EXPIRY_BUFFER_SECONDS
         end
 
-        # -- delegates to valid?
         def exists? = valid?
-
         def access_token = self.load&.fetch(:access_token, nil)
 
-        def token_type = self.load&.fetch(:type, :oauth)
-
         private
+
+        def resolve_env_key(provider)
+          default = Config::Defaults::PROVIDER_ENV_KEYS.fetch(provider, "#{provider.upcase}_API_KEY")
+          Config::Settings.new.provider_config(provider)&.fetch('env_key', nil) || default
+        rescue StandardError
+          default
+        end
 
         def load_from_keychain
           return nil unless RUBY_PLATFORM.include?('darwin')
@@ -86,7 +93,6 @@ module RubynCode
           }
         end
 
-        # Read from local YAML token file
         def load_from_file
           return nil unless File.exist?(tokens_path)
 
@@ -105,28 +111,18 @@ module RubynCode
           nil
         end
 
-        # Fall back to ANTHROPIC_API_KEY environment variable
         def load_from_env
           api_key = ENV.fetch('ANTHROPIC_API_KEY', nil)
           return nil unless api_key && !api_key.empty?
 
-          {
-            access_token: api_key,
-            refresh_token: nil,
-            expires_at: nil,
-            type: :api_key,
-            source: :env
-          }
+          { access_token: api_key, refresh_token: nil, expires_at: nil, type: :api_key, source: :env }
         end
 
-        def tokens_path
-          Config::Defaults::TOKENS_FILE
-        end
+        def tokens_path = Config::Defaults::TOKENS_FILE
 
         def ensure_directory!
-          dir = File.dirname(tokens_path)
-          FileUtils.mkdir_p(dir)
-          File.chmod(0o700, dir)
+          FileUtils.mkdir_p(File.dirname(tokens_path))
+          File.chmod(0o700, File.dirname(tokens_path))
         end
 
         def parse_time(value)

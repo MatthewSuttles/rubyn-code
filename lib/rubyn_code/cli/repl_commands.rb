@@ -78,6 +78,8 @@ module RubynCode
           @session_id = sid
         in { action: :set_model, model: String => model }
           apply_model(model)
+        in { action: :set_provider, provider: String => provider, **rest }
+          apply_provider(provider, rest[:model])
         in { action: :spawn_teammate, name: String => name, role: String => role }
           spawn_teammate(name, role)
         in { action: :new_session, session_id: String => sid }
@@ -105,8 +107,15 @@ module RubynCode
       end
 
       def apply_model(model)
-        @llm_client.model = model if @llm_client.respond_to?(:model=)
+        @llm_client.model = model
         @renderer.info("Model set to #{model}")
+      end
+
+      def apply_provider(provider, model)
+        @llm_client.switch_provider!(provider, model: model)
+        label = "Provider set to #{provider}"
+        label += ", model: #{model}" if model
+        @renderer.info(label)
       end
 
       def display_commands

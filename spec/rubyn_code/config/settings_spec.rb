@@ -136,6 +136,61 @@ RSpec.describe RubynCode::Config::Settings do
     end
   end
 
+  describe '#provider_config' do
+    it 'returns nil for unconfigured providers' do
+      settings = described_class.new(config_path: config_path)
+      expect(settings.provider_config('minimax')).to be_nil
+    end
+
+    it 'returns config hash for a configured provider' do
+      File.write(config_path, YAML.dump(
+        'providers' => {
+          'minimax' => {
+            'base_url' => 'https://api.minimax.chat/v1',
+            'env_key' => 'MINIMAX_API_KEY',
+            'models' => ['M1'],
+            'pricing' => { 'M1' => [0.50, 2.00] }
+          }
+        }
+      ))
+      settings = described_class.new(config_path: config_path)
+      cfg = settings.provider_config('minimax')
+      expect(cfg['base_url']).to eq('https://api.minimax.chat/v1')
+      expect(cfg['models']).to eq(['M1'])
+    end
+  end
+
+  describe '#custom_pricing' do
+    it 'returns empty hash when no providers configured' do
+      settings = described_class.new(config_path: config_path)
+      expect(settings.custom_pricing).to eq({})
+    end
+
+    it 'returns pricing from configured providers' do
+      File.write(config_path, YAML.dump(
+        'providers' => {
+          'minimax' => {
+            'pricing' => { 'M1' => [0.50, 2.00] }
+          }
+        }
+      ))
+      settings = described_class.new(config_path: config_path)
+      expect(settings.custom_pricing).to eq('M1' => [0.50, 2.00])
+    end
+
+    it 'skips malformed pricing entries' do
+      File.write(config_path, YAML.dump(
+        'providers' => {
+          'minimax' => {
+            'pricing' => { 'M1' => [0.50] }
+          }
+        }
+      ))
+      settings = described_class.new(config_path: config_path)
+      expect(settings.custom_pricing).to eq({})
+    end
+  end
+
   describe '#to_h' do
     it 'merges defaults with overrides' do
       settings = described_class.new(config_path: File.join(config_dir, 'nonexistent.yml'))

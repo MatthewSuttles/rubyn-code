@@ -62,7 +62,7 @@ RSpec.describe RubynCode::CLI::DaemonRunner do
     end
 
     it 'exits when auth is not valid' do
-      allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(false)
+      allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).and_return(nil)
       runner = described_class.new(options)
 
       expect(renderer).to receive(:error).with(/No valid authentication/)

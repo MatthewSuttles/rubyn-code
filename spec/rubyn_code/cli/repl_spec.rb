@@ -537,7 +537,7 @@ RSpec.describe RubynCode::CLI::REPL do
 
   describe 'authentication' do
     it 'exits with status 1 when not authenticated' do
-      allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(false)
+      allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).and_return(nil)
 
       renderer = instance_double(RubynCode::CLI::Renderer)
       allow(RubynCode::CLI::Renderer).to receive(:new).and_return(renderer)
