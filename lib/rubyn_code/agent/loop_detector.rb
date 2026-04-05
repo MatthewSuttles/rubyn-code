@@ -36,10 +36,10 @@ module RubynCode
         @name_history.shift while @name_history.length > @name_window
 
         # Track file edit frequency
-        if %w[edit_file write_file].include?(tool_name.to_s) && tool_input.is_a?(Hash)
-          path = tool_input[:path] || tool_input['path']
-          @file_edits[path.to_s] += 1 if path
-        end
+        return unless %w[edit_file write_file].include?(tool_name.to_s) && tool_input.is_a?(Hash)
+
+        path = tool_input[:path] || tool_input['path']
+        @file_edits[path.to_s] += 1 if path
       end
 
       # Returns true when the same tool call signature appears at least
