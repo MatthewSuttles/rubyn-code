@@ -33,10 +33,13 @@ module RubynCode
         puts @pastel.cyan("  > #{name}: #{format_params(params)}")
       end
 
-      def tool_result(_name, output)
-        truncated = output.to_s[0...300]
+      def tool_result(name, output)
+        truncated = output.to_s[0...500]
         lines = truncated.lines
-        if lines.length > 6
+
+        if %w[edit_file write_file].include?(name.to_s)
+          render_diff_result(lines)
+        elsif lines.length > 6
           render_truncated_result(lines)
         else
           puts @pastel.dim("    #{truncated.strip.gsub("\n", "\n    ")}")
@@ -92,7 +95,28 @@ module RubynCode
         end
       end
 
+      DIFF_COLORS = {
+        /\A  \+ / => :green,
+        /\A  - / => :red,
+        /\A  @@ / => :cyan,
+        /\A(?:Created|Updated|Edited) / => :yellow
+      }.freeze
+
       private
+
+      def render_diff_result(lines)
+        lines.each do |line|
+          stripped = line.rstrip
+          puts "    #{colorize_diff_line(stripped)}"
+        end
+      end
+
+      def colorize_diff_line(line)
+        DIFF_COLORS.each do |pattern, color|
+          return @pastel.decorate(line, color) if line.match?(pattern)
+        end
+        @pastel.dim(line)
+      end
 
       def render_truncated_result(lines)
         puts @pastel.dim("    #{lines[0..4].map(&:strip).join("\n    ")}")
