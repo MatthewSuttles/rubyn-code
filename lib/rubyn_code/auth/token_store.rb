@@ -34,7 +34,7 @@ module RubynCode
           data
         end
 
-        def clear!
+        def clear! # rubocop:disable Naming/PredicateMethod -- destructive action, not a predicate
           FileUtils.rm_f(tokens_path)
           true
         end
@@ -53,46 +53,37 @@ module RubynCode
           tokens[:expires_at] > Time.now + EXPIRY_BUFFER_SECONDS
         end
 
-        def exists?
-          valid?
-        end
+        # -- delegates to valid?
+        def exists? = valid?
 
-        def access_token
-          tokens = self.load
-          tokens&.fetch(:access_token, nil)
-        end
+        def access_token = self.load&.fetch(:access_token, nil)
 
-        def token_type
-          tokens = self.load
-          tokens&.fetch(:type, :oauth)
-        end
+        def token_type = self.load&.fetch(:type, :oauth)
 
         private
 
-        # Read Claude Code's OAuth token from macOS Keychain
         def load_from_keychain
           return nil unless RUBY_PLATFORM.include?('darwin')
 
           output = `security find-generic-password -s "#{KEYCHAIN_SERVICE}" -w 2>/dev/null`.strip
           return nil if output.empty?
 
-          data = JSON.parse(output)
-          oauth = data['claudeAiOauth']
-          return nil unless oauth && oauth['accessToken']
+          oauth = JSON.parse(output)['claudeAiOauth']
+          return nil unless oauth&.dig('accessToken')
 
-          expires_at = if oauth['expiresAt']
-                         Time.at(oauth['expiresAt'] / 1000.0) # milliseconds to seconds
-                       end
+          build_keychain_tokens(oauth)
+        rescue StandardError
+          nil
+        end
 
+        def build_keychain_tokens(oauth)
           {
             access_token: oauth['accessToken'],
             refresh_token: oauth['refreshToken'],
-            expires_at: expires_at,
+            expires_at: oauth['expiresAt'] ? Time.at(oauth['expiresAt'] / 1000.0) : nil,
             type: :oauth,
             source: :keychain
           }
-        rescue JSON::ParserError, StandardError
-          nil
         end
 
         # Read from local YAML token file

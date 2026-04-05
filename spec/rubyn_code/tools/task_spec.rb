@@ -41,7 +41,7 @@ RSpec.describe RubynCode::Tools::Task do
           tool = build_tool(dir)
           result = tool.execute(action: 'create', title: 'Task B', session_id: 'sess_123')
 
-          expect(result).to include('Session:  sess_123')
+          expect(result).to include('Session id: sess_123')
         end
       end
 
@@ -115,7 +115,7 @@ RSpec.describe RubynCode::Tools::Task do
           task_id = extract_id(create_result)
 
           result = tool.execute(action: 'update', task_id: task_id, owner: 'alice')
-          expect(result).to include('Owner:    alice')
+          expect(result).to include('Owner: alice')
         end
       end
 
@@ -164,7 +164,7 @@ RSpec.describe RubynCode::Tools::Task do
           task_id = extract_id(create_result)
 
           result = tool.execute(action: 'complete', task_id: task_id, result: 'All 5 tests pass')
-          expect(result).to include('Result:   All 5 tests pass')
+          expect(result).to include('Result: All 5 tests pass')
         end
       end
 

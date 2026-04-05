@@ -32,39 +32,34 @@ module RubynCode
       end
 
       def run
-        conversation = build_conversation
-        executor = build_executor
-        tool_defs = build_tool_definitions
+        state = { conversation: build_conversation, executor: build_executor,
+                  tool_defs: build_tool_definitions, final_text: '' }
 
-        iteration = 0
-        final_text = ''
-
-        loop do
-          break if iteration >= @max_iterations
-
-          response = request_llm(conversation, tool_defs)
-          iteration += 1
-
-          text_content = extract_text(response)
-          tool_calls = extract_tool_calls(response)
-
-          if tool_calls.empty?
-            final_text = text_content
-            break
-          end
-
-          conversation << { role: 'assistant', content: response }
-
-          tool_results = execute_tools(executor, tool_calls)
-          conversation << { role: 'user', content: tool_results }
-
-          final_text = text_content unless text_content.empty?
+        @max_iterations.times do
+          result = run_single_iteration(state)
+          break if result == :done
         end
 
-        Summarizer.call(final_text)
+        Summarizer.call(state[:final_text])
       end
 
       private
+
+      def run_single_iteration(state)
+        response = request_llm(state[:conversation], state[:tool_defs])
+        text_content = extract_text(response)
+        tool_calls = extract_tool_calls(response)
+
+        if tool_calls.empty?
+          state[:final_text] = text_content
+          return :done
+        end
+
+        state[:conversation] << { role: 'assistant', content: response }
+        state[:conversation] << { role: 'user', content: execute_tools(state[:executor], tool_calls) }
+        state[:final_text] = text_content unless text_content.empty?
+        :continue
+      end
 
       def build_conversation
         [

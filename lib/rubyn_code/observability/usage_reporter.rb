@@ -27,24 +27,8 @@ module RubynCode
 
         return "No usage data for session #{session_id}." if rows.empty?
 
-        total_input   = rows.sum { |r| fetch_int(r, 'input_tokens') }
-        total_output  = rows.sum { |r| fetch_int(r, 'output_tokens') }
-        total_cost    = rows.sum { |r| fetch_float(r, 'cost_usd') }
-        turns         = rows.size
-        avg_cost      = turns.positive? ? total_cost / turns : 0.0
-
-        lines = [
-          header('Session Summary'),
-          field('Session', session_id),
-          field('Turns', turns.to_s),
-          field('Input tokens', format_number(total_input)),
-          field('Output tokens', format_number(total_output)),
-          field('Total tokens', format_number(total_input + total_output)),
-          field('Total cost', format_usd(total_cost)),
-          field('Avg cost/turn', format_usd(avg_cost))
-        ]
-
-        lines.join("\n")
+        totals = compute_session_totals(rows)
+        build_session_summary_lines(session_id, rows.size, totals).join("\n")
       end
 
       # Returns a formatted summary of today's total cost across all sessions.
@@ -52,31 +36,11 @@ module RubynCode
       # @return [String] multi-line formatted summary
       def daily_summary
         today = Time.now.utc.strftime('%Y-%m-%d')
-        rows = @db.query(
-          'SELECT session_id, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, ' \
-          "SUM(cost_usd) AS cost_usd, COUNT(*) AS turns FROM #{TABLE_NAME} " \
-          'WHERE created_at >= ? GROUP BY session_id',
-          ["#{today}T00:00:00Z"]
-        ).to_a
+        rows = query_daily_rows(today)
 
         return 'No usage data for today.' if rows.empty?
 
-        total_input  = rows.sum { |r| fetch_int(r, 'input_tokens') }
-        total_output = rows.sum { |r| fetch_int(r, 'output_tokens') }
-        total_cost   = rows.sum { |r| fetch_float(r, 'cost_usd') }
-        total_turns  = rows.sum { |r| fetch_int(r, 'turns') }
-        sessions     = rows.size
-
-        lines = [
-          header("Daily Summary (#{today})"),
-          field('Sessions', sessions.to_s),
-          field('Total turns', total_turns.to_s),
-          field('Input tokens', format_number(total_input)),
-          field('Output tokens', format_number(total_output)),
-          field('Total cost', format_usd(total_cost))
-        ]
-
-        lines.join("\n")
+        build_daily_summary_lines(today, rows).join("\n")
       end
 
       # Returns a cost breakdown by model for a given session.
@@ -84,28 +48,12 @@ module RubynCode
       # @param session_id [String]
       # @return [String] multi-line formatted breakdown
       def model_breakdown(session_id)
-        rows = @db.query(
-          'SELECT model, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, ' \
-          "SUM(cost_usd) AS cost_usd, COUNT(*) AS calls FROM #{TABLE_NAME} " \
-          'WHERE session_id = ? GROUP BY model ORDER BY cost_usd DESC',
-          [session_id]
-        ).to_a
+        rows = query_model_breakdown_rows(session_id)
 
         return "No usage data for session #{session_id}." if rows.empty?
 
         lines = [header('Cost by Model')]
-
-        rows.each do |row|
-          model   = row['model'] || row[:model]
-          cost    = fetch_float(row, 'cost_usd')
-          calls   = fetch_int(row, 'calls')
-          input_t = fetch_int(row, 'input_tokens')
-          output_t = fetch_int(row, 'output_tokens')
-
-          lines << "  #{@formatter.pastel.bold(model)}"
-          lines << "    Calls: #{calls}  |  Input: #{format_number(input_t)}  |  Output: #{format_number(output_t)}  |  Cost: #{format_usd(cost)}"
-        end
-
+        rows.each { |row| append_model_row(lines, row) }
         lines.join("\n")
       end
 
@@ -121,11 +69,81 @@ module RubynCode
       end
 
       def format_usd(amount)
-        '$%.4f' % amount
+        format('$%.4f', amount)
       end
 
-      def format_number(n)
-        n.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse
+      def compute_session_totals(rows)
+        {
+          input: rows.sum { |r| fetch_int(r, 'input_tokens') },
+          output: rows.sum { |r| fetch_int(r, 'output_tokens') },
+          cost: rows.sum { |r| fetch_float(r, 'cost_usd') }
+        }
+      end
+
+      def build_session_summary_lines(session_id, turns, totals) # rubocop:disable Metrics/AbcSize -- assembles multi-field summary
+        avg_cost = turns.positive? ? totals[:cost] / turns : 0.0
+        [
+          header('Session Summary'),
+          field('Session', session_id),
+          field('Turns', turns.to_s),
+          field('Input tokens', format_number(totals[:input])),
+          field('Output tokens', format_number(totals[:output])),
+          field('Total tokens', format_number(totals[:input] + totals[:output])),
+          field('Total cost', format_usd(totals[:cost])),
+          field('Avg cost/turn', format_usd(avg_cost))
+        ]
+      end
+
+      def query_daily_rows(today)
+        @db.query(
+          'SELECT session_id, SUM(input_tokens) AS input_tokens, ' \
+          'SUM(output_tokens) AS output_tokens, SUM(cost_usd) AS cost_usd, ' \
+          "COUNT(*) AS turns FROM #{TABLE_NAME} " \
+          'WHERE created_at >= ? GROUP BY session_id',
+          ["#{today}T00:00:00Z"]
+        ).to_a
+      end
+
+      def build_daily_summary_lines(today, rows) # rubocop:disable Metrics/AbcSize -- assembles multi-field daily summary
+        total_input  = rows.sum { |r| fetch_int(r, 'input_tokens') }
+        total_output = rows.sum { |r| fetch_int(r, 'output_tokens') }
+        total_cost   = rows.sum { |r| fetch_float(r, 'cost_usd') }
+        total_turns  = rows.sum { |r| fetch_int(r, 'turns') }
+
+        [
+          header("Daily Summary (#{today})"),
+          field('Sessions', rows.size.to_s),
+          field('Total turns', total_turns.to_s),
+          field('Input tokens', format_number(total_input)),
+          field('Output tokens', format_number(total_output)),
+          field('Total cost', format_usd(total_cost))
+        ]
+      end
+
+      def query_model_breakdown_rows(session_id)
+        @db.query(
+          'SELECT model, SUM(input_tokens) AS input_tokens, ' \
+          'SUM(output_tokens) AS output_tokens, SUM(cost_usd) AS cost_usd, ' \
+          "COUNT(*) AS calls FROM #{TABLE_NAME} " \
+          'WHERE session_id = ? GROUP BY model ORDER BY cost_usd DESC',
+          [session_id]
+        ).to_a
+      end
+
+      def append_model_row(lines, row)
+        model = row['model'] || row[:model]
+        lines << "  #{@formatter.pastel.bold(model)}"
+        lines << format(
+          '    Calls: %<calls>s  |  Input: %<input>s  |  Output: %<output>s  |  Cost: %<cost>s',
+          calls: fetch_int(row, 'calls'),
+          input: format_number(fetch_int(row, 'input_tokens')),
+          output: format_number(fetch_int(row, 'output_tokens')),
+          cost: format_usd(fetch_float(row, 'cost_usd'))
+        )
+      end
+
+      def format_number(num)
+        num.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse
       end
 
       def fetch_int(row, key)

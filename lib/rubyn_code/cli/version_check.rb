@@ -50,6 +50,16 @@ module RubynCode
           return
         end
 
+        latest = fetch_latest_version
+        return unless latest
+
+        write_cache(latest)
+        @result = latest
+      rescue StandardError
+        # Silent — never interrupt startup for a version check
+      end
+
+      def fetch_latest_version
         conn = Faraday.new do |f|
           f.options.timeout = 5
           f.options.open_timeout = 3
@@ -57,16 +67,8 @@ module RubynCode
         response = conn.get(RUBYGEMS_API)
         return unless response.success?
 
-        data = JSON.parse(response.body)
-        latest = data['version']
-        return unless latest
-        return unless latest.match?(/\A\d+\.\d+/)
-        return unless Gem::Version.correct?(latest)
-
-        write_cache(latest)
-        @result = latest
-      rescue StandardError
-        # Silent — never interrupt startup for a version check
+        latest = JSON.parse(response.body)['version']
+        latest if latest&.match?(/\A\d+\.\d+/) && Gem::Version.correct?(latest)
       end
 
       def newer?(remote, local)

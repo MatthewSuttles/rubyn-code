@@ -7,7 +7,8 @@ module RubynCode
   module Tools
     class Task < Base
       TOOL_NAME = 'task'
-      DESCRIPTION = 'Manage tasks: create, update, complete, list, or get tasks for tracking work items and dependencies.'
+      DESCRIPTION = 'Manage tasks: create, update, complete, list, or get tasks ' \
+                    'for tracking work items and dependencies.'
       PARAMETERS = {
         action: {
           type: :string, required: true,
@@ -63,21 +64,25 @@ module RubynCode
         when 'list'    then execute_list(manager, **params)
         when 'get'     then execute_get(manager, **params)
         else
-          raise Error, "Unknown task action: #{action}. Valid actions: create, update, complete, list, get"
+          raise Error,
+                "Unknown task action: #{action}. Valid: create, update, complete, list, get"
         end
       end
 
+      TASK_OPTIONAL_FIELDS = %i[owner result session_id description].freeze
+
       private
 
-      def execute_create(manager, title: nil, description: nil, session_id: nil, blocked_by: [], priority: 0, **)
+      def execute_create(manager, **params)
+        title = params[:title]
         raise Error, 'title is required for create' if title.nil? || title.empty?
 
         task = manager.create(
           title: title,
-          description: description,
-          session_id: session_id,
-          blocked_by: Array(blocked_by),
-          priority: priority.to_i
+          description: params[:description],
+          session_id: params[:session_id],
+          blocked_by: Array(params.fetch(:blocked_by, [])),
+          priority: params.fetch(:priority, 0).to_i
         )
 
         format_task(task, prefix: 'Created task')
@@ -124,16 +129,11 @@ module RubynCode
 
       def format_task(task, prefix: nil)
         header = prefix ? "#{prefix}: #{task.title}" : task.title
-        parts = [
-          header,
-          "  ID:       #{task.id}",
-          "  Status:   #{task.status}",
-          "  Priority: #{task.priority}"
-        ]
-        parts << "  Owner:    #{task.owner}" if task.owner
-        parts << "  Result:   #{task.result}" if task.result
-        parts << "  Session:  #{task.session_id}" if task.session_id
-        parts << "  Description: #{task.description}" if task.description
+        parts = [header, "  ID:       #{task.id}", "  Status:   #{task.status}", "  Priority: #{task.priority}"]
+        TASK_OPTIONAL_FIELDS.each do |field|
+          value = task.public_send(field)
+          parts << "  #{field.to_s.capitalize.tr('_', ' ')}: #{value}" if value
+        end
         parts.join("\n")
       end
 

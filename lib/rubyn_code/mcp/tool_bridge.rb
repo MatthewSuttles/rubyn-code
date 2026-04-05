@@ -11,6 +11,11 @@ module RubynCode
     # - Delegates #execute to the MCP client's #call_tool
     # - Registers itself with Tools::Registry
     module ToolBridge
+      JSON_TYPE_MAP = {
+        'string' => :string, 'integer' => :integer, 'number' => :number,
+        'boolean' => :boolean, 'array' => :array, 'object' => :object
+      }.freeze
+
       class << self
         # Discovers tools from an MCP client and creates corresponding
         # RubynCode tool classes.
@@ -35,12 +40,21 @@ module RubynCode
         # @return [Class] the newly created and registered tool class
         def build_tool_class(mcp_client, tool_def)
           remote_name = tool_def['name']
-          tool_name = "mcp_#{sanitize_name(remote_name)}"
-          description = tool_def['description'] || "MCP tool: #{remote_name}"
-          input_schema = tool_def['inputSchema'] || {}
-          parameters = build_parameters_from_schema(input_schema)
+          attrs = {
+            tool_name: "mcp_#{sanitize_name(remote_name)}",
+            description: tool_def['description'] || "MCP tool: #{remote_name}",
+            parameters: build_parameters_from_schema(tool_def['inputSchema'] || {})
+          }
+          klass = create_tool_class(attrs[:tool_name], attrs[:description], attrs[:parameters], mcp_client,
+                                    remote_name)
+          Tools::Registry.register(klass)
+          klass
+        end
 
-          klass = Class.new(Tools::Base) do
+        def create_tool_class(tool_name, description, parameters, mcp_client, remote_name) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength -- dynamic class creation requires setting many constants
+          bridge = self
+
+          Class.new(Tools::Base) do
             const_set(:TOOL_NAME, tool_name)
             const_set(:DESCRIPTION, description)
             const_set(:PARAMETERS, parameters)
@@ -60,62 +74,25 @@ module RubynCode
             define_method(:format_result) do |result|
               case result
               when Hash
-                if result.key?('content')
-                  extract_content(result['content'])
-                else
-                  JSON.generate(result)
-                end
-              when String
-                result
-              else
-                result.to_s
+                result.key?('content') ? extract_content(result['content']) : JSON.generate(result)
+              when String then result
+              else result.to_s
               end
             end
 
             define_method(:extract_content) do |content|
-              Array(content).map do |block|
-                case block['type']
-                when 'text'
-                  block['text']
-                when 'image'
-                  "[image: #{block['mimeType']}]"
-                when 'resource'
-                  block.dig('resource', 'text') || "[resource: #{block.dig('resource', 'uri')}]"
-                else
-                  block.to_s
-                end
-              end.join("\n")
+              Array(content).map { |block| bridge.send(:format_mcp_block, block) }.join("\n")
             end
           end
+        end
 
-          # Build parameter definitions from JSON Schema
-          klass.define_singleton_method(:build_parameters) do |schema|
-            properties = schema['properties'] || {}
-            required = schema['required'] || []
-
-            properties.each_with_object({}) do |(name, prop), params|
-              params[name.to_sym] = {
-                type: map_json_type(prop['type']),
-                description: prop['description'] || '',
-                required: required.include?(name)
-              }
-            end
+        def format_mcp_block(block)
+          case block['type']
+          when 'text'     then block['text']
+          when 'image'    then "[image: #{block['mimeType']}]"
+          when 'resource' then block.dig('resource', 'text') || "[resource: #{block.dig('resource', 'uri')}]"
+          else block.to_s
           end
-
-          klass.define_singleton_method(:map_json_type) do |json_type|
-            case json_type
-            when 'string'  then :string
-            when 'integer' then :integer
-            when 'number'  then :number
-            when 'boolean' then :boolean
-            when 'array'   then :array
-            when 'object'  then :object
-            else :string
-            end
-          end
-
-          Tools::Registry.register(klass)
-          klass
         end
 
         # Builds parameter definitions from a JSON Schema.
@@ -140,15 +117,7 @@ module RubynCode
         # @param json_type [String]
         # @return [Symbol]
         def map_json_type(json_type)
-          case json_type
-          when 'string'  then :string
-          when 'integer' then :integer
-          when 'number'  then :number
-          when 'boolean' then :boolean
-          when 'array'   then :array
-          when 'object'  then :object
-          else :string
-          end
+          JSON_TYPE_MAP.fetch(json_type, :string)
         end
 
         # Sanitizes a tool name for use as a Ruby-friendly identifier.

@@ -18,7 +18,7 @@ module RubynCode
         task web_search web_fetch ask_user
       ].to_set.freeze
 
-      def self.check(tool_name:, tool_input:, tier:, deny_list:)
+      def self.check(tool_name:, tier:, deny_list:, tool_input: nil) # rubocop:disable Lint/UnusedMethodArgument
         return :deny if deny_list.blocks?(tool_name)
         return :allow if ALWAYS_ALLOW.include?(tool_name)
 
@@ -26,17 +26,15 @@ module RubynCode
 
         return :ask if risk == :destructive
 
+        resolve_by_tier(tier, risk)
+      end
+
+      def self.resolve_by_tier(tier, risk)
         case tier
-        when Tier::ASK_ALWAYS
-          :ask
-        when Tier::ALLOW_READ
-          risk == :read ? :allow : :ask
-        when Tier::AUTONOMOUS
-          risk == :external ? :ask : :allow
-        when Tier::UNRESTRICTED
-          :allow
-        else
-          :ask
+        when Tier::ASK_ALWAYS, nil then :ask
+        when Tier::ALLOW_READ      then risk == :read ? :allow : :ask
+        when Tier::AUTONOMOUS      then risk == :external ? :ask : :allow
+        when Tier::UNRESTRICTED    then :allow
         end
       end
 
@@ -53,7 +51,7 @@ module RubynCode
         :unknown
       end
 
-      private_class_method :resolve_risk
+      private_class_method :resolve_risk, :resolve_by_tier
     end
   end
 end

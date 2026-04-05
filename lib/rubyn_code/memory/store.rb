@@ -57,34 +57,7 @@ module RubynCode
       def update(id, **attrs)
         return if attrs.empty?
 
-        sets = []
-        params = []
-
-        attrs.each do |key, value|
-          case key
-          when :content
-            sets << 'content = ?'
-            params << value
-          when :tier
-            validate_tier!(value)
-            sets << 'tier = ?'
-            params << value
-          when :category
-            validate_category!(value) if value
-            sets << 'category = ?'
-            params << value
-          when :metadata
-            sets << 'metadata = ?'
-            params << JSON.generate(value)
-          when :expires_at
-            sets << 'expires_at = ?'
-            params << value
-          when :relevance_score
-            sets << 'relevance_score = ?'
-            params << value.to_f
-          end
-        end
-
+        sets, params = build_memory_update(attrs)
         return if sets.empty?
 
         params << id
@@ -92,8 +65,6 @@ module RubynCode
           "UPDATE memories SET #{sets.join(', ')} WHERE id = ? AND project_path = '#{@project_path}'",
           params
         )
-
-        # Content changes are picked up by LIKE-based search — no FTS sync needed
       end
 
       # Deletes a memory and its FTS index entry.
@@ -142,41 +113,57 @@ module RubynCode
         SQL
       end
 
+      MEMORY_ATTR_MAP = {
+        content: ->(v) { v },
+        tier: ->(v) { v },
+        category: ->(v) { v },
+        metadata: ->(v) { JSON.generate(v) },
+        expires_at: ->(v) { v },
+        relevance_score: lambda(&:to_f)
+      }.freeze
+
       private
 
+      def build_memory_update(attrs)
+        sets = []
+        params = []
+
+        attrs.each do |key, value|
+          next unless MEMORY_ATTR_MAP.key?(key)
+
+          validate_tier!(value) if key == :tier
+          validate_category!(value) if key == :category && value
+
+          sets << "#{key} = ?"
+          params << MEMORY_ATTR_MAP[key].call(value)
+        end
+
+        [sets, params]
+      end
+
       def ensure_tables
+        create_memories_table
+        create_memories_indexes
+      end
+
+      def create_memories_table
         @db.execute(<<~SQL)
           CREATE TABLE IF NOT EXISTS memories (
-            id              TEXT PRIMARY KEY,
-            project_path    TEXT NOT NULL,
-            tier            TEXT NOT NULL DEFAULT 'medium',
-            category        TEXT,
-            content         TEXT NOT NULL,
-            relevance_score REAL NOT NULL DEFAULT 1.0,
-            access_count    INTEGER NOT NULL DEFAULT 0,
-            last_accessed_at TEXT,
-            expires_at      TEXT,
-            metadata        TEXT DEFAULT '{}',
-            created_at      TEXT NOT NULL
+            id TEXT PRIMARY KEY, project_path TEXT NOT NULL,
+            tier TEXT NOT NULL DEFAULT 'medium', category TEXT,
+            content TEXT NOT NULL, relevance_score REAL NOT NULL DEFAULT 1.0,
+            access_count INTEGER NOT NULL DEFAULT 0, last_accessed_at TEXT,
+            expires_at TEXT, metadata TEXT DEFAULT '{}', created_at TEXT NOT NULL
           )
         SQL
+      end
 
+      def create_memories_indexes
+        @db.execute('CREATE INDEX IF NOT EXISTS idx_memories_project_tier ON memories (project_path, tier)')
+        @db.execute('CREATE INDEX IF NOT EXISTS idx_memories_project_category ON memories (project_path, category)')
         @db.execute(<<~SQL)
-          CREATE INDEX IF NOT EXISTS idx_memories_project_tier
-          ON memories (project_path, tier)
+          CREATE INDEX IF NOT EXISTS idx_memories_expires_at ON memories (expires_at) WHERE expires_at IS NOT NULL
         SQL
-
-        @db.execute(<<~SQL)
-          CREATE INDEX IF NOT EXISTS idx_memories_project_category
-          ON memories (project_path, category)
-        SQL
-
-        @db.execute(<<~SQL)
-          CREATE INDEX IF NOT EXISTS idx_memories_expires_at
-          ON memories (expires_at) WHERE expires_at IS NOT NULL
-        SQL
-
-        # Search uses LIKE queries — no FTS table needed
       end
 
       # @param tier [String]

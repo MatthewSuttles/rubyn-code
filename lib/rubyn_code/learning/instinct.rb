@@ -38,7 +38,7 @@ module RubynCode
       end
     end
 
-    module InstinctMethods
+    module InstinctMethods # rubocop:disable Metrics/ModuleLength -- instinct CRUD + decay logic with DB operations
       # The minimum confidence threshold below which instincts are considered stale.
       MIN_CONFIDENCE = 0.05
 
@@ -75,24 +75,24 @@ module RubynCode
         # @param helpful [Boolean] whether the instinct was helpful this time
         # @return [Instinct] a new instinct with updated confidence and counters
         def reinforce(instinct, helpful: true)
-          new_applied = instinct.times_applied + 1
-
-          if helpful
-            new_helpful = instinct.times_helpful + 1
-            boost = 0.1 * (1.0 - instinct.confidence) # Diminishing returns
-            new_confidence = (instinct.confidence + boost).clamp(0.0, 1.0)
-          else
-            new_helpful = instinct.times_helpful
-            penalty = 0.15 * instinct.confidence # Proportional penalty
-            new_confidence = (instinct.confidence - penalty).clamp(MIN_CONFIDENCE, 1.0)
-          end
+          new_confidence, new_helpful = compute_reinforcement(instinct, helpful)
 
           instinct.with(
             confidence: new_confidence,
-            times_applied: new_applied,
+            times_applied: instinct.times_applied + 1,
             times_helpful: new_helpful,
             updated_at: Time.now
           )
+        end
+
+        def compute_reinforcement(instinct, helpful)
+          if helpful
+            boost = 0.1 * (1.0 - instinct.confidence)
+            [(instinct.confidence + boost).clamp(0.0, 1.0), instinct.times_helpful + 1]
+          else
+            penalty = 0.15 * instinct.confidence
+            [(instinct.confidence - penalty).clamp(MIN_CONFIDENCE, 1.0), instinct.times_helpful]
+          end
         end
 
         # Returns a human-readable label for a confidence score.
@@ -119,18 +119,39 @@ module RubynCode
           now = Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
 
           if helpful
-            db.execute(
-              'UPDATE instincts SET confidence = MIN(1.0, confidence + 0.1 * (1.0 - confidence)), times_applied = times_applied + 1, times_helpful = times_helpful + 1, updated_at = ? WHERE id = ?',
-              [now, instinct_id]
-            )
+            reinforce_positive(db, instinct_id, now)
           else
-            db.execute(
-              "UPDATE instincts SET confidence = MAX(#{MIN_CONFIDENCE}, confidence - 0.15 * confidence), times_applied = times_applied + 1, updated_at = ? WHERE id = ?",
-              [now, instinct_id]
-            )
+            reinforce_negative(db, instinct_id, now)
           end
         rescue StandardError => e
           warn "[Learning::InstinctMethods] Failed to reinforce instinct #{instinct_id}: #{e.message}"
+        end
+
+        def reinforce_positive(db, instinct_id, now)
+          db.execute(
+            <<~SQL.tr("\n", ' ').strip,
+              UPDATE instincts
+              SET confidence = MIN(1.0, confidence + 0.1 * (1.0 - confidence)),
+                  times_applied = times_applied + 1,
+                  times_helpful = times_helpful + 1,
+                  updated_at = ?
+              WHERE id = ?
+            SQL
+            [now, instinct_id]
+          )
+        end
+
+        def reinforce_negative(db, instinct_id, now)
+          db.execute(
+            <<~SQL.tr("\n", ' ').strip,
+              UPDATE instincts
+              SET confidence = MAX(#{MIN_CONFIDENCE}, confidence - 0.15 * confidence),
+                  times_applied = times_applied + 1,
+                  updated_at = ?
+              WHERE id = ?
+            SQL
+            [now, instinct_id]
+          )
         end
 
         # Applies time-based decay to all instincts in the database for a given
@@ -146,29 +167,37 @@ module RubynCode
           ).to_a
 
           now = Time.now
-          rows.each do |row|
-            updated_at = begin
-              Time.parse(row['updated_at'].to_s)
-            rescue StandardError
-              Time.now
-            end
-            elapsed_days = (now - updated_at).to_f / 86_400
-            next if elapsed_days <= 0
-
-            decay_factor = Math.exp(-row['decay_rate'].to_f * elapsed_days)
-            new_confidence = (row['confidence'].to_f * decay_factor).clamp(MIN_CONFIDENCE, 1.0)
-
-            if new_confidence <= MIN_CONFIDENCE
-              db.execute('DELETE FROM instincts WHERE id = ?', [row['id']])
-            else
-              db.execute(
-                'UPDATE instincts SET confidence = ? WHERE id = ?',
-                [new_confidence, row['id']]
-              )
-            end
-          end
+          rows.each { |row| decay_single_row(db, row, now) }
         rescue StandardError => e
           warn "[Learning::InstinctMethods] Failed to decay instincts: #{e.message}"
+        end
+
+        def decay_single_row(db, row, now)
+          elapsed_days = compute_elapsed_days(row, now)
+          return if elapsed_days <= 0
+
+          new_confidence = compute_decayed_confidence(row, elapsed_days)
+          apply_decay_to_db(db, row['id'], new_confidence)
+        end
+
+        def compute_elapsed_days(row, now)
+          updated_at = Time.parse(row['updated_at'].to_s)
+          (now - updated_at).to_f / 86_400
+        rescue StandardError
+          0
+        end
+
+        def compute_decayed_confidence(row, elapsed_days)
+          decay_factor = Math.exp(-row['decay_rate'].to_f * elapsed_days)
+          (row['confidence'].to_f * decay_factor).clamp(MIN_CONFIDENCE, 1.0)
+        end
+
+        def apply_decay_to_db(db, instinct_id, new_confidence)
+          if new_confidence <= MIN_CONFIDENCE
+            db.execute('DELETE FROM instincts WHERE id = ?', [instinct_id])
+          else
+            db.execute('UPDATE instincts SET confidence = ? WHERE id = ?', [new_confidence, instinct_id])
+          end
         end
       end
     end

@@ -10,10 +10,18 @@ module RubynCode
       TOOL_NAME = 'run_specs'
       DESCRIPTION = 'Runs RSpec or Minitest specs. Auto-detects which test framework is in use.'
       PARAMETERS = {
-        path: { type: :string, required: false, description: 'Specific test file or directory to run' },
-        format: { type: :string, required: false, default: 'documentation',
-                  description: "Output format (default: 'documentation')" },
-        fail_fast: { type: :boolean, required: false, description: 'Stop on first failure' }
+        path: {
+          type: :string, required: false,
+          description: 'Specific test file or directory to run'
+        },
+        format: {
+          type: :string, required: false, default: 'documentation',
+          description: "Output format (default: 'documentation')"
+        },
+        fail_fast: {
+          type: :boolean, required: false,
+          description: 'Stop on first failure'
+        }
       }.freeze
       RISK_LEVEL = :execute
       REQUIRES_CONFIRMATION = false
@@ -30,14 +38,21 @@ module RubynCode
       private
 
       def detect_framework
+        detect_from_gemfile || detect_from_files
+      end
+
+      def detect_from_gemfile
         gemfile_path = File.join(project_root, 'Gemfile')
+        return nil unless File.exist?(gemfile_path)
 
-        if File.exist?(gemfile_path)
-          content = File.read(gemfile_path)
-          return :rspec if content.match?(/['"]rspec['"]/) || content.match?(/['"]rspec-rails['"]/)
-          return :minitest if content.match?(/['"]minitest['"]/)
-        end
+        content = File.read(gemfile_path)
+        return :rspec if content.match?(/['"]rspec['"]/) || content.match?(/['"]rspec-rails['"]/)
+        return :minitest if content.match?(/['"]minitest['"]/)
 
+        nil
+      end
+
+      def detect_from_files
         return :rspec if File.exist?(File.join(project_root, '.rspec'))
         return :rspec if File.directory?(File.join(project_root, 'spec'))
         return :minitest if File.directory?(File.join(project_root, 'test'))
@@ -54,11 +69,7 @@ module RubynCode
           cmd += " #{path}" if path
           cmd
         when :minitest
-          if path
-            "bundle exec ruby -Itest #{path}"
-          else
-            'bundle exec rails test'
-          end
+          path ? "bundle exec ruby -Itest #{path}" : 'bundle exec rails test'
         end
       end
 

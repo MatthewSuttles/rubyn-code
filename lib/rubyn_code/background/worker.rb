@@ -93,91 +93,79 @@ module RubynCode
       private
 
       def execute_job(job_id, command, timeout_seconds)
-        stdout, stderr, = nil
-        final_status = :completed
-
-        begin
-          stdin_io, stdout_io, stderr_io, wait_thr = Open3.popen3(command, chdir: @project_root)
-          stdin_io.close
-          out_buf = +''
-          err_buf = +''
-          out_reader = Thread.new do
-            out_buf << stdout_io.read
-          rescue StandardError
-            nil
-          end
-          err_reader = Thread.new do
-            err_buf << stderr_io.read
-          rescue StandardError
-            nil
-          end
-
-          unless wait_thr.join(timeout_seconds)
-            begin
-              Process.kill('TERM', wait_thr.pid)
-            rescue StandardError
-              nil
-            end
-            sleep 0.1
-            begin
-              Process.kill('KILL', wait_thr.pid)
-            rescue StandardError
-              nil
-            end
-            wait_thr.join(5)
-            out_reader.join(2)
-            err_reader.join(2)
-            [stdout_io, stderr_io].each do |io|
-              io.close
-            rescue StandardError
-              nil
-            end
-            raise Timeout::Error
-          end
-
-          out_reader.join(5)
-          err_reader.join(5)
-          [stdout_io, stderr_io].each do |io|
-            io.close
-          rescue StandardError
-            nil
-          end
-
-          stdout = out_buf
-          stderr = err_buf
-          process_status = wait_thr.value
-          final_status = process_status.success? ? :completed : :error
-        rescue Timeout::Error
-          final_status = :timeout
-          stdout = nil
-          stderr = "Command timed out after #{timeout_seconds} seconds"
-        rescue StandardError => e
-          final_status = :error
-          stdout = nil
-          stderr = e.message
-        end
+        stdout, stderr, final_status = run_process(command, timeout_seconds)
 
         result = build_result(stdout, stderr)
-        completed_at = Time.now
-
-        completed_job = @mutex.synchronize do
-          @jobs[job_id] = Job.new(
-            id: job_id,
-            command: command,
-            status: final_status,
-            result: result,
-            started_at: @jobs[job_id].started_at,
-            completed_at: completed_at
-          )
-        end
+        completed_job = finalize_job(job_id, command, final_status, result)
 
         @notifier.push({
-                         type: :job_completed,
-                         job_id: job_id,
-                         status: final_status,
-                         result: result,
+                         type: :job_completed, job_id: job_id,
+                         status: final_status, result: result,
                          duration: completed_job.duration
                        })
+      end
+
+      def run_process(command, timeout_seconds)
+        stdin_io, stdout_io, stderr_io, wait_thr = Open3.popen3(command, chdir: @project_root)
+        stdin_io.close
+        io_state = { stdout_io: stdout_io, stderr_io: stderr_io }
+        out_reader, err_reader, out_buf, err_buf = start_readers(stdout_io, stderr_io)
+        io_state.merge!(out_reader: out_reader, err_reader: err_reader)
+
+        handle_wait(wait_thr, timeout_seconds, io_state)
+
+        status = wait_thr.value.success? ? :completed : :error
+        [out_buf, err_buf, status]
+      rescue Timeout::Error
+        [nil, "Command timed out after #{timeout_seconds} seconds", :timeout]
+      rescue StandardError => e
+        [nil, e.message, :error]
+      end
+
+      def start_readers(stdout_io, stderr_io)
+        out_buf = +''
+        err_buf = +''
+        out_reader = Thread.new { out_buf << stdout_io.read rescue nil } # rubocop:disable Style/RescueModifier
+        err_reader = Thread.new { err_buf << stderr_io.read rescue nil } # rubocop:disable Style/RescueModifier
+        [out_reader, err_reader, out_buf, err_buf]
+      end
+
+      def handle_wait(wait_thr, timeout_seconds, io_state)
+        unless wait_thr.join(timeout_seconds)
+          kill_process(wait_thr)
+          cleanup_io(io_state)
+          raise Timeout::Error
+        end
+
+        cleanup_io(io_state)
+      end
+
+      def cleanup_io(io_state)
+        cleanup_readers(io_state[:out_reader], io_state[:err_reader],
+                        io_state[:stdout_io], io_state[:stderr_io])
+      end
+
+      def kill_process(wait_thr)
+        Process.kill('TERM', wait_thr.pid) rescue nil # rubocop:disable Style/RescueModifier
+        sleep 0.1
+        Process.kill('KILL', wait_thr.pid) rescue nil # rubocop:disable Style/RescueModifier
+        wait_thr.join(5)
+      end
+
+      def cleanup_readers(out_reader, err_reader, stdout_io, stderr_io)
+        out_reader.join(5)
+        err_reader.join(5)
+        [stdout_io, stderr_io].each { |io| io.close rescue nil } # rubocop:disable Style/RescueModifier
+      end
+
+      def finalize_job(job_id, command, final_status, result)
+        @mutex.synchronize do
+          @jobs[job_id] = Job.new(
+            id: job_id, command: command, status: final_status,
+            result: result, started_at: @jobs[job_id].started_at,
+            completed_at: Time.now
+          )
+        end
       end
 
       def build_result(stdout, stderr)

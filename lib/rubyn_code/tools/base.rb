@@ -57,7 +57,8 @@ module RubynCode
                    end
 
         unless expanded.start_with?(project_root)
-          raise PermissionDeniedError, "Path traversal denied: #{path} resolves outside project root"
+          raise PermissionDeniedError,
+                "Path traversal denied: #{path} resolves outside project root"
         end
 
         expanded
@@ -67,7 +68,8 @@ module RubynCode
         return output if output.nil? || output.length <= max
 
         half = max / 2
-        "#{output[0, half]}\n\n... [truncated #{output.length - max} characters] ...\n\n#{output[-half, half]}"
+        middle = "\n\n... [truncated #{output.length - max} characters] ...\n\n"
+        "#{output[0, half]}#{middle}#{output[-half, half]}"
       end
 
       private
@@ -82,34 +84,30 @@ module RubynCode
         stdout = +''
         stderr = +''
 
-        out_reader = Thread.new do
-          stdout << stdout_io.read
-        rescue StandardError
-          nil
-        end
-        err_reader = Thread.new do
-          stderr << stderr_io.read
-        rescue StandardError
-          nil
-        end
+        out_reader = Thread.new { stdout << stdout_io.read rescue nil } # rubocop:disable Style/RescueModifier
+        err_reader = Thread.new { stderr << stderr_io.read rescue nil } # rubocop:disable Style/RescueModifier
 
-        timed_out = false
-        unless wait_thr.join(timeout)
-          timed_out = true
-          begin
-            Process.kill('TERM', wait_thr.pid)
-          rescue StandardError
-            nil
-          end
-          sleep 0.1
-          begin
-            Process.kill('KILL', wait_thr.pid)
-          rescue StandardError
-            nil
-          end
-          wait_thr.join(5)
-        end
+        wait_for_process(wait_thr, timeout)
+        finalize_readers(out_reader, err_reader, stdout_io, stderr_io)
 
+        [stdout, stderr, wait_thr.value]
+      end
+
+      def wait_for_process(wait_thr, timeout)
+        return if wait_thr.join(timeout)
+
+        kill_process(wait_thr.pid)
+        wait_thr.join(5)
+        raise Error, "Command timed out after #{timeout}s"
+      end
+
+      def kill_process(pid)
+        Process.kill('TERM', pid) rescue nil # rubocop:disable Style/RescueModifier
+        sleep 0.1
+        Process.kill('KILL', pid) rescue nil # rubocop:disable Style/RescueModifier
+      end
+
+      def finalize_readers(out_reader, err_reader, stdout_io, stderr_io)
         out_reader.join(5)
         err_reader.join(5)
         [stdout_io, stderr_io].each do |io|
@@ -117,10 +115,6 @@ module RubynCode
         rescue StandardError
           nil
         end
-
-        raise Error, "Command timed out after #{timeout}s" if timed_out
-
-        [stdout, stderr, wait_thr.value]
       end
 
       def read_file_safely(path)

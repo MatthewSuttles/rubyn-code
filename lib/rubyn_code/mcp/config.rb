@@ -30,18 +30,8 @@ module RubynCode
           config_path = File.join(project_path, CONFIG_FILENAME)
           return [] unless File.exist?(config_path)
 
-          raw = File.read(config_path)
-          data = JSON.parse(raw)
-          servers = data['mcpServers'] || {}
-
-          servers.map do |name, server_def|
-            {
-              name: name,
-              command: server_def['command'],
-              args: Array(server_def['args']),
-              env: expand_env(server_def['env'] || {})
-            }
-          end
+          data = JSON.parse(File.read(config_path))
+          parse_servers(data['mcpServers'] || {})
         rescue JSON::ParserError => e
           warn "[MCP::Config] Failed to parse #{config_path}: #{e.message}"
           []
@@ -56,6 +46,13 @@ module RubynCode
         #
         # @param env_hash [Hash<String, String>] raw env key-value pairs
         # @return [Hash<String, String>] expanded env key-value pairs
+        def parse_servers(servers)
+          servers.map do |name, server_def|
+            { name: name, command: server_def['command'],
+              args: Array(server_def['args']), env: expand_env(server_def['env'] || {}) }
+          end
+        end
+
         def expand_env(env_hash)
           env_hash.each_with_object({}) do |(key, value), result|
             result[key] = expand_value(value)

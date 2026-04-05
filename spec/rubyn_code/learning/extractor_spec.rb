@@ -3,6 +3,7 @@
 require 'spec_helper'
 
 # Ensure LLM data classes are loaded (they live behind autoload)
+require 'rubyn_code/llm/message_builder'
 
 RSpec.describe RubynCode::Learning::Extractor do
   let(:llm_client) { instance_double('RubynCode::LLM::Client') }
@@ -157,20 +158,21 @@ RSpec.describe RubynCode::Learning::Extractor do
     end
   end
 
-  describe 'extract_text with Hash response' do
+  describe 'parse_response with Hash response' do
     it 'extracts text from a Hash response using dig' do
-      hash_response = { 'content' => [{ 'text' => 'extracted from hash' }] }
+      hash_response = { 'content' => [{ 'text' => '[{"type":"error_resolution","pattern":"hash test","context_tags":["test"],"confidence":0.5}]' }] }
 
       # Use send to test private method directly
-      text = described_class.send(:extract_text, hash_response)
-      expect(text).to eq('extracted from hash')
+      results = described_class.send(:parse_response, hash_response)
+      expect(results).to be_an(Array)
+      expect(results.first['pattern']).to eq('hash test')
     end
 
-    it 'returns nil for Hash with missing content path' do
+    it 'returns empty array for Hash with missing content path' do
       hash_response = { 'other_key' => 'no content' }
 
-      text = described_class.send(:extract_text, hash_response)
-      expect(text).to be_nil
+      results = described_class.send(:parse_response, hash_response)
+      expect(results).to eq([])
     end
   end
 

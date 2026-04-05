@@ -35,9 +35,9 @@ module RubynCode
           return :shutdown if monotonic_now >= deadline
 
           # Messages always take priority over tasks.
-          return :resume if has_pending_messages?
+          return :resume if pending_messages?
 
-          return :resume if has_claimable_task?
+          return :resume if claimable_task?
 
           remaining = deadline - monotonic_now
           return :shutdown if remaining <= 0
@@ -76,7 +76,7 @@ module RubynCode
       private
 
       # @return [Boolean]
-      def has_pending_messages?
+      def pending_messages?
         messages = @mailbox.pending_for(@agent_name)
         messages.is_a?(Array) ? !messages.empty? : false
       rescue StandardError
@@ -84,7 +84,7 @@ module RubynCode
       end
 
       # @return [Boolean]
-      def has_claimable_task?
+      def claimable_task?
         rows = @task_manager.db.query(<<~SQL).to_a
           SELECT 1 FROM tasks
           WHERE status = 'pending'

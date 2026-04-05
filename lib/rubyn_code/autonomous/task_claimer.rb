@@ -15,53 +15,49 @@ module RubynCode
       # @return [Tasks::Task, nil] the claimed task, or nil if none available
       def self.call(task_manager:, agent_name:)
         db = task_manager.db
-
-        # Atomically claim the first eligible task. The WHERE conditions
-        # ensure that only pending tasks with no current owner are touched,
-        # avoiding race conditions with other agents.
-        db.execute(<<~SQL, [agent_name])
-          UPDATE tasks
-          SET owner = ?,
-              status = 'in_progress',
-              updated_at = datetime('now')
-          WHERE id = (
-            SELECT id FROM tasks
-            WHERE status = 'pending'
-              AND (owner IS NULL OR owner = '')
-            ORDER BY priority DESC, created_at ASC
-            LIMIT 1
-          )
-          AND status = 'pending'
-          AND (owner IS NULL OR owner = '')
-        SQL
-
-        # Fetch the task we just claimed. Using owner + status filters
-        # ensures we only retrieve a task that *this* agent successfully
-        # claimed (another agent cannot have flipped it in between).
-        rows = db.query(<<~SQL, [agent_name]).to_a
-          SELECT id, session_id, title, description, status,
-                 priority, owner, result, metadata, created_at, updated_at
-          FROM tasks
-          WHERE owner = ?
-            AND status = 'in_progress'
-          ORDER BY updated_at DESC
-          LIMIT 1
-        SQL
-
-        return nil if rows.empty?
-
-        row = rows.first
-        build_task(row)
+        claim_next_pending_task(db, agent_name)
+        fetch_claimed_task(db, agent_name)
       rescue StandardError => e
-        # If anything goes wrong (e.g. task was already claimed between
-        # our SELECT and UPDATE, or a constraint violation) we treat it
-        # as "no work available" rather than crashing the daemon.
         RubynCode.logger.warn("TaskClaimer: failed to claim task: #{e.message}") if RubynCode.respond_to?(:logger)
         nil
       end
 
       class << self
         private
+
+        def claim_next_pending_task(db, agent_name)
+          db.execute(<<~SQL, [agent_name])
+            UPDATE tasks
+            SET owner = ?,
+                status = 'in_progress',
+                updated_at = datetime('now')
+            WHERE id = (
+              SELECT id FROM tasks
+              WHERE status = 'pending'
+                AND (owner IS NULL OR owner = '')
+              ORDER BY priority DESC, created_at ASC
+              LIMIT 1
+            )
+            AND status = 'pending'
+            AND (owner IS NULL OR owner = '')
+          SQL
+        end
+
+        def fetch_claimed_task(db, agent_name)
+          rows = db.query(<<~SQL, [agent_name]).to_a
+            SELECT id, session_id, title, description, status,
+                   priority, owner, result, metadata, created_at, updated_at
+            FROM tasks
+            WHERE owner = ?
+              AND status = 'in_progress'
+            ORDER BY updated_at DESC
+            LIMIT 1
+          SQL
+
+          return nil if rows.empty?
+
+          build_task(rows.first)
+        end
 
         # @param row [Hash] a database row hash
         # @return [Tasks::Task]

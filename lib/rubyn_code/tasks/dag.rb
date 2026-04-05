@@ -113,30 +113,35 @@ module RubynCode
       # @return [Array<String>]
       # @raise [RuntimeError] if the graph contains a cycle
       def topological_sort
+        all_nodes = collect_all_nodes
+        in_degree = compute_in_degrees(all_nodes)
+
+        sorted = kahn_sort(all_nodes, in_degree)
+        raise 'Cycle detected in task dependency graph' if sorted.size != all_nodes.size
+
+        sorted
+      end
+
+      private
+
+      def collect_all_nodes
+        nodes = Set.new
+        @forward.each do |task_id, deps|
+          nodes.add(task_id)
+          deps.each { |dep_id| nodes.add(dep_id) }
+        end
+        nodes
+      end
+
+      def compute_in_degrees(all_nodes)
         in_degree = Hash.new(0)
-        all_nodes = Set.new
+        all_nodes.each { |n| in_degree[n] = 0 }
+        @forward.each { |task_id, deps| in_degree[task_id] += deps.size }
+        in_degree
+      end
 
-        @forward.each do |task_id, deps|
-          all_nodes.add(task_id)
-          deps.each do |dep_id|
-            all_nodes.add(dep_id)
-            in_degree[dep_id] # touch to initialize
-            in_degree[task_id] += 1 # task_id depends on dep_id, so task_id has higher in-degree
-          end
-        end
-
-        # Nodes with no dependencies come first
-        # Note: in our graph, forward[task_id] = set of tasks task_id depends ON,
-        # so the "edges" for topological sort point from dep -> task_id.
-        in_degree_corrected = Hash.new(0)
-        all_nodes.each { |n| in_degree_corrected[n] = 0 }
-
-        @forward.each do |task_id, deps|
-          # task_id depends on each dep, meaning dep must come before task_id
-          in_degree_corrected[task_id] += deps.size
-        end
-
-        queue = all_nodes.select { |n| in_degree_corrected[n].zero? }
+      def kahn_sort(all_nodes, in_degree)
+        queue = all_nodes.select { |n| in_degree[n].zero? }
         sorted = []
 
         until queue.empty?
@@ -144,17 +149,13 @@ module RubynCode
           sorted << node
 
           @reverse[node].each do |dependent|
-            in_degree_corrected[dependent] -= 1
-            queue << dependent if in_degree_corrected[dependent].zero?
+            in_degree[dependent] -= 1
+            queue << dependent if in_degree[dependent].zero?
           end
         end
 
-        raise 'Cycle detected in task dependency graph' if sorted.size != all_nodes.size
-
         sorted
       end
-
-      private
 
       def ensure_table
         @db.execute(<<~SQL)

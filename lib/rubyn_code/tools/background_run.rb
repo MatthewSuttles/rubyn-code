@@ -30,7 +30,8 @@ module RubynCode
         return 'Error: Background worker not available. Use bash tool instead.' unless @background_worker
 
         job_id = @background_worker.run(command, timeout: timeout)
-        "Background job started: #{job_id}\nCommand: #{command}\nTimeout: #{timeout}s\nResults will appear automatically when complete."
+        "Background job started: #{job_id}\nCommand: #{command}\n" \
+          "Timeout: #{timeout}s\nResults will appear automatically when complete."
       end
     end
 

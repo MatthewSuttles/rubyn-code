@@ -37,39 +37,17 @@ module RubynCode
       # @param cache_write_tokens [Integer] cache-write token count
       # @param request_type [String] the type of request (e.g., "chat", "compact")
       # @return [CostRecord] the persisted cost record
-      def record!(model:, input_tokens:, output_tokens:, cache_read_tokens: 0, cache_write_tokens: 0,
-                  request_type: 'chat')
+      def record!(model:, input_tokens:, output_tokens:, **opts)
+        cache_read  = opts.fetch(:cache_read_tokens, 0)
+        cache_write = opts.fetch(:cache_write_tokens, 0)
+        req_type    = opts.fetch(:request_type, 'chat')
+
         cost = CostCalculator.calculate(
-          model: model,
-          input_tokens: input_tokens,
-          output_tokens: output_tokens,
-          cache_read_tokens: cache_read_tokens,
-          cache_write_tokens: cache_write_tokens
+          model: model, input_tokens: input_tokens, output_tokens: output_tokens,
+          cache_read_tokens: cache_read, cache_write_tokens: cache_write
         )
 
-        id = SecureRandom.uuid
-        now = Time.now.utc.iso8601
-
-        @db.execute(
-          "INSERT INTO #{TABLE_NAME} (id, session_id, model, input_tokens, output_tokens, " \
-          'cache_read_tokens, cache_write_tokens, cost_usd, request_type, created_at) ' \
-          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [id, @session_id, model, input_tokens, output_tokens,
-           cache_read_tokens, cache_write_tokens, cost, request_type, now]
-        )
-
-        CostRecord.new(
-          id: id,
-          session_id: @session_id,
-          model: model,
-          input_tokens: input_tokens,
-          output_tokens: output_tokens,
-          cache_read_tokens: cache_read_tokens,
-          cache_write_tokens: cache_write_tokens,
-          cost_usd: cost,
-          request_type: request_type,
-          created_at: now
-        )
+        persist_cost_record(model, input_tokens, output_tokens, cache_read, cache_write, cost, req_type)
       end
 
       # Raises BudgetExceededError if either the session or daily budget is exceeded.
@@ -80,14 +58,16 @@ module RubynCode
         sc = session_cost
         if sc >= @session_limit
           raise BudgetExceededError,
-                "Session budget exceeded: $#{'%.4f' % sc} >= $#{format('%.2f', @session_limit)} limit"
+                format('Session budget exceeded: $%<cost>.4f >= $%<limit>.2f limit',
+                       cost: sc, limit: @session_limit)
         end
 
         dc = daily_cost
         return unless dc >= @daily_limit
 
         raise BudgetExceededError,
-              "Daily budget exceeded: $#{'%.4f' % dc} >= $#{format('%.2f', @daily_limit)} limit"
+              format('Daily budget exceeded: $%<cost>.4f >= $%<limit>.2f limit',
+                     cost: dc, limit: @daily_limit)
       end
 
       # Returns the total cost accumulated in the current session.
@@ -123,6 +103,40 @@ module RubynCode
       end
 
       private
+
+      CostRecordAttrs = Data.define(:model, :input_tokens, :output_tokens, :cache_read, :cache_write, :cost,
+                                    :req_type)
+      private_constant :CostRecordAttrs
+
+      def persist_cost_record(model, input_tokens, output_tokens, cache_read, cache_write, cost, req_type) # rubocop:disable Metrics/ParameterLists -- maps directly to DB columns
+        attrs = CostRecordAttrs.new(model:, input_tokens:, output_tokens:, cache_read:, cache_write:, cost:,
+                                    req_type:)
+        insert_cost_record(attrs)
+      end
+
+      def insert_cost_record(attrs)
+        record_id = SecureRandom.uuid
+        now = Time.now.utc.iso8601
+
+        @db.execute(
+          "INSERT INTO #{TABLE_NAME} (id, session_id, model, input_tokens, output_tokens, " \
+          'cache_read_tokens, cache_write_tokens, cost_usd, request_type, created_at) ' \
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [record_id, @session_id, attrs.model, attrs.input_tokens, attrs.output_tokens,
+           attrs.cache_read, attrs.cache_write, attrs.cost, attrs.req_type, now]
+        )
+
+        build_cost_record(record_id, attrs, now)
+      end
+
+      def build_cost_record(record_id, attrs, now)
+        CostRecord.new(
+          id: record_id, session_id: @session_id, model: attrs.model,
+          input_tokens: attrs.input_tokens, output_tokens: attrs.output_tokens,
+          cache_read_tokens: attrs.cache_read, cache_write_tokens: attrs.cache_write,
+          cost_usd: attrs.cost, request_type: attrs.req_type, created_at: now
+        )
+      end
 
       def ensure_table_exists
         @db.execute(<<~SQL)

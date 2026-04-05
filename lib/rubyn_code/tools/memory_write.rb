@@ -15,7 +15,8 @@ module RubynCode
         tier: { type: :string, required: false,
                 description: 'Memory retention tier: short, medium (default), or long' },
         category: { type: :string, required: false,
-                    description: 'Category: code_pattern, user_preference, project_convention, error_resolution, or decision' }
+                    description: 'Category: code_pattern, user_preference, ' \
+                                 'project_convention, error_resolution, or decision' }
       }.freeze
       RISK_LEVEL = :read # Memory is internal — no user approval needed
 

@@ -29,12 +29,10 @@ module RubynCode
         def calculate(model:, input_tokens:, output_tokens:, cache_read_tokens: 0, cache_write_tokens: 0)
           input_rate, output_rate = rates_for(model)
 
-          input_cost       = (input_tokens.to_f / 1_000_000) * input_rate
-          output_cost      = (output_tokens.to_f / 1_000_000) * output_rate
-          cache_read_cost  = (cache_read_tokens.to_f / 1_000_000) * input_rate * CACHE_READ_DISCOUNT
-          cache_write_cost = (cache_write_tokens.to_f / 1_000_000) * input_rate * CACHE_WRITE_PREMIUM
-
-          input_cost + output_cost + cache_read_cost + cache_write_cost
+          token_cost(input_tokens, input_rate) +
+            token_cost(output_tokens, output_rate) +
+            token_cost(cache_read_tokens, input_rate * CACHE_READ_DISCOUNT) +
+            token_cost(cache_write_tokens, input_rate * CACHE_WRITE_PREMIUM)
         end
 
         private
@@ -44,6 +42,10 @@ module RubynCode
         #
         # @param model [String]
         # @return [Array(Float, Float)] [input_rate, output_rate]
+        def token_cost(tokens, rate)
+          (tokens.to_f / 1_000_000) * rate
+        end
+
         def rates_for(model)
           return PRICING[model] if PRICING.key?(model)
 

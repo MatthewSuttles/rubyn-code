@@ -38,7 +38,7 @@ module RubynCode
       # @return [Array<Array(Integer, String)>] pairs of [version, file_path]
       def pending_migrations
         applied = applied_versions
-        available_migrations.reject { |version, _| applied.include?(version) }
+        available_migrations.reject { |version, _| applied.include?(version) } # rubocop:disable Style/HashExcept
       end
 
       # Returns the set of already-applied migration versions.
@@ -67,16 +67,16 @@ module RubynCode
       def available_migrations
         all = Dir.glob(File.join(MIGRATIONS_DIR, '*'))
                  .select { |path| path.end_with?('.sql', '.rb') }
-                 .map { |path| parse_migration_file(path) }
-                 .compact
+                 .filter_map { |path| parse_migration_file(path) }
 
-        # Deduplicate: if both .rb and .sql exist for the same version, prefer .rb
+        deduplicate_migrations(all)
+      end
+
+      def deduplicate_migrations(all)
         by_version = {}
         all.each do |version, path|
-          existing = by_version[version]
-          by_version[version] = [version, path] if existing.nil? || path.end_with?('.rb')
+          by_version[version] = [version, path] if !by_version[version] || path.end_with?('.rb')
         end
-
         by_version.values.sort_by(&:first)
       end
 
@@ -139,33 +139,49 @@ module RubynCode
         in_block = false
 
         sql.each_line do |line|
-          stripped = line.strip
-
-          # Track BEGIN/END blocks (e.g., triggers)
-          if stripped.match?(/\bBEGIN\b/i) && !stripped.match?(/\ABEGIN\s+(IMMEDIATE|DEFERRED|EXCLUSIVE)/i)
-            in_block = true
-          end
-          current << line
-
-          if in_block
-            if stripped.match?(/\bEND\b\s*;?\s*$/i)
-              in_block = false
-              statements << current.strip.chomp(';')
-              current = +''
-            end
-          elsif stripped.end_with?(';')
-            stmt = current.strip.chomp(';').strip
-            statements << stmt unless stmt.empty? || (stmt.match?(/\A\s*--/) && !stmt.include?("\n"))
-            current = +''
-          end
+          in_block, current = process_sql_line(line, statements, current, in_block)
         end
 
-        # Handle any remaining content
+        finalize_statements(statements, current)
+      end
+
+      def process_sql_line(line, statements, current, in_block)
+        stripped = line.strip
+        in_block = true if begin_block?(stripped)
+        current << line
+
+        if in_block && stripped.match?(/\bEND\b\s*;?\s*$/i)
+          statements << current.strip.chomp(';')
+          [false, +'']
+        elsif !in_block && stripped.end_with?(';')
+          append_statement(statements, current)
+          [false, +'']
+        else
+          [in_block, current]
+        end
+      end
+
+      def begin_block?(stripped)
+        stripped.match?(/\bBEGIN\b/i) &&
+          !stripped.match?(/\ABEGIN\s+(IMMEDIATE|DEFERRED|EXCLUSIVE)/i)
+      end
+
+      def append_statement(statements, current)
+        stmt = current.strip.chomp(';').strip
+        return if stmt.empty? || (stmt.match?(/\A\s*--/) && !stmt.include?("\n"))
+
+        statements << stmt
+      end
+
+      def finalize_statements(statements, current)
         remainder = current.strip.chomp(';').strip
         statements << remainder unless remainder.empty?
 
-        # Filter out comment-only statements
-        statements.reject { |s| s.lines.all? { |l| l.strip.empty? || l.strip.start_with?('--') } }
+        statements.reject { |s| comment_only?(s) }
+      end
+
+      def comment_only?(stmt)
+        stmt.lines.all? { |l| l.strip.empty? || l.strip.start_with?('--') }
       end
 
       # Extracts the version number and name from a migration filename.

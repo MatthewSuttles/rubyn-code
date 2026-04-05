@@ -16,19 +16,21 @@ module RubynCode
 
       # Persists a complete session snapshot.
       #
-      # @param session_id [String] unique session identifier
-      # @param project_path [String] project this session belongs to
-      # @param messages [Array<Hash>] the conversation messages
-      # @param title [String, nil] human-readable session title
-      # @param model [String, nil] LLM model used
-      # @param metadata [Hash] arbitrary metadata
+      # @param attrs [Hash] session attributes:
+      #   :session_id, :project_path, :messages (required);
+      #   :title, :model, :metadata (optional)
       # @return [void]
-      def save_session(session_id:, project_path:, messages:, title: nil, model: nil, metadata: {})
+      def save_session(session_id:, project_path:, messages:, **opts)
         now = Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
         messages_json = JSON.generate(messages)
-        meta_json = JSON.generate(metadata)
+        meta_json = JSON.generate(opts.fetch(:metadata, {}))
+        title = opts[:title]
+        model = opts[:model]
 
-        @db.execute(<<~SQL, [session_id, project_path, title, model, messages_json, 'active', meta_json, now, now, messages_json, title, model, meta_json, now])
+        insert_params = [session_id, project_path, title, model, messages_json, 'active', meta_json, now, now]
+        update_params = [messages_json, title, model, meta_json, now]
+
+        @db.execute(<<~SQL, insert_params + update_params)
           INSERT INTO sessions (id, project_path, title, model, messages, status, metadata, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
@@ -71,20 +73,7 @@ module RubynCode
       # @param limit [Integer] maximum results (default 20)
       # @return [Array<Hash>] session summaries (without full messages)
       def list_sessions(project_path: nil, status: nil, limit: 20)
-        conditions = []
-        params = []
-
-        if project_path
-          conditions << 'project_path = ?'
-          params << project_path
-        end
-
-        if status
-          conditions << 'status = ?'
-          params << status
-        end
-
-        where_clause = conditions.empty? ? '' : "WHERE #{conditions.join(' AND ')}"
+        where_clause, params = build_list_filters(project_path, status)
         params << limit
 
         rows = @db.query(<<~SQL, params).to_a
@@ -95,18 +84,7 @@ module RubynCode
           LIMIT ?
         SQL
 
-        rows.map do |row|
-          {
-            id: row['id'],
-            project_path: row['project_path'],
-            title: row['title'],
-            model: row['model'],
-            status: row['status'],
-            metadata: parse_json_hash(row['metadata']),
-            created_at: row['created_at'],
-            updated_at: row['updated_at']
-          }
-        end
+        rows.map { |row| row_to_session_summary(row) }
       end
 
       # Updates session attributes.
@@ -117,29 +95,7 @@ module RubynCode
       def update_session(session_id, **attrs)
         return if attrs.empty?
 
-        sets = []
-        params = []
-
-        attrs.each do |key, value|
-          case key
-          when :title
-            sets << 'title = ?'
-            params << value
-          when :status
-            sets << 'status = ?'
-            params << value
-          when :model
-            sets << 'model = ?'
-            params << value
-          when :metadata
-            sets << 'metadata = ?'
-            params << JSON.generate(value)
-          when :messages
-            sets << 'messages = ?'
-            params << JSON.generate(value)
-          end
-        end
-
+        sets, params = build_update_clauses(attrs)
         return if sets.empty?
 
         sets << 'updated_at = ?'
@@ -157,7 +113,52 @@ module RubynCode
         @db.execute('DELETE FROM sessions WHERE id = ?', [session_id])
       end
 
+      JSON_ATTRS = %i[metadata messages].freeze
+      SIMPLE_ATTRS = %i[title status model].freeze
+
       private
+
+      def build_list_filters(project_path, status)
+        conditions = []
+        params = []
+        if project_path
+          conditions << 'project_path = ?'
+          params << project_path
+        end
+        if status
+          conditions << 'status = ?'
+          params << status
+        end
+        where_clause = conditions.empty? ? '' : "WHERE #{conditions.join(' AND ')}"
+        [where_clause, params]
+      end
+
+      def row_to_session_summary(row)
+        {
+          id: row['id'],
+          project_path: row['project_path'],
+          title: row['title'],
+          model: row['model'],
+          status: row['status'],
+          metadata: parse_json_hash(row['metadata']),
+          created_at: row['created_at'],
+          updated_at: row['updated_at']
+        }
+      end
+
+      def build_update_clauses(attrs)
+        sets = []
+        params = []
+
+        attrs.each do |key, value|
+          next unless SIMPLE_ATTRS.include?(key) || JSON_ATTRS.include?(key)
+
+          sets << "#{key} = ?"
+          params << (JSON_ATTRS.include?(key) ? JSON.generate(value) : value)
+        end
+
+        [sets, params]
+      end
 
       def ensure_table
         @db.execute(<<~SQL)

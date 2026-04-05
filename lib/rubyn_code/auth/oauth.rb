@@ -25,25 +25,11 @@ module RubynCode
         code_challenge = derive_code_challenge(code_verifier)
         state = SecureRandom.hex(24)
 
-        auth_url = build_authorization_url(code_challenge:, state:)
-
-        callback_server = Server.new
-        open_browser(auth_url)
-
-        result = callback_server.wait_for_callback(timeout: 120)
-
-        unless secure_compare(result[:state], state)
-          raise StateMismatchError, 'OAuth state parameter mismatch — possible CSRF attack'
-        end
+        result = perform_browser_auth(code_challenge, state)
+        validate_state!(result[:state], state)
 
         tokens = exchange_code(code: result[:code], code_verifier:)
-
-        TokenStore.save(
-          access_token: tokens[:access_token],
-          refresh_token: tokens[:refresh_token],
-          expires_at: Time.now + tokens[:expires_in].to_i
-        )
-
+        persist_tokens(tokens)
         tokens
       end
 
@@ -51,35 +37,13 @@ module RubynCode
         stored = TokenStore.load
         raise RefreshError, 'No stored refresh token available' unless stored&.dig(:refresh_token)
 
-        response = http_client.post(token_url) do |req|
-          req.headers['Content-Type'] = 'application/x-www-form-urlencoded'
-          req.body = URI.encode_www_form(
-            grant_type: 'refresh_token',
-            client_id: client_id,
-            refresh_token: stored[:refresh_token]
-          )
-        end
-
-        unless response.success?
-          body = parse_json(response.body)
-          error_msg = body&.dig('error_description') || body&.dig('error') || response.body
-          raise RefreshError, "Token refresh failed (#{response.status}): #{error_msg}"
-        end
+        response = post_refresh_request(stored[:refresh_token])
+        raise_refresh_error(response) unless response.success?
 
         body = parse_json(response.body)
         raise RefreshError, 'Invalid response from token endpoint' unless body
 
-        TokenStore.save(
-          access_token: body['access_token'],
-          refresh_token: body['refresh_token'] || stored[:refresh_token],
-          expires_at: Time.now + body['expires_in'].to_i
-        )
-
-        {
-          access_token: body['access_token'],
-          refresh_token: body['refresh_token'] || stored[:refresh_token],
-          expires_in: body['expires_in']
-        }
+        save_refreshed_tokens(body, stored)
       end
 
       private
@@ -108,40 +72,92 @@ module RubynCode
       end
 
       def exchange_code(code:, code_verifier:)
-        response = http_client.post(token_url) do |req|
-          req.headers['Content-Type'] = 'application/x-www-form-urlencoded'
-          req.body = URI.encode_www_form(
-            grant_type: 'authorization_code',
-            client_id: client_id,
-            code: code,
-            redirect_uri: redirect_uri,
-            code_verifier: code_verifier
-          )
-        end
-
-        unless response.success?
-          body = parse_json(response.body)
-          error_msg = body&.dig('error_description') || body&.dig('error') || response.body
-          raise TokenExchangeError, "Code exchange failed (#{response.status}): #{error_msg}"
-        end
+        response = post_code_exchange(code, code_verifier)
+        raise_exchange_error(response) unless response.success?
 
         body = parse_json(response.body)
         raise TokenExchangeError, 'Invalid response from token endpoint' unless body
 
+        { access_token: body['access_token'], refresh_token: body['refresh_token'], expires_in: body['expires_in'] }
+      end
+
+      def post_code_exchange(code, code_verifier)
+        http_client.post(token_url) do |req|
+          req.headers['Content-Type'] = 'application/x-www-form-urlencoded'
+          req.body = URI.encode_www_form(
+            grant_type: 'authorization_code', client_id: client_id,
+            code: code, redirect_uri: redirect_uri, code_verifier: code_verifier
+          )
+        end
+      end
+
+      def raise_exchange_error(response)
+        body = parse_json(response.body)
+        error_msg = body&.dig('error_description') || body&.dig('error') || response.body
+        raise TokenExchangeError, "Code exchange failed (#{response.status}): #{error_msg}"
+      end
+
+      def perform_browser_auth(code_challenge, state)
+        auth_url = build_authorization_url(code_challenge:, state:)
+        callback_server = Server.new
+        open_browser(auth_url)
+        callback_server.wait_for_callback(timeout: 120)
+      end
+
+      def validate_state!(received, expected)
+        return if secure_compare(received, expected)
+
+        raise StateMismatchError, 'OAuth state parameter mismatch — possible CSRF attack'
+      end
+
+      def persist_tokens(tokens)
+        TokenStore.save(
+          access_token: tokens[:access_token],
+          refresh_token: tokens[:refresh_token],
+          expires_at: Time.now + tokens[:expires_in].to_i
+        )
+      end
+
+      def post_refresh_request(refresh_token)
+        http_client.post(token_url) do |req|
+          req.headers['Content-Type'] = 'application/x-www-form-urlencoded'
+          req.body = URI.encode_www_form(
+            grant_type: 'refresh_token',
+            client_id: client_id,
+            refresh_token: refresh_token
+          )
+        end
+      end
+
+      def raise_refresh_error(response)
+        body = parse_json(response.body)
+        error_msg = body&.dig('error_description') || body&.dig('error') || response.body
+        raise RefreshError, "Token refresh failed (#{response.status}): #{error_msg}"
+      end
+
+      def save_refreshed_tokens(body, stored)
+        effective_refresh = body['refresh_token'] || stored[:refresh_token]
+
+        TokenStore.save(
+          access_token: body['access_token'],
+          refresh_token: effective_refresh,
+          expires_at: Time.now + body['expires_in'].to_i
+        )
+
         {
           access_token: body['access_token'],
-          refresh_token: body['refresh_token'],
+          refresh_token: effective_refresh,
           expires_in: body['expires_in']
         }
       end
 
       def open_browser(url)
         launcher = case RUBY_PLATFORM
-                   when /darwin/  then 'open'
-                   when /linux/   then 'xdg-open'
-                   when /mingw|mswin/ then 'start'
-                   else 'xdg-open'
+                   when /darwin/       then 'open'
+                   when /linux/        then 'xdg-open'
+                   when /mingw|mswin/  then 'start'
                    end
+        launcher ||= 'xdg-open'
 
         system(launcher, url, exception: false)
       end
@@ -160,13 +176,13 @@ module RubynCode
         nil
       end
 
-      def secure_compare(a, b)
-        return false if a.nil? || b.nil?
-        return false unless a.bytesize == b.bytesize
+      def secure_compare(left, right) # rubocop:disable Naming/PredicateMethod -- constant-time comparison, not a predicate
+        return false if left.nil? || right.nil?
+        return false unless left.bytesize == right.bytesize
 
-        l = a.unpack('C*')
-        r = b.unpack('C*')
-        l.zip(r).reduce(0) { |acc, (x, y)| acc | (x ^ y) }.zero?
+        left_bytes = left.unpack('C*')
+        right_bytes = right.unpack('C*')
+        left_bytes.zip(right_bytes).reduce(0) { |acc, (lhs, rhs)| acc | (lhs ^ rhs) }.zero?
       end
 
       def client_id     = Config::Defaults::OAUTH_CLIENT_ID

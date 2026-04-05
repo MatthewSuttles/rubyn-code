@@ -37,17 +37,19 @@ module RubynCode
         hunks = compute_hunks(old_lines, new_lines)
         return pastel.dim('No differences found.') if hunks.empty?
 
-        parts = []
-        parts << render_header(filename)
-        hunks.each { |hunk| parts << render_hunk(hunk) }
-        parts << ''
-
-        result = parts.join("\n")
+        result = assemble_output(hunks, filename)
         $stdout.puts(result)
         result
       end
 
       private
+
+      def assemble_output(hunks, filename)
+        parts = [render_header(filename)]
+        hunks.each { |hunk| parts << render_hunk(hunk) }
+        parts << ''
+        parts.join("\n")
+      end
 
       def render_header(filename)
         [
@@ -84,54 +86,68 @@ module RubynCode
 
       # Builds the LCS length table for two arrays of lines.
       def build_lcs_table(old_lines, new_lines)
-        m = old_lines.size
-        n = new_lines.size
-        table = Array.new(m + 1) { Array.new(n + 1, 0) }
+        row_count = old_lines.size
+        col_count = new_lines.size
+        table = Array.new(row_count + 1) { Array.new(col_count + 1, 0) }
 
-        (1..m).each do |i|
-          (1..n).each do |j|
-            table[i][j] = if old_lines[i - 1] == new_lines[j - 1]
-                            table[i - 1][j - 1] + 1
-                          else
-                            [table[i - 1][j], table[i][j - 1]].max
-                          end
-          end
+        (1..row_count).each do |row|
+          fill_lcs_row(table, row, old_lines, new_lines, col_count)
         end
 
         table
+      end
+
+      def fill_lcs_row(table, row, old_lines, new_lines, col_count) # rubocop:disable Metrics/AbcSize -- LCS algorithm step
+        (1..col_count).each do |col|
+          table[row][col] = if old_lines[row - 1] == new_lines[col - 1]
+                              table[row - 1][col - 1] + 1
+                            else
+                              [table[row - 1][col], table[row][col - 1]].max
+                            end
+        end
       end
 
       # Backtracks through the LCS table to produce a sequence of diff operations.
       # Returns an array of [:equal, :delete, :add] paired with line indices.
       def backtrack_diff(table, old_lines, new_lines)
         result = []
-        i = old_lines.size
-        j = new_lines.size
+        old_idx = old_lines.size
+        new_idx = new_lines.size
 
-        while i.positive? || j.positive?
-          if i.positive? && j.positive? && old_lines[i - 1] == new_lines[j - 1]
-            result.unshift([:equal, i - 1, j - 1])
-            i -= 1
-            j -= 1
-          elsif j.positive? && (i.zero? || table[i][j - 1] >= table[i - 1][j])
-            result.unshift([:add, nil, j - 1])
-            j -= 1
-          elsif i.positive?
-            result.unshift([:delete, i - 1, nil])
-            i -= 1
-          end
+        while old_idx.positive? || new_idx.positive?
+          old_idx, new_idx = backtrack_step(result, table, old_lines, new_lines, old_idx, new_idx)
         end
 
         result
       end
 
+      def backtrack_step(result, table, old_lines, new_lines, old_idx, new_idx) # rubocop:disable Metrics/AbcSize, Metrics/ParameterLists -- LCS backtrack step requires all state
+        if lines_match?(old_lines, new_lines, old_idx, new_idx)
+          result.unshift([:equal, old_idx - 1, new_idx - 1])
+          [old_idx - 1, new_idx - 1]
+        elsif new_idx.positive? && (old_idx.zero? || table[old_idx][new_idx - 1] >= table[old_idx - 1][new_idx])
+          result.unshift([:add, nil, new_idx - 1])
+          [old_idx, new_idx - 1]
+        else
+          result.unshift([:delete, old_idx - 1, nil])
+          [old_idx - 1, new_idx]
+        end
+      end
+
+      def lines_match?(old_lines, new_lines, old_idx, new_idx)
+        old_idx.positive? && new_idx.positive? && old_lines[old_idx - 1] == new_lines[new_idx - 1]
+      end
+
       # Groups raw diff operations into hunks with surrounding context lines.
       def group_into_hunks(raw_diff, old_lines, new_lines)
-        # Identify change indices (non-equal operations)
         change_indices = raw_diff.each_index.reject { |idx| raw_diff[idx][0] == :equal }
         return [] if change_indices.empty?
 
-        # Group changes that are within context_lines of each other
+        groups = cluster_changes(change_indices)
+        groups.map { |group| build_hunk(group, raw_diff, old_lines, new_lines) }
+      end
+
+      def cluster_changes(change_indices)
         groups = []
         current_group = [change_indices.first]
 
@@ -144,52 +160,61 @@ module RubynCode
           end
         end
         groups << current_group
+      end
 
-        # Build hunks from groups
-        groups.map do |group|
-          range_start = [group.first - @context_lines, 0].max
-          range_end = [group.last + @context_lines, raw_diff.size - 1].min
+      def build_hunk(group, raw_diff, old_lines, new_lines)
+        range_start = [group.first - @context_lines, 0].max
+        range_end = [group.last + @context_lines, raw_diff.size - 1].min
 
-          lines = []
-          old_start = nil
-          new_start = nil
-          old_count = 0
-          new_count = 0
+        lines, old_start, new_start, old_count, new_count =
+          collect_hunk_lines(range_start, range_end, raw_diff, old_lines, new_lines)
 
-          (range_start..range_end).each do |idx|
-            op, old_idx, new_idx = raw_diff[idx]
+        Hunk.new(
+          old_start: old_start || 1, old_count: old_count,
+          new_start: new_start || 1, new_count: new_count,
+          lines: lines.freeze
+        )
+      end
 
-            case op
-            when :equal
-              old_start ||= old_idx + 1
-              new_start ||= new_idx + 1
-              lines << DiffLine.new(type: :context, content: old_lines[old_idx])
-              old_count += 1
-              new_count += 1
-            when :delete
-              old_start ||= old_idx + 1
-              new_start ||= (new_idx || find_new_start(raw_diff, idx)) + 1
-              lines << DiffLine.new(type: :delete, content: old_lines[old_idx])
-              old_count += 1
-            when :add
-              old_start ||= (old_idx || find_old_start(raw_diff, idx)) + 1
-              new_start ||= new_idx + 1
-              lines << DiffLine.new(type: :add, content: new_lines[new_idx])
-              new_count += 1
-            end
-          end
+      def collect_hunk_lines(range_start, range_end, raw_diff, old_lines, new_lines)
+        acc = { lines: [], old_start: nil, new_start: nil, old_count: 0, new_count: 0 }
 
-          old_start ||= 1
-          new_start ||= 1
-
-          Hunk.new(
-            old_start: old_start,
-            old_count: old_count,
-            new_start: new_start,
-            new_count: new_count,
-            lines: lines.freeze
-          )
+        (range_start..range_end).each do |idx|
+          apply_diff_entry(acc, raw_diff, idx, old_lines, new_lines)
         end
+
+        acc.values_at(:lines, :old_start, :new_start, :old_count, :new_count)
+      end
+
+      def apply_diff_entry(acc, raw_diff, idx, old_lines, new_lines)
+        op, old_idx, new_idx = raw_diff[idx]
+        case op
+        when :equal  then apply_equal_entry(acc, old_lines, old_idx, new_idx)
+        when :delete then apply_delete_entry(acc, raw_diff, idx, old_lines, old_idx, new_idx)
+        when :add    then apply_add_entry(acc, raw_diff, idx, new_lines, old_idx, new_idx)
+        end
+      end
+
+      def apply_equal_entry(acc, old_lines, old_idx, new_idx)
+        acc[:old_start] ||= old_idx + 1
+        acc[:new_start] ||= new_idx + 1
+        acc[:lines] << DiffLine.new(type: :context, content: old_lines[old_idx])
+        acc[:old_count] += 1
+        acc[:new_count] += 1
+      end
+
+      def apply_delete_entry(acc, raw_diff, idx, old_lines, old_idx, new_idx) # rubocop:disable Metrics/ParameterLists -- diff entry requires context from caller
+        acc[:old_start] ||= old_idx + 1
+        acc[:new_start] ||= (new_idx || find_new_start(raw_diff, idx)) + 1
+        acc[:lines] << DiffLine.new(type: :delete, content: old_lines[old_idx])
+        acc[:old_count] += 1
+      end
+
+      def apply_add_entry(acc, raw_diff, idx, new_lines, old_idx, new_idx) # rubocop:disable Metrics/ParameterLists -- diff entry requires context from caller
+        acc[:old_start] ||= (old_idx || find_old_start(raw_diff, idx)) + 1
+        acc[:new_start] ||= new_idx + 1
+        acc[:lines] << DiffLine.new(type: :add, content: new_lines[new_idx])
+        acc[:new_count] += 1
       end
 
       # Find the nearest new-side line number for context when a delete has no new_idx.

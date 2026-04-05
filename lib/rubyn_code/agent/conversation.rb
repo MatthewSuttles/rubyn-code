@@ -128,64 +128,58 @@ module RubynCode
       # If a tool_use is orphaned (e.g. from Ctrl-C interruption),
       # inject a synthetic tool_result so the API doesn't reject the request.
       def repair_orphaned_tool_uses(formatted)
-        # Collect all tool_use IDs from assistant messages
-        tool_use_ids = Set.new
-        formatted.each do |msg|
-          next unless msg[:role] == 'assistant' && msg[:content].is_a?(Array)
-
-          msg[:content].each do |block|
-            if block.is_a?(Hash) && (block[:type] == 'tool_use' || block['type'] == 'tool_use')
-              tool_use_ids << (block[:id] || block['id'])
-            end
-          end
-        end
-
-        # Collect all tool_result IDs from user messages
-        tool_result_ids = Set.new
-        formatted.each do |msg|
-          next unless msg[:role] == 'user' && msg[:content].is_a?(Array)
-
-          msg[:content].each do |block|
-            if block.is_a?(Hash) && (block[:type] == 'tool_result' || block['type'] == 'tool_result')
-              tool_result_ids << (block[:tool_use_id] || block['tool_use_id'])
-            end
-          end
-        end
-
-        # Find orphans
-        orphaned = tool_use_ids - tool_result_ids
+        orphaned = collect_tool_use_ids(formatted) - collect_tool_result_ids(formatted)
         return formatted if orphaned.empty?
 
-        # Inject synthetic tool_results for orphans
         orphan_results = orphaned.map do |id|
           { type: 'tool_result', tool_use_id: id, content: '[interrupted]', is_error: true }
         end
 
-        # Append as a user message after the last assistant message
         formatted << { role: 'user', content: orphan_results }
         formatted
       end
 
+      def collect_tool_use_ids(formatted)
+        collect_block_ids(formatted, role: 'assistant', type: 'tool_use', id_key: :id, id_str_key: 'id')
+      end
+
+      def collect_tool_result_ids(formatted)
+        collect_block_ids(formatted, role: 'user', type: 'tool_result', id_key: :tool_use_id,
+                                     id_str_key: 'tool_use_id')
+      end
+
+      def collect_block_ids(formatted, role:, type:, id_key:, id_str_key:) # rubocop:disable Metrics/CyclomaticComplexity -- iterates blocks with type+role guards
+        ids = Set.new
+        formatted.each do |msg|
+          next unless msg[:role] == role && msg[:content].is_a?(Array)
+
+          msg[:content].each do |block|
+            next unless block.is_a?(Hash) && block_matches_type?(block, type)
+
+            ids << (block[id_key] || block[id_str_key])
+          end
+        end
+        ids
+      end
+
+      def block_matches_type?(block, type)
+        block[:type] == type || block['type'] == type
+      end
+
       # Normalize content and tool_calls into a single array of content blocks.
       def normalize_content(content, tool_calls)
-        blocks = []
-
-        case content
-        when Array
-          content.each { |b| blocks << block_to_hash(b) }
-        when String
-          blocks << { type: 'text', text: content } unless content.empty?
-        when Hash
-          blocks << content
-        else
-          blocks << block_to_hash(content) if content.respond_to?(:type)
-        end
-
-        tool_calls.each do |tc|
-          blocks << block_to_hash(tc)
-        end
-
+        blocks = content_to_blocks(content)
+        tool_calls.each { |tc| blocks << block_to_hash(tc) }
         blocks
+      end
+
+      def content_to_blocks(content)
+        case content
+        when Array  then content.map { |b| block_to_hash(b) }
+        when String then content.empty? ? [] : [{ type: 'text', text: content }]
+        when Hash   then [content]
+        else content.respond_to?(:type) ? [block_to_hash(content)] : []
+        end
       end
 
       # Format message content for the API. Converts Data objects to hashes.
@@ -200,23 +194,28 @@ module RubynCode
 
       def block_to_hash(block)
         return block if block.is_a?(Hash)
+        return block unless block.respond_to?(:type)
 
-        if block.respond_to?(:type)
-          case block.type.to_s
-          when 'text'
-            { type: 'text', text: block.text }
-          when 'tool_use'
-            { type: 'tool_use', id: block.id, name: block.name, input: block.input }
-          when 'tool_result'
-            h = { type: 'tool_result', tool_use_id: block.tool_use_id, content: block.content.to_s }
-            h[:is_error] = true if block.respond_to?(:is_error) && block.is_error
-            h
-          else
-            block.respond_to?(:to_h) ? block.to_h : block
-          end
+        typed_block_to_hash(block)
+      end
+
+      def typed_block_to_hash(block)
+        case block.type.to_s
+        when 'text'
+          { type: 'text', text: block.text }
+        when 'tool_use'
+          { type: 'tool_use', id: block.id, name: block.name, input: block.input }
+        when 'tool_result'
+          tool_result_block_to_hash(block)
         else
-          block
+          block.respond_to?(:to_h) ? block.to_h : block
         end
+      end
+
+      def tool_result_block_to_hash(block)
+        h = { type: 'tool_result', tool_use_id: block.tool_use_id, content: block.content.to_s }
+        h[:is_error] = true if block.respond_to?(:is_error) && block.is_error
+        h
       end
 
       # Extract text from content blocks.
