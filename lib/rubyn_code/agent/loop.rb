@@ -146,15 +146,30 @@ module RubynCode
 
         text = extract_response_text(response)
 
-        # Empty response — the LLM had nothing to say (often after
-        # dispatching background jobs). Keep iterating to pick up results.
-        if text.strip.empty?
-          RubynCode::Debug.llm('Empty response — retrying')
-          return nil
-        end
+        return handle_empty_response if text.strip.empty?
 
         @conversation.add_assistant_message(response_content(response))
         text
+      end
+
+      # Empty LLM response (0 content blocks). Common after dispatching
+      # background_run — the LLM has nothing to say until results arrive.
+      # Wait briefly for jobs, then either continue or return empty.
+      # Empty LLM response (0 content blocks). Common after dispatching
+      # background_run — the LLM has nothing to say until results arrive.
+      # Wait briefly for jobs, then either continue or accept the empty response.
+      def handle_empty_response
+        RubynCode::Debug.llm('Empty response — waiting for background jobs')
+        sleep 2 # give jobs a moment to register as active
+        drain_background_notifications
+
+        if pending_background_jobs?
+          wait_for_background_jobs
+          nil # keep iterating — job results are now in conversation
+        else
+          RubynCode::Debug.llm('No background jobs — accepting empty response')
+          '' # return empty string to stop the loop
+        end
       end
 
       def handle_tool_response(response, tool_calls, iteration)
