@@ -31,7 +31,7 @@ module RubynCode
         opts[:max_tokens] = @max_tokens_override if @max_tokens_override
         if @task_budget_remaining
           opts[:task_budget] = {
-            total: TASK_BUDGET_TOTAL, remaining: @task_budget_remaining
+            total: UsageTracker::TASK_BUDGET_TOTAL, remaining: @task_budget_remaining
           }
         end
         opts
