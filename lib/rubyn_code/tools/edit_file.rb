@@ -52,16 +52,44 @@ module RubynCode
         replace_all ? content.gsub(old_text, new_text) : content.sub(old_text, new_text)
       end
 
+      CONTEXT_LINES = 3 # rubocop:disable Lint/UselessConstantScoping
+
       def format_diff_result(path, original, old_text, new_text, replace_all)
         count = replace_all ? original.scan(old_text).length : 1
-        line_num = find_line_number(original, old_text)
+        lines = diff_header(path, count, original, old_text)
+        lines.concat(diff_body(original, old_text, new_text))
+        lines.join("\n")
+      end
 
-        lines = []
-        lines << "Edited #{path} (#{count} replacement#{'s' if count > 1})"
-        lines << "  @@ line #{line_num} @@" if line_num
+      def diff_header(path, count, original, old_text)
+        line_num = find_line_number(original, old_text)
+        header = ["Edited #{path} (#{count} replacement#{'s' if count > 1})"]
+        header << "  @@ line #{line_num} @@" if line_num
+        header
+      end
+
+      def diff_body(original, old_text, new_text)
+        lines = context_before(original, old_text)
         old_text.lines.each { |l| lines << "  - #{l.chomp}" }
         new_text.lines.each { |l| lines << "  + #{l.chomp}" }
-        lines.join("\n")
+        lines.concat(context_after(original, old_text))
+      end
+
+      def context_before(content, text)
+        idx = content.index(text)
+        return [] unless idx
+
+        before = content[0...idx].lines.last(CONTEXT_LINES)
+        before.map { |l| "    #{l.chomp}" }
+      end
+
+      def context_after(content, text)
+        idx = content.index(text)
+        return [] unless idx
+
+        after_start = idx + text.length
+        after = content[after_start..].lines.first(CONTEXT_LINES)
+        after.map { |l| "    #{l.chomp}" }
       end
 
       def find_line_number(content, text)

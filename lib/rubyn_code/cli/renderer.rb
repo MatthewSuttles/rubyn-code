@@ -33,16 +33,23 @@ module RubynCode
         puts @pastel.cyan("  > #{name}: #{format_params(params)}")
       end
 
-      def tool_result(name, output)
-        truncated = output.to_s[0...500]
-        lines = truncated.lines
+      DIFF_TOOLS = %w[edit_file write_file].freeze
+      DIFF_RESULT_LIMIT = 2000
+      DEFAULT_RESULT_LIMIT = 500
 
-        if %w[edit_file write_file].include?(name.to_s)
-          render_diff_result(lines)
-        elsif lines.length > 6
-          render_truncated_result(lines)
+      def tool_result(name, output)
+        raw = output.to_s
+
+        if DIFF_TOOLS.include?(name.to_s)
+          render_diff_result(raw[0...DIFF_RESULT_LIMIT].lines)
         else
-          puts @pastel.dim("    #{truncated.strip.gsub("\n", "\n    ")}")
+          truncated = raw[0...DEFAULT_RESULT_LIMIT]
+          lines = truncated.lines
+          if lines.length > 6
+            render_truncated_result(lines)
+          else
+            puts @pastel.dim("    #{truncated.strip.gsub("\n", "\n    ")}")
+          end
         end
       end
 
@@ -88,11 +95,9 @@ module RubynCode
       end
 
       def prompt
-        if @yolo
-          @pastel.bold.green('rubyn ') + @pastel.bold.red('YOLO') + @pastel.bold.green(' > ')
-        else
-          @pastel.bold.green('rubyn > ')
-        end
+        return @pastel.bold.green('rubyn ') + @pastel.bold.red('YOLO') + @pastel.bold.green(' > ') if @yolo
+
+        @pastel.bold.green('rubyn > ')
       end
 
       DIFF_COLORS = {
