@@ -30,7 +30,7 @@ module RubynCode
         @llm_client = LLM::Client.new
         @conversation = Agent::Conversation.new
         @tool_executor = Tools::Executor.new(project_root: @project_root)
-        @context_manager = Context::Manager.new
+        @context_manager = Context::Manager.new(llm_client: @llm_client)
         @hook_registry = Hooks::Registry.new
         @hook_runner = Hooks::Runner.new(registry: @hook_registry)
         @stall_detector = Agent::LoopDetector.new

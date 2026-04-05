@@ -13,11 +13,15 @@ module RubynCode
       attr_reader :total_input_tokens, :total_output_tokens
 
       # @param threshold [Integer] estimated token count that triggers auto-compaction
-      def initialize(threshold: Config::Defaults::CONTEXT_THRESHOLD_TOKENS)
+      # @param llm_client [LLM::Client, nil] needed for LLM-driven compaction
+      def initialize(threshold: Config::Defaults::CONTEXT_THRESHOLD_TOKENS, llm_client: nil)
         @threshold = threshold
+        @llm_client = llm_client
         @total_input_tokens = 0
         @total_output_tokens = 0
       end
+
+      attr_writer :llm_client
 
       # Accumulates token counts from an LLM response usage object.
       #
@@ -77,11 +81,9 @@ module RubynCode
         end
 
         # Step 3: Full LLM-driven auto-compact (expensive, last resort)
-        compactor = Compactor.new(
-          llm_client: conversation.respond_to?(:llm_client) ? conversation.llm_client : nil,
-          threshold: @threshold
-        )
+        return unless @llm_client
 
+        compactor = Compactor.new(llm_client: @llm_client, threshold: @threshold)
         new_messages = compactor.auto_compact!(messages)
         apply_compacted_messages(conversation, new_messages)
       end

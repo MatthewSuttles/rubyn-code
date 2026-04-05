@@ -224,6 +224,7 @@ module RubynCode
       autoload :ContextInfo, 'rubyn_code/cli/commands/context_info'
       autoload :Diff, 'rubyn_code/cli/commands/diff'
       autoload :Model, 'rubyn_code/cli/commands/model'
+      autoload :NewSession, 'rubyn_code/cli/commands/new_session'
     end
   end
 
