@@ -7,9 +7,11 @@ module RubynCode
   module Tools
     class LoadSkill < Base
       TOOL_NAME = 'load_skill'
-      DESCRIPTION = 'Loads a skill document into the conversation context. Use /skill-name or provide the skill name.'
+      DESCRIPTION = 'Loads a best-practice skill document into context. ' \
+                    'Pass the skill name (e.g. "shared-examples", "adapter", "request-specs").'
       PARAMETERS = {
-        name: { type: :string, required: true, description: 'Name of the skill to load' }
+        name: { type: :string, required: true,
+                description: 'Skill name, e.g. "adapter", "shared-examples", "request-specs"' }
       }.freeze
       RISK_LEVEL = :read
       REQUIRES_CONFIRMATION = false
@@ -20,18 +22,23 @@ module RubynCode
       end
 
       def execute(name:)
+        # Strip leading slash — LLM sometimes sends /skill-name
+        cleaned = name.to_s.sub(%r{\A/+}, '').strip
+        return 'Error: skill name required' if cleaned.empty?
+
         loader = @skill_loader || default_loader
-        loader.load(name)
+        loader.load(cleaned)
       end
 
       private
 
       def default_loader
         skills_dirs = [
-          File.join(project_root, '.rubyn', 'skills'),
-          File.join(Dir.home, '.rubyn', 'skills')
+          File.expand_path('../../../skills', __dir__), # bundled gem skills
+          File.join(project_root, '.rubyn-code', 'skills'), # project skills
+          File.join(Dir.home, '.rubyn-code', 'skills') # global user skills
         ]
-        catalog = Skills::Catalog.new(skills_dirs)
+        catalog = Skills::Catalog.new(skills_dirs.select { |d| Dir.exist?(d) })
         Skills::Loader.new(catalog)
       end
     end
