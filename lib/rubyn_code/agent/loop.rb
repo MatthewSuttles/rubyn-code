@@ -137,14 +137,24 @@ module RubynCode
           response = recover_truncated_response(response)
         end
 
+        # Wait for background jobs before finalizing
         if pending_background_jobs?
           @conversation.add_assistant_message(response_content(response))
           wait_for_background_jobs
           return nil # signal: keep iterating
         end
 
+        text = extract_response_text(response)
+
+        # Empty response — the LLM had nothing to say (often after
+        # dispatching background jobs). Keep iterating to pick up results.
+        if text.strip.empty?
+          RubynCode::Debug.llm('Empty response — retrying')
+          return nil
+        end
+
         @conversation.add_assistant_message(response_content(response))
-        extract_response_text(response)
+        text
       end
 
       def handle_tool_response(response, tool_calls, iteration)
