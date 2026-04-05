@@ -32,8 +32,19 @@ module RubynCode
   # LLM
   module LLM
     autoload :Client, 'rubyn_code/llm/client'
-    autoload :Streaming, 'rubyn_code/llm/streaming'
     autoload :MessageBuilder, 'rubyn_code/llm/message_builder'
+
+    # Adapters (provider-specific implementations)
+    module Adapters
+      autoload :Base, 'rubyn_code/llm/adapters/base'
+      autoload :JsonParsing, 'rubyn_code/llm/adapters/json_parsing'
+      autoload :PromptCaching, 'rubyn_code/llm/adapters/prompt_caching'
+      autoload :Anthropic, 'rubyn_code/llm/adapters/anthropic'
+      autoload :AnthropicStreaming, 'rubyn_code/llm/adapters/anthropic_streaming'
+    end
+
+    # Backward-compat: LLM::Streaming → Adapters::AnthropicStreaming
+    autoload :Streaming, 'rubyn_code/llm/streaming'
   end
 
   # Layer 1: Agent Loop
