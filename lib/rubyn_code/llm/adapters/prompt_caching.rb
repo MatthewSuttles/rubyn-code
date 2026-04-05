@@ -11,7 +11,7 @@ module RubynCode
       module PromptCaching
         CACHE_EPHEMERAL = { type: 'ephemeral' }.freeze
 
-        OAUTH_GATE = "You are Claude Code, Anthropic's official CLI for Claude."
+        OAUTH_GATE = "You are Claude Code, Anthropic's official CLI for Claude.".freeze
 
         private
 
