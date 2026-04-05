@@ -5,7 +5,7 @@ require "spec_helper"
 RSpec.describe RubynCode::Agent::Loop, "background job integration" do
   let(:llm_client)      { instance_double(RubynCode::LLM::Client) }
   let(:tool_executor)   { instance_double(RubynCode::Tools::Executor, tool_definitions: []) }
-  let(:context_manager) { instance_double(RubynCode::Context::Manager, check_compaction!: nil, track_usage: nil, estimated_tokens: 0) }
+  let(:context_manager) { instance_double(RubynCode::Context::Manager, check_compaction!: nil, track_usage: nil, estimated_tokens: 0, needs_compaction?: false) }
   let(:hook_runner)     { instance_double(RubynCode::Hooks::Runner, fire: nil) }
   let(:conversation)    { RubynCode::Agent::Conversation.new }
   let(:stall_detector)  { RubynCode::Agent::LoopDetector.new }
