@@ -27,6 +27,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'rouge', '>= 4.0', '< 5.0'
   spec.add_dependency 'tty-markdown', '~> 0.7'
   spec.add_dependency 'tty-prompt', '~> 0.23'
+  spec.add_dependency 'tty-reader', '~> 0.9'
   spec.add_dependency 'tty-spinner', '~> 0.9'
 
   # CLI input (removed from Ruby 4.0 stdlib)

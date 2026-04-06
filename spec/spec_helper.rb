@@ -3,11 +3,7 @@
 require "simplecov"
 SimpleCov.start do
   add_filter "/spec/"
-  # CI has platform-specific spec crashes (macOS keychain, interactive terminal)
-  # that trigger "previous error not related to SimpleCov" and exit code failures.
-  # Disable minimum and refuse to fail the build on coverage.
-  minimum_coverage 0
-  at_exit { SimpleCov.result }
+  minimum_coverage 90
 end
 
 require "rubyn_code"
