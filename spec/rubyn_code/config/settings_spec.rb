@@ -142,7 +142,7 @@ RSpec.describe RubynCode::Config::Settings do
       expect(File.exist?(config_path)).to be true
       data = YAML.safe_load(File.read(config_path))
       expect(data['provider']).to eq('anthropic')
-      expect(data['model']).to eq('claude-opus-4-6')
+      expect(data['model']).to eq('claude-opus-5-4')
       expect(data['providers']['anthropic']['env_key']).to eq('ANTHROPIC_API_KEY')
       expect(data['providers']['openai']['env_key']).to eq('OPENAI_API_KEY')
     end

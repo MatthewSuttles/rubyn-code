@@ -9,10 +9,13 @@ module RubynCode
     module CostCalculator
       # Per-million-token rates: { model_prefix => [input_rate, output_rate] }
       PRICING = {
-        # Anthropic
+        # Anthropic — Claude 5.4 (latest)
+        'claude-haiku-5-4' => [0.80, 4.00],
+        'claude-sonnet-5-4' => [3.00, 15.00],
+        'claude-opus-5-4' => [15.00, 75.00],
+        # Anthropic — Claude 4.x (legacy, kept for prefix matching)
         'claude-haiku-4-5' => [1.00, 5.00],
-        'claude-sonnet-4-20250514' => [3.00, 15.00],
-        'claude-opus-4-20250514' => [15.00, 75.00],
+        'claude-sonnet-4-6' => [3.00, 15.00],
         'claude-opus-4-6' => [15.00, 75.00],
         # OpenAI
         'gpt-4o' => [2.50, 10.00],

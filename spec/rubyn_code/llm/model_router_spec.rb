@@ -39,11 +39,11 @@ RSpec.describe RubynCode::LLM::ModelRouter do
 
   describe '.model_for' do
     it 'returns the first preferred model for a task tier' do
-      expect(described_class.model_for(:file_search)).to eq('claude-haiku-4-5')
+      expect(described_class.model_for(:file_search)).to eq('claude-haiku-5-4')
     end
 
     it 'returns a top-tier model for architecture tasks' do
-      expect(described_class.model_for(:architecture)).to eq('claude-opus-4-6')
+      expect(described_class.model_for(:architecture)).to eq('claude-opus-5-4')
     end
 
     it 'filters by available_models when provided' do
@@ -53,29 +53,29 @@ RSpec.describe RubynCode::LLM::ModelRouter do
 
     it 'falls back to first preferred when no available models match' do
       result = described_class.model_for(:file_search, available_models: ['nonexistent-model'])
-      expect(result).to eq('claude-haiku-4-5')
+      expect(result).to eq('claude-haiku-5-4')
     end
 
     it 'returns first preferred when available_models is empty' do
       result = described_class.model_for(:generate_specs, available_models: [])
-      expect(result).to eq('claude-sonnet-4-6')
+      expect(result).to eq('claude-sonnet-5-4')
     end
   end
 
   describe '.resolve' do
     it 'returns provider and model hash for a task type' do
       result = described_class.resolve(:file_search)
-      expect(result).to eq({ provider: 'anthropic', model: 'claude-haiku-4-5' })
+      expect(result).to eq({ provider: 'anthropic', model: 'claude-haiku-5-4' })
     end
 
     it 'returns top-tier provider and model for architecture' do
       result = described_class.resolve(:architecture)
-      expect(result).to eq({ provider: 'anthropic', model: 'claude-opus-4-6' })
+      expect(result).to eq({ provider: 'anthropic', model: 'claude-opus-5-4' })
     end
 
     it 'returns mid-tier for unknown tasks' do
       result = described_class.resolve(:something_random)
-      expect(result).to eq({ provider: 'anthropic', model: 'claude-sonnet-4-6' })
+      expect(result).to eq({ provider: 'anthropic', model: 'claude-sonnet-5-4' })
     end
   end
 

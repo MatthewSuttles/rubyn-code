@@ -27,17 +27,17 @@ module RubynCode
       # version via prefix matching in CostCalculator and the provider API.
       TIER_DEFAULTS = {
         cheap: [
-          %w[anthropic claude-haiku-4-5],
+          %w[anthropic claude-haiku-5-4],
           %w[openai gpt-4o-mini],
           %w[openai gpt-4.1-nano]
         ].freeze,
         mid: [
-          %w[anthropic claude-sonnet-4-6],
+          %w[anthropic claude-sonnet-5-4],
           %w[openai gpt-4o],
           %w[openai gpt-4.1]
         ].freeze,
         top: [
-          %w[anthropic claude-opus-4-6],
+          %w[anthropic claude-opus-5-4],
           %w[openai o3]
         ].freeze
       }.freeze
