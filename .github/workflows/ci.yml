@@ -23,7 +23,7 @@ jobs:
           bundler-cache: true
 
       - name: Run specs
-        run: bundle exec rspec --format documentation --order defined 2>&1 | tail -30
+        run: bundle exec rspec --format documentation --order defined
 
   lint:
     runs-on: ubuntu-latest
