@@ -53,6 +53,8 @@ module RubynCode
         check_user_feedback(user_input)
         drain_background_notifications
         inject_skill_listing unless @skills_injected
+        @decision_compactor&.detect_topic_switch(user_input)
+        @skill_ttl&.tick!
         @conversation.add_user_message(user_input)
         reset_iteration_state
 
@@ -88,6 +90,14 @@ module RubynCode
         @stall_detector     = opts.fetch(:stall_detector, LoopDetector.new)
         @skill_loader       = opts[:skill_loader]
         @project_root       = opts[:project_root]
+        @decision_compactor = build_decision_compactor
+        @skill_ttl          = Skills::TtlManager.new
+      end
+
+      def build_decision_compactor
+        Context::DecisionCompactor.new(context_manager: @context_manager)
+      rescue StandardError
+        nil
       end
 
       def assign_callbacks(opts)
@@ -150,6 +160,9 @@ module RubynCode
         return handle_empty_response if text.strip.empty?
 
         @conversation.add_assistant_message(response_content(response))
+
+        # Decision-based compaction (topic switch, milestone)
+        @decision_compactor&.check!(@conversation)
 
         # Compact after the response if context is over threshold
         compact_if_needed

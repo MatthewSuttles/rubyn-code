@@ -4,7 +4,7 @@ module RubynCode
   module Agent
     # Handles LLM chat calls, option building, prompt-too-long recovery,
     # and maintenance tasks (compaction, budget, stall detection).
-    module LlmCaller
+    module LlmCaller # rubocop:disable Metrics/ModuleLength -- LLM call pipeline with routing + recovery
       private
 
       def call_llm
@@ -30,6 +30,7 @@ module RubynCode
           on_text: @on_text
         }
         opts[:max_tokens] = @max_tokens_override if @max_tokens_override
+        opts[:model] = routed_model
         if @task_budget_remaining
           opts[:task_budget] = {
             total: UsageTracker::TASK_BUDGET_TOTAL, remaining: @task_budget_remaining
@@ -38,11 +39,43 @@ module RubynCode
         opts
       end
 
-      def log_llm_call(opts)
-        model = @llm_client.respond_to?(:model) ? @llm_client.model : 'default'
+      # Uses ModelRouter to pick the right model for the current task.
+      # Only returns models from the active provider — never crosses
+      # provider boundaries (e.g., won't send a GPT model to Anthropic).
+      # Falls back to nil (use client's default) if routing fails.
+      def routed_model
+        last_user = last_user_message_text
+        return nil unless last_user
+
+        recent = @stall_detector.respond_to?(:recent_tools) ? @stall_detector.recent_tools : []
+        task = LLM::ModelRouter.detect_task(last_user, recent_tools: recent)
+        resolved = LLM::ModelRouter.resolve(task, client: @llm_client)
+
+        # Only use the routed model if it's from the same provider
+        active = @llm_client.respond_to?(:provider_name) ? @llm_client.provider_name : nil
+        return nil if active && resolved[:provider] != active
+
+        resolved[:model]
+      rescue StandardError
+        nil
+      end
+
+      def last_user_message_text
+        msg = @conversation.messages.reverse_each.find { |m| m[:role] == 'user' }
+        return nil unless msg
+
+        content = msg[:content]
+        content.is_a?(String) ? content : nil
+      end
+
+      def log_llm_call(opts) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- safe accessor checks
+        default_model = @llm_client.respond_to?(:model) ? @llm_client.model : 'default'
+        routed = opts[:model]
+        effective = routed || default_model
         provider = @llm_client.respond_to?(:provider_name) ? @llm_client.provider_name : 'unknown'
         tool_count = opts[:tools]&.size || 0
-        RubynCode::Debug.llm("chat provider=#{provider} model=#{model} tools=#{tool_count}")
+        routed_tag = routed && routed != default_model ? " (routed from #{default_model})" : ''
+        RubynCode::Debug.llm("chat provider=#{provider} model=#{effective}#{routed_tag} tools=#{tool_count}")
       rescue StandardError
         nil
       end

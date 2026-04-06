@@ -4,7 +4,7 @@ module RubynCode
   module Agent
     # Handles tool definition filtering, permission checks, and execution
     # for the agent loop.
-    module ToolProcessor
+    module ToolProcessor # rubocop:disable Metrics/ModuleLength -- tool filtering + permissions + execution + decision signals
       CORE_TOOLS = %w[read_file write_file edit_file glob grep bash spawn_agent background_run].freeze
       PLAN_MODE_RISK_LEVELS = %i[read].freeze
 
@@ -15,7 +15,27 @@ module RubynCode
         return all_tools if all_tools.size <= CORE_TOOLS.size
 
         @discovered_tools ||= Set.new
+
+        # Use DynamicToolSchema to filter based on detected task context
+        context = detect_task_context
+        if context
+          active = DynamicToolSchema.active_tools(task_context: context, discovered_tools: @discovered_tools)
+          return DynamicToolSchema.filter(all_tools, active_names: active)
+        end
+
         all_tools.select { |t| core_or_discovered?(t) }
+      end
+
+      def detect_task_context # rubocop:disable Metrics/CyclomaticComplexity -- safe navigation chain
+        last_msg = @conversation&.messages&.reverse_each&.find { |m| m[:role] == 'user' } # rubocop:disable Style/SafeNavigationChainLength
+        return nil unless last_msg
+
+        text = last_msg[:content]
+        return nil unless text.is_a?(String)
+
+        DynamicToolSchema.detect_context(text)
+      rescue StandardError
+        nil
       end
 
       def core_or_discovered?(tool)
@@ -96,9 +116,24 @@ module RubynCode
         @hook_runner.fire(:pre_tool_use, tool_name: tool_name, tool_input: tool_input)
         result = @tool_executor.execute(tool_name, symbolize_keys(tool_input))
         @hook_runner.fire(:post_tool_use, tool_name: tool_name, tool_input: tool_input, result: result)
+        signal_decision_compactor(tool_name, tool_input, result)
         [result.to_s, false]
       rescue StandardError => e
         ["Error executing #{tool_name}: #{e.message}", true]
+      end
+
+      def signal_decision_compactor(tool_name, tool_input, result) # rubocop:disable Metrics/CyclomaticComplexity -- tool dispatch
+        return unless @decision_compactor
+
+        case tool_name
+        when 'edit_file', 'write_file'
+          path = tool_input[:path] || tool_input['path']
+          @decision_compactor.signal_file_edited!(path) if path
+        when 'run_specs'
+          @decision_compactor.signal_specs_passed! if result.to_s.include?('0 failures')
+        end
+      rescue StandardError
+        nil
       end
 
       def prompt_user(tool_name, tool_input)
