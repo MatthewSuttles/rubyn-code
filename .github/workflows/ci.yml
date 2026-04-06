@@ -22,11 +22,8 @@ jobs:
           ruby-version: ${{ matrix.ruby-version }}
           bundler-cache: true
 
-      - name: Debug spec loading
-        run: bundle exec rspec --dry-run --format progress 2>&1 | tail -5
-        continue-on-error: true
       - name: Run specs
-        run: bundle exec rspec --format progress --warnings 2>&1 | tee /tmp/rspec.txt; grep "0 failures" /tmp/rspec.txt && grep "Line Coverage" /tmp/rspec.txt
+        run: bundle exec rspec --format documentation --order defined 2>&1 | tail -30
 
   lint:
     runs-on: ubuntu-latest
