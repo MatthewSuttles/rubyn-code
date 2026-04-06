@@ -3,6 +3,7 @@
 require 'faraday'
 require 'json'
 require 'securerandom'
+require_relative '../message_builder'
 
 module RubynCode
   module LLM
