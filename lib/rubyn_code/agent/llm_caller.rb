@@ -11,6 +11,7 @@ module RubynCode
         @hook_runner.fire(:pre_llm_call, conversation: @conversation)
 
         opts = build_llm_opts
+        log_llm_call(opts)
         response = @llm_client.chat(**opts)
 
         @hook_runner.fire(:post_llm_call, response: response, conversation: @conversation)
@@ -35,6 +36,15 @@ module RubynCode
           }
         end
         opts
+      end
+
+      def log_llm_call(opts)
+        model = @llm_client.respond_to?(:model) ? @llm_client.model : 'default'
+        provider = @llm_client.respond_to?(:provider_name) ? @llm_client.provider_name : 'unknown'
+        tool_count = opts[:tools]&.size || 0
+        RubynCode::Debug.llm("chat provider=#{provider} model=#{model} tools=#{tool_count}")
+      rescue StandardError
+        nil
       end
 
       def recover_prompt_too_long(opts)
