@@ -22,6 +22,26 @@ jobs:
           ruby-version: ${{ matrix.ruby-version }}
           bundler-cache: true
 
+      - name: Check spec file loading
+        run: |
+          bundle exec ruby -e "
+            require 'rubyn_code'
+            failed = []
+            Dir['spec/**/*_spec.rb'].sort.each do |f|
+              begin
+                load f
+              rescue => e
+                failed << [f, e.class, e.message[0..120]]
+              end
+            end
+            if failed.any?
+              puts \"#{failed.size} spec files failed to load:\"
+              failed.each { |f, cls, msg| puts \"  #{f}: #{cls}: #{msg}\" }
+              exit 1
+            else
+              puts \"All #{Dir['spec/**/*_spec.rb'].size} spec files loaded successfully\"
+            end
+          "
       - name: Run specs
         run: bundle exec rake spec
 
