@@ -59,8 +59,27 @@ Score: 18/22 (82%) — 4 failures
 - **run_specs**: Run `bundle exec rspec spec/rubyn_code/llm/model_router_spec.rb --format progress`. PASS if output contains `0 failures`.
 
 ### 6. Context & Efficiency Engine
-- **File Cache**: Read `lib/rubyn_code/version.rb` twice. PASS if both reads succeed (cache should serve the second).
-- **Output Compressor**: Run `bash` with `seq 1 500` (generates 500 lines). PASS if the result is shorter than the raw output (compressor truncated it).
+
+#### File Cache
+- Read `lib/rubyn_code/version.rb` twice. PASS if both reads succeed (cache should serve the second).
+
+#### Output Compressor — Head/Tail Strategy
+- Run `bash` with `seq 1 5000` (generates 5,000 lines — well over the bash threshold of 4,000 chars). PASS if the result contains "lines omitted" or is significantly shorter than 5,000 lines. This proves the head_tail compressor is working.
+
+#### Output Compressor — Spec Summary Strategy
+- Run `bash` with `cd <project_root> && bundle exec rspec spec/rubyn_code/tools/base_spec.rb --format documentation 2>&1`. This produces multi-line RSpec output. PASS if the result you receive is shorter than the full verbose output — specifically check if passing specs got compressed to a summary line like "N examples, 0 failures" instead of listing every example.
+
+#### Output Compressor — Grep Top Matches
+- Run `grep` searching for `def ` across all of `lib/`. This will match hundreds of method definitions. PASS if the result contains "matches omitted" or shows only a subset of results (the compressor limits to top N matches).
+
+#### Output Compressor — Glob Tree Collapse
+- Run `glob` for `**/*.rb` across the entire project. With 170+ files this should exceed the glob threshold. PASS if the result shows directory summaries like `app/models/ (N files)` instead of listing every individual file path, OR if the result is significantly shorter than listing all 170+ paths individually.
+
+#### Output Compressor — Diff Strategy
+- Run `bash` with `cd <project_root> && git log --oneline -1 --format=%H | xargs git diff HEAD~5..` (diff of last 5 commits). If the diff is large enough, the compressor should keep headers but truncate bodies. PASS if result contains diff headers. SKIP if diff is small enough to pass through uncompressed.
+
+#### Compression Stats
+- After running the above tests, note whether any output you received contained truncation markers like "lines omitted", "matches omitted", or "files)". Count how many of the 5 compression strategies actually triggered. Report: "N/5 compression strategies verified active".
 
 ### 7. Skills System
 - **load_skill**: Load any available skill (e.g., `classes`). PASS if content is returned.
