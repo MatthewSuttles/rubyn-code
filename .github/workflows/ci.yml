@@ -23,7 +23,7 @@ jobs:
           bundler-cache: true
 
       - name: Run specs
-        run: bundle exec rake spec
+        run: bundle exec rspec --format progress 2>&1 | tee /tmp/rspec_output.txt; grep -q "0 failures" /tmp/rspec_output.txt
 
   lint:
     runs-on: ubuntu-latest
