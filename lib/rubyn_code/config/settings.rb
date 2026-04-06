@@ -139,10 +139,20 @@ module RubynCode
           'model' => Defaults::DEFAULT_MODEL,
           'providers' => {
             'anthropic' => {
-              'env_key' => 'ANTHROPIC_API_KEY'
+              'env_key' => 'ANTHROPIC_API_KEY',
+              'models' => {
+                'cheap' => 'claude-haiku-4-5',
+                'mid' => 'claude-sonnet-4-6',
+                'top' => 'claude-opus-4-6'
+              }
             },
             'openai' => {
-              'env_key' => 'OPENAI_API_KEY'
+              'env_key' => 'OPENAI_API_KEY',
+              'models' => {
+                'cheap' => 'gpt-5.4-nano',
+                'mid' => 'gpt-5.4-mini',
+                'top' => 'gpt-5.4'
+              }
             }
           }
         }

@@ -137,14 +137,20 @@ RSpec.describe RubynCode::Config::Settings do
   end
 
   describe 'seed_config!' do
-    it 'creates config.yml on first run with default providers' do
+    it 'creates config.yml on first run with default providers and model tiers' do
       settings = described_class.new(config_path: config_path)
       expect(File.exist?(config_path)).to be true
       data = YAML.safe_load(File.read(config_path))
       expect(data['provider']).to eq('anthropic')
       expect(data['model']).to eq('claude-opus-4-6')
       expect(data['providers']['anthropic']['env_key']).to eq('ANTHROPIC_API_KEY')
+      expect(data['providers']['anthropic']['models']['cheap']).to eq('claude-haiku-4-5')
+      expect(data['providers']['anthropic']['models']['mid']).to eq('claude-sonnet-4-6')
+      expect(data['providers']['anthropic']['models']['top']).to eq('claude-opus-4-6')
       expect(data['providers']['openai']['env_key']).to eq('OPENAI_API_KEY')
+      expect(data['providers']['openai']['models']['cheap']).to eq('gpt-5.4-nano')
+      expect(data['providers']['openai']['models']['mid']).to eq('gpt-5.4-mini')
+      expect(data['providers']['openai']['models']['top']).to eq('gpt-5.4')
     end
 
     it 'does not overwrite an existing config' do
