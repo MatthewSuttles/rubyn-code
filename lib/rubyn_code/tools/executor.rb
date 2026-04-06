@@ -3,19 +3,22 @@
 module RubynCode
   module Tools
     class Executor
-      attr_reader :project_root
+      attr_reader :project_root, :output_compressor, :file_cache
       attr_accessor :llm_client, :background_worker, :on_agent_status, :db, :ask_user_callback
 
       def initialize(project_root:)
         @project_root = File.expand_path(project_root)
         @injections = {}
+        @output_compressor = OutputCompressor.new
+        @file_cache = FileCache.new
         Registry.load_all!
       end
 
       def execute(tool_name, params) # rubocop:disable Metrics/AbcSize -- maps tool errors to results
         tool = build_tool(tool_name)
         filtered = filter_params(tool, params)
-        tool.truncate(tool.execute(**filtered).to_s)
+        raw = tool.truncate(tool.execute(**filtered).to_s)
+        @output_compressor.compress(tool_name, raw)
       rescue ToolNotFoundError => e
         error_result("Tool error: #{e.message}")
       rescue PermissionDeniedError => e

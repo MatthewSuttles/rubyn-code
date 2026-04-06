@@ -18,12 +18,46 @@ module RubynCode
         parts = [SYSTEM_PROMPT]
         parts << PLAN_MODE_PROMPT if @plan_mode
         parts << "Working directory: #{@project_root}" if @project_root
+        append_response_mode(parts)
+        append_project_profile(parts)
         append_memories(parts)
         append_project_instructions(parts)
         append_instincts(parts)
         append_skills(parts)
         append_deferred_tools(parts)
         parts.join("\n")
+      end
+
+      def append_response_mode(parts)
+        text = last_user_text
+        return if text.empty?
+
+        mode = ResponseModes.detect(text)
+        parts << ResponseModes.instruction_for(mode)
+      rescue StandardError
+        nil
+      end
+
+      def last_user_text
+        return '' unless @conversation&.messages&.any?
+
+        last_user = @conversation.messages.reverse_each.find { |m| m[:role] == 'user' }
+        return '' unless last_user
+
+        last_user[:content].is_a?(String) ? last_user[:content] : ''
+      end
+
+      def append_project_profile(parts)
+        return unless @project_root
+
+        profile = Config::ProjectProfile.new(project_root: @project_root)
+        loaded = profile.load
+        return unless loaded
+
+        prompt_text = profile.to_prompt
+        parts << "\n## #{prompt_text}" unless prompt_text.empty?
+      rescue StandardError
+        nil
       end
 
       def append_memories(parts)

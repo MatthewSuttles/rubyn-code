@@ -15,6 +15,10 @@ module RubynCode
   # Infrastructure
   autoload :Config, 'rubyn_code/config/settings'
 
+  module Config
+    autoload :ProjectProfile, 'rubyn_code/config/project_profile'
+  end
+
   # Database
   module DB
     autoload :Connection, 'rubyn_code/db/connection'
@@ -33,6 +37,7 @@ module RubynCode
   module LLM
     autoload :Client, 'rubyn_code/llm/client'
     autoload :MessageBuilder, 'rubyn_code/llm/message_builder'
+    autoload :ModelRouter, 'rubyn_code/llm/model_router'
 
     # Adapters (provider-specific implementations)
     module Adapters
@@ -56,6 +61,8 @@ module RubynCode
     autoload :Loop, 'rubyn_code/agent/loop'
     autoload :LoopDetector, 'rubyn_code/agent/loop_detector'
     autoload :Conversation, 'rubyn_code/agent/conversation'
+    autoload :ResponseModes, 'rubyn_code/agent/response_modes'
+    autoload :DynamicToolSchema, 'rubyn_code/agent/dynamic_tool_schema'
   end
 
   # Layer 2: Tool System
@@ -93,6 +100,9 @@ module RubynCode
     autoload :GitLog, 'rubyn_code/tools/git_log'
     autoload :GitStatus, 'rubyn_code/tools/git_status'
     autoload :SpawnTeammate, 'rubyn_code/tools/spawn_teammate'
+    autoload :OutputCompressor, 'rubyn_code/tools/output_compressor'
+    autoload :FileCache, 'rubyn_code/tools/file_cache'
+    autoload :SpecOutputParser, 'rubyn_code/tools/spec_output_parser'
   end
 
   # Layer 3: Permissions
@@ -111,6 +121,9 @@ module RubynCode
     autoload :AutoCompact, 'rubyn_code/context/auto_compact'
     autoload :ManualCompact, 'rubyn_code/context/manual_compact'
     autoload :ContextCollapse, 'rubyn_code/context/context_collapse'
+    autoload :ContextBudget, 'rubyn_code/context/context_budget'
+    autoload :SchemaFilter, 'rubyn_code/context/schema_filter'
+    autoload :DecisionCompactor, 'rubyn_code/context/decision_compactor'
   end
 
   # Layer 5: Skills
@@ -118,6 +131,7 @@ module RubynCode
     autoload :Loader, 'rubyn_code/skills/loader'
     autoload :Catalog, 'rubyn_code/skills/catalog'
     autoload :Document, 'rubyn_code/skills/document'
+    autoload :TtlManager, 'rubyn_code/skills/ttl_manager'
   end
 
   # Layer 6: Sub-Agents
@@ -176,6 +190,8 @@ module RubynCode
     autoload :BudgetEnforcer, 'rubyn_code/observability/budget_enforcer'
     autoload :UsageReporter, 'rubyn_code/observability/usage_reporter'
     autoload :Models, 'rubyn_code/observability/models'
+    autoload :TokenAnalytics, 'rubyn_code/observability/token_analytics'
+    autoload :SkillAnalytics, 'rubyn_code/observability/skill_analytics'
   end
 
   # Layer 14: Hooks
@@ -201,6 +217,12 @@ module RubynCode
     autoload :Instinct, 'rubyn_code/learning/instinct'
     autoload :InstinctMethods, 'rubyn_code/learning/instinct'
     autoload :Injector, 'rubyn_code/learning/injector'
+    autoload :Shortcut, 'rubyn_code/learning/shortcut'
+  end
+
+  # Codebase Index
+  module Index
+    autoload :CodebaseIndex, 'rubyn_code/index/codebase_index'
   end
 
   # CLI
