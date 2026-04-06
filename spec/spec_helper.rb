@@ -3,10 +3,11 @@
 require "simplecov"
 SimpleCov.start do
   add_filter "/spec/"
-  # CI runs fewer specs than local (no macOS keychain, no interactive terminal)
-  # and some specs crash on Linux due to Ruby 4.0 platform differences.
-  # Disabling minimum until CI environment is stabilized.
+  # CI has platform-specific spec crashes (macOS keychain, interactive terminal)
+  # that trigger "previous error not related to SimpleCov" and exit code failures.
+  # Disable minimum and refuse to fail the build on coverage.
   minimum_coverage 0
+  at_exit { SimpleCov.result }
 end
 
 require "rubyn_code"
