@@ -352,7 +352,7 @@ Works with Claude Pro, Max, Team, and Enterprise. Default model: **Claude Opus 4
 export OPENAI_API_KEY=sk-...
 ```
 
-Available models: `gpt-4o`, `gpt-4o-mini`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `o3`, `o4-mini`
+Available models: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-4o`, `gpt-4o-mini`, `o3`, `o4-mini`
 
 ### OpenAI-Compatible Providers (Groq, Together, Ollama, etc.)
 
@@ -416,6 +416,58 @@ permission_mode: autonomous
 # provider_base_url: http://localhost:11434/v1
 # model: llama3
 ```
+
+### Multi-Provider Model Routing
+
+Rubyn can automatically route tasks to different AI models based on complexity. Simple tasks (file search, git ops) use cheap, fast models. Complex tasks (architecture, security review) use the most capable model. Configure per-provider model tiers in `config.yml`:
+
+```yaml
+# ~/.rubyn-code/config.yml
+provider: anthropic
+model: claude-opus-4-6
+
+providers:
+  anthropic:
+    env_key: ANTHROPIC_API_KEY
+    models:
+      cheap: claude-haiku-4-5      # file search, git ops, formatting
+      mid: claude-sonnet-4-6       # code gen, specs, refactors, reviews
+      top: claude-opus-4-6         # architecture, security, complex work
+
+  openai:
+    env_key: OPENAI_API_KEY
+    models:
+      cheap: gpt-5.4-nano          # lightweight tasks
+      mid: gpt-5.4-mini            # regular coding
+      top: gpt-5.4                 # complex reasoning
+
+  groq:
+    base_url: https://api.groq.com/openai/v1
+    env_key: GROQ_API_KEY
+    models:
+      cheap: llama-3-8b
+      mid: llama-3-70b
+    pricing:
+      llama-3-8b: [0.05, 0.08]    # [input_rate, output_rate] per million tokens
+      llama-3-70b: [0.59, 0.79]
+
+  ollama:
+    base_url: http://localhost:11434/v1
+    models:
+      cheap: llama3
+      mid: llama3
+      top: llama3
+```
+
+**How it works:** When you ask Rubyn to do something, the Model Router detects the task type and picks the right tier. If you've configured model tiers for a provider, those are used first. Otherwise it falls back to the built-in defaults (Anthropic for all tiers).
+
+| Tier | Task types | Default model |
+|------|-----------|---------------|
+| **cheap** | File search, git ops, formatting, summaries | `claude-haiku-4-5` |
+| **mid** | Code generation, specs, refactors, code review, bug fixes | `claude-sonnet-4-6` |
+| **top** | Architecture, security review, complex refactors, planning | `claude-opus-4-6` |
+
+You can also set custom pricing per model so `/cost` reports accurate spending for third-party providers.
 
 ## Development
 
