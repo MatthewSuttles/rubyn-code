@@ -58,7 +58,24 @@ RSpec.describe RubynCode::LLM::ModelRouter do
 
     it 'returns first preferred when available_models is empty' do
       result = described_class.model_for(:generate_specs, available_models: [])
-      expect(result).to eq('claude-sonnet-4-20250514')
+      expect(result).to eq('claude-sonnet-4-6')
+    end
+  end
+
+  describe '.resolve' do
+    it 'returns provider and model hash for a task type' do
+      result = described_class.resolve(:file_search)
+      expect(result).to eq({ provider: 'anthropic', model: 'claude-haiku-4-5' })
+    end
+
+    it 'returns top-tier provider and model for architecture' do
+      result = described_class.resolve(:architecture)
+      expect(result).to eq({ provider: 'anthropic', model: 'claude-opus-4-6' })
+    end
+
+    it 'returns mid-tier for unknown tasks' do
+      result = described_class.resolve(:something_random)
+      expect(result).to eq({ provider: 'anthropic', model: 'claude-sonnet-4-6' })
     end
   end
 
