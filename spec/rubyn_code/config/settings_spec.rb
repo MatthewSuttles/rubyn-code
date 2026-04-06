@@ -136,6 +136,109 @@ RSpec.describe RubynCode::Config::Settings do
     end
   end
 
+  describe 'seed_config!' do
+    it 'creates config.yml on first run with default providers' do
+      settings = described_class.new(config_path: config_path)
+      expect(File.exist?(config_path)).to be true
+      data = YAML.safe_load(File.read(config_path))
+      expect(data['provider']).to eq('anthropic')
+      expect(data['model']).to eq('claude-opus-4-6')
+      expect(data['providers']['anthropic']['env_key']).to eq('ANTHROPIC_API_KEY')
+      expect(data['providers']['openai']['env_key']).to eq('OPENAI_API_KEY')
+    end
+
+    it 'does not overwrite an existing config' do
+      File.write(config_path, YAML.dump('model' => 'custom-model'))
+      settings = described_class.new(config_path: config_path)
+      expect(settings.model).to eq('custom-model')
+    end
+  end
+
+  describe '#add_provider' do
+    it 'adds a provider and persists to disk' do
+      settings = described_class.new(config_path: config_path)
+      settings.add_provider('groq',
+                            base_url: 'https://api.groq.com/openai/v1',
+                            env_key: 'GROQ_API_KEY',
+                            models: %w[llama-3],
+                            pricing: { 'llama-3' => [0.10, 0.20] })
+
+      reloaded = described_class.new(config_path: config_path)
+      cfg = reloaded.provider_config('groq')
+      expect(cfg['base_url']).to eq('https://api.groq.com/openai/v1')
+      expect(cfg['env_key']).to eq('GROQ_API_KEY')
+      expect(cfg['models']).to eq(%w[llama-3])
+      expect(cfg['pricing']).to eq('llama-3' => [0.10, 0.20])
+    end
+
+    it 'omits optional fields when not provided' do
+      settings = described_class.new(config_path: config_path)
+      settings.add_provider('ollama', base_url: 'http://localhost:11434/v1')
+
+      reloaded = described_class.new(config_path: config_path)
+      cfg = reloaded.provider_config('ollama')
+      expect(cfg['base_url']).to eq('http://localhost:11434/v1')
+      expect(cfg).not_to have_key('env_key')
+      expect(cfg).not_to have_key('models')
+      expect(cfg).not_to have_key('pricing')
+    end
+  end
+
+  describe '#provider_config' do
+    it 'returns nil for unconfigured providers' do
+      settings = described_class.new(config_path: config_path)
+      expect(settings.provider_config('minimax')).to be_nil
+    end
+
+    it 'returns config hash for a configured provider' do
+      File.write(config_path, YAML.dump(
+        'providers' => {
+          'minimax' => {
+            'base_url' => 'https://api.minimax.chat/v1',
+            'env_key' => 'MINIMAX_API_KEY',
+            'models' => ['M1'],
+            'pricing' => { 'M1' => [0.50, 2.00] }
+          }
+        }
+      ))
+      settings = described_class.new(config_path: config_path)
+      cfg = settings.provider_config('minimax')
+      expect(cfg['base_url']).to eq('https://api.minimax.chat/v1')
+      expect(cfg['models']).to eq(['M1'])
+    end
+  end
+
+  describe '#custom_pricing' do
+    it 'returns empty hash when no providers configured' do
+      settings = described_class.new(config_path: config_path)
+      expect(settings.custom_pricing).to eq({})
+    end
+
+    it 'returns pricing from configured providers' do
+      File.write(config_path, YAML.dump(
+        'providers' => {
+          'minimax' => {
+            'pricing' => { 'M1' => [0.50, 2.00] }
+          }
+        }
+      ))
+      settings = described_class.new(config_path: config_path)
+      expect(settings.custom_pricing).to eq('M1' => [0.50, 2.00])
+    end
+
+    it 'skips malformed pricing entries' do
+      File.write(config_path, YAML.dump(
+        'providers' => {
+          'minimax' => {
+            'pricing' => { 'M1' => [0.50] }
+          }
+        }
+      ))
+      settings = described_class.new(config_path: config_path)
+      expect(settings.custom_pricing).to eq({})
+    end
+  end
+
   describe '#to_h' do
     it 'merges defaults with overrides' do
       settings = described_class.new(config_path: File.join(config_dir, 'nonexistent.yml'))

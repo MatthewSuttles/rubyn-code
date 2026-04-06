@@ -151,16 +151,12 @@ module RubynCode
 
         @conversation.add_assistant_message(response_content(response))
 
-        # Compact after the response if context is over threshold —
-        # like Claude Code, pause for compaction before the next turn
+        # Compact after the response if context is over threshold
         compact_if_needed
 
         text
       end
 
-      # Empty LLM response (0 content blocks). Common after dispatching
-      # background_run — the LLM has nothing to say until results arrive.
-      # Wait briefly for jobs, then either continue or return empty.
       # Empty LLM response (0 content blocks). Common after dispatching
       # background_run — the LLM has nothing to say until results arrive.
       # Wait briefly for jobs, then either continue or accept the empty response.

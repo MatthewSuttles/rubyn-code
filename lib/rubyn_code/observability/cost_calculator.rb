@@ -9,9 +9,19 @@ module RubynCode
     module CostCalculator
       # Per-million-token rates: { model_prefix => [input_rate, output_rate] }
       PRICING = {
+        # Anthropic
         'claude-haiku-4-5' => [1.00, 5.00],
         'claude-sonnet-4-20250514' => [3.00, 15.00],
-        'claude-opus-4-20250514' => [15.00, 75.00]
+        'claude-opus-4-20250514' => [15.00, 75.00],
+        'claude-opus-4-6' => [15.00, 75.00],
+        # OpenAI
+        'gpt-4o' => [2.50, 10.00],
+        'gpt-4o-mini' => [0.15, 0.60],
+        'gpt-4.1' => [2.00, 8.00],
+        'gpt-4.1-mini' => [0.40, 1.60],
+        'gpt-4.1-nano' => [0.10, 0.40],
+        'o3' => [2.00, 8.00],
+        'o4-mini' => [1.10, 4.40]
       }.freeze
 
       CACHE_READ_DISCOUNT  = 0.1
@@ -47,6 +57,10 @@ module RubynCode
         end
 
         def rates_for(model)
+          # User-configured pricing takes priority
+          custom = config_pricing(model)
+          return custom if custom
+
           return PRICING[model] if PRICING.key?(model)
 
           # Try prefix match (e.g., "claude-sonnet-4-20250514-v2" matches "claude-sonnet-4-20250514")
@@ -56,6 +70,14 @@ module RubynCode
 
           # Conservative fallback: use the most expensive known model
           PRICING.max_by { |_, rates| rates.first }.last
+        end
+
+        def config_pricing(model)
+          settings = Config::Settings.new
+          custom = settings.custom_pricing
+          custom[model]
+        rescue StandardError
+          nil
         end
       end
     end

@@ -81,13 +81,16 @@ module RubynCode
       end
 
       def ensure_auth!
-        unless Auth::TokenStore.valid?
-          @renderer.error('No valid authentication found.')
-          @renderer.info('Run `rubyn-code --auth` or set ANTHROPIC_API_KEY first.')
+        provider = @daemon_opts.fetch(:provider, Config::Defaults::DEFAULT_PROVIDER)
+
+        unless Auth::TokenStore.load_for_provider(provider)
+          @renderer.error("No valid authentication found for provider '#{provider}'.")
+          env_key = Config::Defaults::PROVIDER_ENV_KEYS.fetch(provider, "#{provider.upcase}_API_KEY")
+          @renderer.info("Set #{env_key} or run `rubyn-code --auth`.")
           exit(1)
         end
 
-        @llm_client = LLM::Client.new
+        @llm_client = LLM::Client.new(provider: provider)
       end
 
       def setup_database!
