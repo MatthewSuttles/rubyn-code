@@ -7,7 +7,8 @@ RSpec.describe RubynCode::LLM::ModelRouter do
     settings = instance_double(
       RubynCode::Config::Settings,
       to_h: { 'providers' => {} },
-      provider_config: nil
+      provider_config: nil,
+      provider: 'anthropic'
     )
     allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
   end
@@ -72,6 +73,28 @@ RSpec.describe RubynCode::LLM::ModelRouter do
       expect(result).to eq('claude-sonnet-4-6')
     end
 
+    context 'when active provider is openai with no tier config' do
+      before do
+        settings = instance_double(
+          RubynCode::Config::Settings,
+          to_h: { 'providers' => {} },
+          provider_config: nil,
+          provider: 'openai'
+        )
+        allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+      end
+
+      it 'falls back to openai defaults instead of anthropic' do
+        result = described_class.model_for(:file_search)
+        expect(result).to eq('gpt-5.4-nano')
+      end
+
+      it 'uses openai top-tier for architecture' do
+        result = described_class.model_for(:architecture)
+        expect(result).to eq('gpt-5.4')
+      end
+    end
+
     context 'with per-provider config overrides' do
       before do
         settings = instance_double(
@@ -84,18 +107,14 @@ RSpec.describe RubynCode::LLM::ModelRouter do
               }
             }
           },
-          provider_config: nil
+          provider_config: nil,
+          provider: 'anthropic'
         )
         allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
       end
 
       it 'prefers config-defined model over hardcoded default' do
         result = described_class.model_for(:file_search, available_models: ['gpt-5.4-nano'])
-        expect(result).to eq('gpt-5.4-nano')
-      end
-
-      it 'uses config model as first choice when no available_models filter' do
-        result = described_class.model_for(:file_search)
         expect(result).to eq('gpt-5.4-nano')
       end
     end
@@ -117,6 +136,50 @@ RSpec.describe RubynCode::LLM::ModelRouter do
       expect(result).to eq({ provider: 'anthropic', model: 'claude-sonnet-4-6' })
     end
 
+    context 'when active provider is openai with no tier config' do
+      before do
+        settings = instance_double(
+          RubynCode::Config::Settings,
+          to_h: { 'providers' => {} },
+          provider_config: nil,
+          provider: 'openai'
+        )
+        allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+      end
+
+      it 'resolves to openai defaults for cheap tasks' do
+        result = described_class.resolve(:file_search)
+        expect(result).to eq({ provider: 'openai', model: 'gpt-5.4-nano' })
+      end
+    end
+
+    context 'when active provider has no tiers in TIER_DEFAULTS' do
+      before do
+        settings = instance_double(
+          RubynCode::Config::Settings,
+          to_h: {
+            'providers' => {
+              'minimax' => { 'base_url' => 'https://api.minimax.chat' }
+            }
+          },
+          provider_config: { 'base_url' => 'https://api.minimax.chat' },
+          provider: 'minimax',
+          model: 'minimax-01'
+        )
+        allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+      end
+
+      it 'uses the configured model for all tiers since minimax has no tier entries' do
+        result = described_class.resolve(:file_search)
+        expect(result).to eq({ provider: 'minimax', model: 'minimax-01' })
+      end
+
+      it 'uses the configured model even for top-tier tasks' do
+        result = described_class.resolve(:architecture)
+        expect(result).to eq({ provider: 'minimax', model: 'minimax-01' })
+      end
+    end
+
     context 'with per-provider config overrides' do
       before do
         settings = instance_double(
@@ -129,7 +192,8 @@ RSpec.describe RubynCode::LLM::ModelRouter do
               }
             }
           },
-          provider_config: { 'base_url' => 'https://api.groq.com' }
+          provider_config: { 'base_url' => 'https://api.groq.com' },
+          provider: 'anthropic'
         )
         allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
       end
@@ -140,7 +204,7 @@ RSpec.describe RubynCode::LLM::ModelRouter do
         expect(result[:model]).to eq('llama-3-8b')
       end
 
-      it 'falls back to defaults for tiers not configured' do
+      it 'falls back to active provider defaults for tiers not configured' do
         result = described_class.resolve(:architecture)
         expect(result[:provider]).to eq('anthropic')
         expect(result[:model]).to eq('claude-opus-4-6')

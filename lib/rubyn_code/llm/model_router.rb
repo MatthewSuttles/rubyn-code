@@ -83,49 +83,49 @@ module RubynCode
         # @param task_type [Symbol]
         # @param client [LLM::Client, nil] active client (for provider checks)
         # @return [Hash] { provider:, model: }
-        def resolve(task_type, client: nil)
+        def resolve(task_type, client: nil) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- multi-source fallback chain
           tier = tier_for(task_type)
+          active = active_provider
 
-          # 1. Check config overrides for each available provider
+          # 1. Config overrides — prefer the active provider's config
           configured = config_tier_models(tier)
-          configured.each do |provider, model|
-            return { provider: provider, model: model } if client.nil? || provider_available?(provider)
+          active_cfg = configured.find { |p, _| p == active }
+          return pair_to_hash(active_cfg) if active_cfg
+
+          # 2. Any other configured provider
+          configured.each do |pair|
+            return pair_to_hash(pair) if client.nil? || provider_available?(pair[0])
           end
 
-          # 2. Fall back to hardcoded defaults
-          TIER_DEFAULTS[tier].each do |provider, model|
-            return { provider: provider, model: model } if client.nil? || provider_available?(provider)
+          # 3. Hardcoded defaults — prefer the active provider
+          defaults = TIER_DEFAULTS[tier]
+          active_default = defaults.find { |p, _| p == active }
+          return pair_to_hash(active_default) if active_default
+
+          # 4. Active provider not in defaults (e.g. minimax) — use their configured model for all tiers
+          return { provider: active, model: active_model } if provider_available?(active)
+
+          # 5. Any available default
+          defaults.each do |pair|
+            return pair_to_hash(pair) if client.nil? || provider_available?(pair[0])
           end
 
-          # 3. Last resort: first default
-          first = TIER_DEFAULTS[tier].first
-          { provider: first[0], model: first[1] }
+          pair_to_hash(defaults.first)
         end
 
         # Returns just the model name for a task type (backward-compatible).
-        def model_for(task_type, available_models: []) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- config + defaults search
+        # -- config + defaults search
+        def model_for(task_type, available_models: [])
           tier = tier_for(task_type)
+          candidates = build_candidate_list(tier)
 
-          # Check config overrides first
-          configured = config_tier_models(tier)
-          if available_models.any? && configured.any?
-            configured.each do |pair|
-              model = pair[1]
-              return model if available_models.any? { |m| m.start_with?(model) }
-            end
-          end
-
-          # Then check hardcoded defaults
-          defaults = TIER_DEFAULTS[tier]
           if available_models.any?
-            defaults.each do |pair|
-              model = pair[1]
-              return model if available_models.any? { |m| m.start_with?(model) }
+            candidates.each do |pair|
+              return pair[1] if available_models.any? { |m| m.start_with?(pair[1]) }
             end
           end
 
-          # Fall back to first configured or first default
-          configured.any? ? configured.first[1] : defaults.first[1]
+          candidates.first&.at(1) || TIER_DEFAULTS[tier].first[1]
         end
 
         # Detect task type from a user message and recent tool calls.
@@ -139,6 +139,43 @@ module RubynCode
         end
 
         private
+
+        def pair_to_hash(pair)
+          { provider: pair[0], model: pair[1] }
+        end
+
+        # Returns the user's active provider and model from config.
+        def active_provider
+          Config::Settings.new.provider
+        rescue StandardError
+          Config::Defaults::DEFAULT_PROVIDER
+        end
+
+        def active_model
+          Config::Settings.new.model
+        rescue StandardError
+          Config::Defaults::DEFAULT_MODEL
+        end
+
+        # Builds an ordered candidate list: active provider first, then others.
+        # If the active provider isn't in TIER_DEFAULTS or config, the user's
+        # configured model is used as a catch-all for every tier.
+        def build_candidate_list(tier)
+          active = active_provider
+          configured = config_tier_models(tier)
+          defaults = TIER_DEFAULTS[tier]
+          all = configured + defaults.to_a
+
+          # Sort: active provider's entries first, then the rest
+          active_entries, others = all.partition { |p, _| p == active }
+          result = (active_entries + others).uniq { |_, m| m }
+
+          # If the active provider has no entries at all, add the user's
+          # configured model as a fallback so unknown providers still work
+          result.unshift([active, active_model]) if result.none? { |p, _| p == active }
+
+          result
+        end
 
         # Read per-provider model tier overrides from config.yml.
         # Returns array of [provider, model] pairs for the given tier.
