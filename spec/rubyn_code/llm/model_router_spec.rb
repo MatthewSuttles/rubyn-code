@@ -1,6 +1,17 @@
 # frozen_string_literal: true
 
 RSpec.describe RubynCode::LLM::ModelRouter do
+  # Stub Settings so config_tier_models returns [] (no config overrides)
+  # unless a specific test sets up overrides.
+  before do
+    settings = instance_double(
+      RubynCode::Config::Settings,
+      to_h: { 'providers' => {} },
+      provider_config: nil
+    )
+    allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+  end
+
   describe '.tier_for' do
     it 'returns :cheap for file_search' do
       expect(described_class.tier_for(:file_search)).to eq(:cheap)
@@ -38,44 +49,102 @@ RSpec.describe RubynCode::LLM::ModelRouter do
   end
 
   describe '.model_for' do
-    it 'returns the first preferred model for a task tier' do
-      expect(described_class.model_for(:file_search)).to eq('claude-haiku-5-4')
+    it 'returns the first preferred model for a cheap task' do
+      expect(described_class.model_for(:file_search)).to eq('claude-haiku-4-5')
     end
 
     it 'returns a top-tier model for architecture tasks' do
-      expect(described_class.model_for(:architecture)).to eq('claude-opus-5-4')
+      expect(described_class.model_for(:architecture)).to eq('claude-opus-4-6')
     end
 
     it 'filters by available_models when provided' do
-      result = described_class.model_for(:file_search, available_models: ['gpt-4o-mini-2024'])
-      expect(result).to eq('gpt-4o-mini')
+      result = described_class.model_for(:file_search, available_models: ['gpt-5.4-nano-2026'])
+      expect(result).to eq('gpt-5.4-nano')
     end
 
     it 'falls back to first preferred when no available models match' do
       result = described_class.model_for(:file_search, available_models: ['nonexistent-model'])
-      expect(result).to eq('claude-haiku-5-4')
+      expect(result).to eq('claude-haiku-4-5')
     end
 
     it 'returns first preferred when available_models is empty' do
       result = described_class.model_for(:generate_specs, available_models: [])
-      expect(result).to eq('claude-sonnet-5-4')
+      expect(result).to eq('claude-sonnet-4-6')
+    end
+
+    context 'with per-provider config overrides' do
+      before do
+        settings = instance_double(
+          RubynCode::Config::Settings,
+          to_h: {
+            'providers' => {
+              'openai' => {
+                'env_key' => 'OPENAI_API_KEY',
+                'models' => { 'cheap' => 'gpt-5.4-nano', 'mid' => 'gpt-5.4-mini', 'top' => 'gpt-5.4' }
+              }
+            }
+          },
+          provider_config: nil
+        )
+        allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+      end
+
+      it 'prefers config-defined model over hardcoded default' do
+        result = described_class.model_for(:file_search, available_models: ['gpt-5.4-nano'])
+        expect(result).to eq('gpt-5.4-nano')
+      end
+
+      it 'uses config model as first choice when no available_models filter' do
+        result = described_class.model_for(:file_search)
+        expect(result).to eq('gpt-5.4-nano')
+      end
     end
   end
 
   describe '.resolve' do
-    it 'returns provider and model hash for a task type' do
+    it 'returns provider and model hash for a cheap task' do
       result = described_class.resolve(:file_search)
-      expect(result).to eq({ provider: 'anthropic', model: 'claude-haiku-5-4' })
+      expect(result).to eq({ provider: 'anthropic', model: 'claude-haiku-4-5' })
     end
 
     it 'returns top-tier provider and model for architecture' do
       result = described_class.resolve(:architecture)
-      expect(result).to eq({ provider: 'anthropic', model: 'claude-opus-5-4' })
+      expect(result).to eq({ provider: 'anthropic', model: 'claude-opus-4-6' })
     end
 
     it 'returns mid-tier for unknown tasks' do
       result = described_class.resolve(:something_random)
-      expect(result).to eq({ provider: 'anthropic', model: 'claude-sonnet-5-4' })
+      expect(result).to eq({ provider: 'anthropic', model: 'claude-sonnet-4-6' })
+    end
+
+    context 'with per-provider config overrides' do
+      before do
+        settings = instance_double(
+          RubynCode::Config::Settings,
+          to_h: {
+            'providers' => {
+              'groq' => {
+                'base_url' => 'https://api.groq.com',
+                'models' => { 'cheap' => 'llama-3-8b', 'mid' => 'llama-3-70b' }
+              }
+            }
+          },
+          provider_config: { 'base_url' => 'https://api.groq.com' }
+        )
+        allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+      end
+
+      it 'uses config-defined provider and model when available' do
+        result = described_class.resolve(:file_search)
+        expect(result[:provider]).to eq('groq')
+        expect(result[:model]).to eq('llama-3-8b')
+      end
+
+      it 'falls back to defaults for tiers not configured' do
+        result = described_class.resolve(:architecture)
+        expect(result[:provider]).to eq('anthropic')
+        expect(result[:model]).to eq('claude-opus-4-6')
+      end
     end
   end
 

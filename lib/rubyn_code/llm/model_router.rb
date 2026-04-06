@@ -3,9 +3,25 @@
 module RubynCode
   module LLM
     # Routes tasks to appropriate model tiers based on complexity.
-    # Integrates with the multi-provider adapter layer — resolves models
-    # against configured providers and falls back to the active provider
-    # when a preferred model isn't available.
+    # Integrates with the multi-provider adapter layer and reads
+    # per-provider model tier overrides from config.yml.
+    #
+    # Users can configure tier models per provider in config.yml:
+    #
+    #   providers:
+    #     anthropic:
+    #       env_key: ANTHROPIC_API_KEY
+    #       models:
+    #         cheap: claude-haiku-4-5
+    #         mid: claude-sonnet-4-6
+    #         top: claude-opus-4-6
+    #     openai:
+    #       env_key: OPENAI_API_KEY
+    #       models:
+    #         cheap: gpt-5.4-nano
+    #         mid: gpt-5.4-mini
+    #         top: gpt-5.4
+    #
     module ModelRouter # rubocop:disable Metrics/ModuleLength -- tier routing with provider integration
       TASK_TIERS = {
         cheap: %i[
@@ -22,23 +38,19 @@ module RubynCode
         ].freeze
       }.freeze
 
-      # Default model preferences per tier. Each entry is [provider, model].
-      # Uses stable model IDs (no date suffixes) so they resolve to the latest
-      # version via prefix matching in CostCalculator and the provider API.
+      # Hardcoded fallbacks when no config override exists.
       TIER_DEFAULTS = {
         cheap: [
-          %w[anthropic claude-haiku-5-4],
-          %w[openai gpt-4o-mini],
-          %w[openai gpt-4.1-nano]
+          %w[anthropic claude-haiku-4-5],
+          %w[openai gpt-5.4-nano]
         ].freeze,
         mid: [
-          %w[anthropic claude-sonnet-5-4],
-          %w[openai gpt-4o],
-          %w[openai gpt-4.1]
+          %w[anthropic claude-sonnet-4-6],
+          %w[openai gpt-5.4-mini]
         ].freeze,
         top: [
-          %w[anthropic claude-opus-5-4],
-          %w[openai o3]
+          %w[anthropic claude-opus-4-6],
+          %w[openai gpt-5.4]
         ].freeze
       }.freeze
 
@@ -57,9 +69,6 @@ module RubynCode
 
       class << self
         # Determine the appropriate model tier for a task.
-        #
-        # @param task_type [Symbol] the type of task
-        # @return [Symbol] :cheap, :mid, or :top
         def tier_for(task_type)
           TASK_TIERS.each do |tier, tasks|
             return tier if tasks.include?(task_type.to_sym)
@@ -67,36 +76,47 @@ module RubynCode
           :mid
         end
 
-        # Resolve the best [provider, model] pair for a task type,
-        # checking which providers are actually configured.
+        # Resolve the best [provider, model] pair for a task type.
+        # Checks per-provider config overrides first, then falls back
+        # to TIER_DEFAULTS.
         #
-        # @param task_type [Symbol] the type of task
-        # @param client [LLM::Client, nil] the active LLM client (for provider checks)
-        # @return [Hash] { provider:, model: } or nil to use current
+        # @param task_type [Symbol]
+        # @param client [LLM::Client, nil] active client (for provider checks)
+        # @return [Hash] { provider:, model: }
         def resolve(task_type, client: nil)
           tier = tier_for(task_type)
-          defaults = TIER_DEFAULTS[tier]
 
-          if client
-            defaults.each do |provider, model|
-              return { provider: provider, model: model } if provider_available?(provider)
-            end
+          # 1. Check config overrides for each available provider
+          configured = config_tier_models(tier)
+          configured.each do |provider, model|
+            return { provider: provider, model: model } if client.nil? || provider_available?(provider)
           end
 
-          first = defaults.first
+          # 2. Fall back to hardcoded defaults
+          TIER_DEFAULTS[tier].each do |provider, model|
+            return { provider: provider, model: model } if client.nil? || provider_available?(provider)
+          end
+
+          # 3. Last resort: first default
+          first = TIER_DEFAULTS[tier].first
           { provider: first[0], model: first[1] }
         end
 
-        # Returns just the model name for a task type.
-        # Backward-compatible — does not require a client.
-        #
-        # @param task_type [Symbol]
-        # @param available_models [Array<String>] models the user has access to
-        # @return [String] the model identifier
-        def model_for(task_type, available_models: [])
+        # Returns just the model name for a task type (backward-compatible).
+        def model_for(task_type, available_models: []) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- config + defaults search
           tier = tier_for(task_type)
-          defaults = TIER_DEFAULTS[tier]
 
+          # Check config overrides first
+          configured = config_tier_models(tier)
+          if available_models.any? && configured.any?
+            configured.each do |pair|
+              model = pair[1]
+              return model if available_models.any? { |m| m.start_with?(model) }
+            end
+          end
+
+          # Then check hardcoded defaults
+          defaults = TIER_DEFAULTS[tier]
           if available_models.any?
             defaults.each do |pair|
               model = pair[1]
@@ -104,7 +124,8 @@ module RubynCode
             end
           end
 
-          defaults.first[1]
+          # Fall back to first configured or first default
+          configured.any? ? configured.first[1] : defaults.first[1]
         end
 
         # Detect task type from a user message and recent tool calls.
@@ -119,7 +140,31 @@ module RubynCode
 
         private
 
-        # Check if a provider is available (built-in or user-configured).
+        # Read per-provider model tier overrides from config.yml.
+        # Returns array of [provider, model] pairs for the given tier.
+        # -- config traversal
+        def config_tier_models(tier)
+          settings = Config::Settings.new
+          providers = settings.to_h['providers']
+          return [] unless providers.is_a?(Hash)
+
+          tier_key = tier.to_s
+          results = []
+
+          providers.each do |provider_name, cfg|
+            next unless cfg.is_a?(Hash)
+
+            models = cfg['models']
+            next unless models.is_a?(Hash) && models[tier_key]
+
+            results << [provider_name, models[tier_key]]
+          end
+
+          results
+        rescue StandardError
+          []
+        end
+
         def provider_available?(provider)
           return true if %w[anthropic openai].include?(provider)
 

@@ -11,7 +11,7 @@ module RubynCode
       MEMORIES_DIR = File.join(HOME_DIR, 'memories')
 
       DEFAULT_PROVIDER = 'anthropic'
-      DEFAULT_MODEL = 'claude-opus-5-4'
+      DEFAULT_MODEL = 'claude-opus-4-6'
       MAX_ITERATIONS = 200
       MAX_SUB_AGENT_ITERATIONS = 200
       MAX_EXPLORE_AGENT_ITERATIONS = 200
