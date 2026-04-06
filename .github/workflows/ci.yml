@@ -22,14 +22,8 @@ jobs:
           ruby-version: ${{ matrix.ruby-version }}
           bundler-cache: true
 
-      - name: Debug - test single spec file
-        run: bundle exec rspec spec/rubyn_code/cli/app_spec.rb --format documentation 2>&1 || true
-      - name: Debug - test config spec
-        run: bundle exec rspec spec/rubyn_code/config/settings_spec.rb --format documentation 2>&1 || true
-      - name: Debug - test context spec
-        run: bundle exec rspec spec/rubyn_code/context/manager_spec.rb --format documentation 2>&1 || true
       - name: Run specs
-        run: bundle exec rspec --format progress --order defined
+        run: bundle exec rspec --format progress
 
   lint:
     runs-on: ubuntu-latest
