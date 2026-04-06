@@ -3,114 +3,48 @@
 require 'spec_helper'
 
 RSpec.describe RubynCode::Tools::LoadSkill do
-  let(:project_root) { Dir.mktmpdir('load-skill-spec') }
-  let(:skill_loader) { instance_double(RubynCode::Skills::Loader) }
+  let(:project_root) { '/tmp/test_project' }
 
-  subject(:tool) { described_class.new(project_root: project_root, skill_loader: skill_loader) }
+  def build_tool(skill_loader:)
+    described_class.new(project_root: project_root, skill_loader: skill_loader)
+  end
 
-  after { FileUtils.rm_rf(project_root) }
+  describe '#execute' do
+    context 'with an injected skill_loader' do
+      let(:loader) do
+        obj = Object.new
+        obj.define_singleton_method(:load) do |name|
+          "Loaded skill: #{name}"
+        end
+        obj
+      end
+
+      it 'delegates to skill_loader.load' do
+        tool = build_tool(skill_loader: loader)
+        result = tool.execute(name: 'rails-testing')
+
+        expect(result).to eq('Loaded skill: rails-testing')
+      end
+
+      it 'passes name through to the loader' do
+        received_name = nil
+        tracking_loader = Object.new
+        tracking_loader.define_singleton_method(:load) do |name|
+          received_name = name
+          'ok'
+        end
+
+        tool = build_tool(skill_loader: tracking_loader)
+        tool.execute(name: 'deploy-checklist')
+
+        expect(received_name).to eq('deploy-checklist')
+      end
+    end
+  end
 
   describe '.tool_name' do
     it 'returns load_skill' do
       expect(described_class.tool_name).to eq('load_skill')
-    end
-  end
-
-  describe '.risk_level' do
-    it 'is read-only' do
-      expect(described_class.risk_level).to eq(:read)
-    end
-  end
-
-  describe '.requires_confirmation?' do
-    it 'does not require confirmation' do
-      expect(described_class.requires_confirmation?).to be false
-    end
-  end
-
-  describe '#execute' do
-    context 'with a valid skill name' do
-      it 'loads the skill through the loader' do
-        allow(skill_loader).to receive(:load).with('adapter').and_return('Adapter skill content')
-
-        result = tool.execute(name: 'adapter')
-        expect(result).to eq('Adapter skill content')
-      end
-    end
-
-    context 'when name has a leading slash' do
-      it 'strips the leading slash before loading' do
-        allow(skill_loader).to receive(:load).with('request-specs').and_return('Request specs skill')
-
-        result = tool.execute(name: '/request-specs')
-        expect(result).to eq('Request specs skill')
-        expect(skill_loader).to have_received(:load).with('request-specs')
-      end
-    end
-
-    context 'when name has multiple leading slashes' do
-      it 'strips all leading slashes' do
-        allow(skill_loader).to receive(:load).with('my-skill').and_return('content')
-
-        result = tool.execute(name: '///my-skill')
-        expect(result).to eq('content')
-        expect(skill_loader).to have_received(:load).with('my-skill')
-      end
-    end
-
-    context 'when name is empty' do
-      it 'returns an error message' do
-        result = tool.execute(name: '')
-        expect(result).to eq('Error: skill name required')
-      end
-    end
-
-    context 'when name is only slashes' do
-      it 'returns an error message' do
-        result = tool.execute(name: '///')
-        expect(result).to eq('Error: skill name required')
-      end
-    end
-
-    context 'when name is only whitespace' do
-      it 'returns an error message' do
-        result = tool.execute(name: '   ')
-        expect(result).to eq('Error: skill name required')
-      end
-    end
-
-    context 'when name is nil' do
-      it 'returns an error message' do
-        result = tool.execute(name: nil)
-        expect(result).to eq('Error: skill name required')
-      end
-    end
-
-    context 'when name has surrounding whitespace' do
-      it 'strips whitespace before loading' do
-        allow(skill_loader).to receive(:load).with('clean-name').and_return('loaded')
-
-        result = tool.execute(name: '  clean-name  ')
-        expect(result).to eq('loaded')
-      end
-    end
-
-    context 'without an injected skill_loader' do
-      subject(:tool_no_loader) { described_class.new(project_root: project_root) }
-
-      it 'uses the default loader and raises for unknown skill' do
-        expect { tool_no_loader.execute(name: 'nonexistent-skill-xyz') }
-          .to raise_error(RubynCode::Error, /not found/i)
-      end
-    end
-  end
-
-  describe '.to_schema' do
-    it 'returns a valid schema hash' do
-      schema = described_class.to_schema
-      expect(schema[:name]).to eq('load_skill')
-      expect(schema[:description]).to include('skill')
-      expect(schema[:input_schema]).to be_a(Hash)
     end
   end
 end

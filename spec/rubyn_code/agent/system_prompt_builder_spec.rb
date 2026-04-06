@@ -2,8 +2,9 @@
 
 require 'spec_helper'
 
-# Force-load the Loop class which requires the builder module
-RubynCode::Agent::Loop
+# Load the module dependencies directly
+require_relative '../../../lib/rubyn_code/agent/prompts'
+require_relative '../../../lib/rubyn_code/agent/system_prompt_builder'
 
 RSpec.describe RubynCode::Agent::SystemPromptBuilder do
   # Create a host class that includes the module, simulating how Loop uses it.
