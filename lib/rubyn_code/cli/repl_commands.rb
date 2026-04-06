@@ -75,15 +75,13 @@ module RubynCode
         in { action: :set_plan_mode, enabled: true | false => enabled }
           apply_plan_mode(enabled)
         in { action: :set_session_id, session_id: String => sid }
-          @session_id = sid
+          start_new_session(sid)
         in { action: :set_model, model: String => model }
           apply_model(model)
         in { action: :set_provider, provider: String => provider, **rest }
           apply_provider(provider, rest[:model])
         in { action: :spawn_teammate, name: String => name, role: String => role }
           spawn_teammate(name, role)
-        in { action: :new_session, session_id: String => sid }
-          start_new_session(sid)
         else
           # Unknown result hash — ignore
         end
