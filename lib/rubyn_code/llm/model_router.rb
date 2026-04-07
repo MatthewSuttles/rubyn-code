@@ -27,10 +27,11 @@ module RubynCode
         cheap: %i[
           file_search spec_summary schema_lookup format_code
           git_operations memory_retrieval context_summary
+          chatting explore
         ].freeze,
         mid: %i[
           generate_specs simple_refactor code_review
-          documentation bug_fix explore
+          documentation bug_fix
         ].freeze,
         top: %i[
           architecture complex_refactor security_review
@@ -130,7 +131,7 @@ module RubynCode
 
         # Detect task type from a user message and recent tool calls.
         def detect_task(message, recent_tools: [])
-          detect_from_message(message) || detect_from_tools(recent_tools) || :explore
+          detect_from_message(message) || detect_from_tools(recent_tools) || :chatting
         end
 
         # Returns cost estimate multiplier for a tier relative to top tier.

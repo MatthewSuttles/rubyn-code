@@ -19,7 +19,7 @@ RSpec.describe RubynCode::LLM::ModelRouter do
     end
 
     it 'returns :cheap for other cheap tasks' do
-      %i[spec_summary schema_lookup format_code git_operations memory_retrieval context_summary].each do |task|
+      %i[spec_summary schema_lookup format_code git_operations memory_retrieval context_summary chatting explore].each do |task|
         expect(described_class.tier_for(task)).to eq(:cheap)
       end
     end
@@ -29,7 +29,7 @@ RSpec.describe RubynCode::LLM::ModelRouter do
     end
 
     it 'returns :mid for other mid tasks' do
-      %i[simple_refactor code_review documentation bug_fix explore].each do |task|
+      %i[simple_refactor code_review documentation bug_fix].each do |task|
         expect(described_class.tier_for(task)).to eq(:mid)
       end
     end
@@ -246,8 +246,8 @@ RSpec.describe RubynCode::LLM::ModelRouter do
         expect(described_class.detect_task('explain this code in a doc')).to eq(:documentation)
       end
 
-      it 'returns :explore for generic messages' do
-        expect(described_class.detect_task('hello world')).to eq(:explore)
+      it 'returns :chatting for generic messages' do
+        expect(described_class.detect_task('hello world')).to eq(:chatting)
       end
     end
 
