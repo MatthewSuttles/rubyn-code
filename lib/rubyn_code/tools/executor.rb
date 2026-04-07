@@ -15,9 +15,14 @@ module RubynCode
       end
 
       def execute(tool_name, params) # rubocop:disable Metrics/AbcSize -- maps tool errors to results
+        # File cache intercept: serve cached reads, invalidate on writes
+        cached = try_file_cache(tool_name, params)
+        return cached if cached
+
         tool = build_tool(tool_name)
         filtered = filter_params(tool, params)
         raw = tool.truncate(tool.execute(**filtered).to_s)
+        update_file_cache(tool_name, filtered, raw)
         @output_compressor.compress(tool_name, raw)
       rescue ToolNotFoundError => e
         error_result("Tool error: #{e.message}")
@@ -67,6 +72,41 @@ module RubynCode
       def inject_agent_deps(tool)
         tool.llm_client = @llm_client if tool.respond_to?(:llm_client=)
         tool.on_status = @on_agent_status if tool.respond_to?(:on_status=)
+      end
+
+      # Serve read_file from cache if the file hasn't changed.
+      def try_file_cache(tool_name, params)
+        return nil unless tool_name == 'read_file'
+
+        path = resolve_cache_path(params)
+        return nil unless path && @file_cache.cached?(path)
+
+        result = @file_cache.read(path)
+        result[:content]
+      rescue StandardError
+        nil
+      end
+
+      # Cache read_file results; invalidate on write_file/edit_file.
+      def update_file_cache(tool_name, params, _raw)
+        path = resolve_cache_path(params)
+        return unless path
+
+        case tool_name
+        when 'read_file' then @file_cache.read(path) # populates cache
+        when 'write_file', 'edit_file' then @file_cache.on_write(path)
+        end
+      rescue StandardError
+        nil
+      end
+
+      def resolve_cache_path(params)
+        p = params[:path] || params['path']
+        return nil unless p
+
+        File.expand_path(p, @project_root)
+      rescue StandardError
+        nil
       end
 
       def error_result(message)

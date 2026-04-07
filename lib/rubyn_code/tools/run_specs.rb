@@ -75,7 +75,7 @@ module RubynCode
 
       def build_output(stdout, stderr, status)
         parts = []
-        parts << stdout unless stdout.empty?
+        parts << SpecOutputParser.parse(stdout) unless stdout.empty?
         parts << "STDERR:\n#{stderr}" unless stderr.empty?
         parts << "Exit code: #{status.exitstatus}" unless status.success?
         parts.empty? ? '(no output)' : parts.join("\n")

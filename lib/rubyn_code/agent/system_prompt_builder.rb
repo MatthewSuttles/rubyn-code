@@ -20,6 +20,7 @@ module RubynCode
         parts << "Working directory: #{@project_root}" if @project_root
         append_response_mode(parts)
         append_project_profile(parts)
+        append_codebase_index(parts)
         append_memories(parts)
         append_project_instructions(parts)
         append_instincts(parts)
@@ -56,6 +57,18 @@ module RubynCode
 
         prompt_text = profile.to_prompt
         parts << "\n## #{prompt_text}" unless prompt_text.empty?
+      rescue StandardError
+        nil
+      end
+
+      def append_codebase_index(parts)
+        return unless @project_root
+
+        index = Index::CodebaseIndex.new(project_root: @project_root)
+        loaded = index.load
+        return unless loaded && index.nodes.any?
+
+        parts << "\n## #{index.to_prompt_summary}"
       rescue StandardError
         nil
       end

@@ -45,6 +45,7 @@ module RubynCode
         ensure_home_directory!
         seed_config! unless File.exist?(@config_path)
         load!
+        backfill_provider_models!
       end
 
       # Define accessor methods for each configurable key
@@ -131,32 +132,48 @@ module RubynCode
         end
       end
 
+      # Default model tiers per built-in provider. Used by seed_config! and
+      # backfill_provider_models! so new and existing configs stay in sync.
+      DEFAULT_PROVIDER_MODELS = {
+        'anthropic' => {
+          'env_key' => 'ANTHROPIC_API_KEY',
+          'models' => { 'cheap' => 'claude-haiku-4-5', 'mid' => 'claude-sonnet-4-6', 'top' => 'claude-opus-4-6' }
+        },
+        'openai' => {
+          'env_key' => 'OPENAI_API_KEY',
+          'models' => { 'cheap' => 'gpt-5.4-nano', 'mid' => 'gpt-5.4-mini', 'top' => 'gpt-5.4' }
+        }
+      }.freeze
+
       private
 
       def seed_config!
         @data = {
           'provider' => Defaults::DEFAULT_PROVIDER,
           'model' => Defaults::DEFAULT_MODEL,
-          'providers' => {
-            'anthropic' => {
-              'env_key' => 'ANTHROPIC_API_KEY',
-              'models' => {
-                'cheap' => 'claude-haiku-4-5',
-                'mid' => 'claude-sonnet-4-6',
-                'top' => 'claude-opus-4-6'
-              }
-            },
-            'openai' => {
-              'env_key' => 'OPENAI_API_KEY',
-              'models' => {
-                'cheap' => 'gpt-5.4-nano',
-                'mid' => 'gpt-5.4-mini',
-                'top' => 'gpt-5.4'
-              }
-            }
-          }
+          'providers' => DEFAULT_PROVIDER_MODELS.transform_values(&:dup)
         }
         save!
+      end
+
+      # Backfills missing 'models' keys into existing provider configs.
+      # Never overwrites user-set values — only adds what's missing.
+      def backfill_provider_models! # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- iterates providers with guard clauses
+        providers = @data['providers']
+        return unless providers.is_a?(Hash)
+
+        changed = false
+        DEFAULT_PROVIDER_MODELS.each do |name, defaults|
+          next unless providers.key?(name)
+          next if providers[name].is_a?(Hash) && providers[name].key?('models')
+
+          providers[name] = {} unless providers[name].is_a?(Hash)
+          providers[name]['models'] = defaults['models'].dup
+          changed = true
+        end
+        save! if changed
+      rescue StandardError
+        nil
       end
 
       def build_provider_hash(base_url:, env_key:, models:, pricing:)
