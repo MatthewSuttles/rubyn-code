@@ -51,6 +51,7 @@ module RubynCode
         Tools::Registry.all.select { |t| PLAN_MODE_RISK_LEVELS.include?(t::RISK_LEVEL) }.map(&:to_schema)
       end
 
+      # -- tool dispatch with budget + signals
       def process_tool_calls(tool_calls)
         aggregate_chars = 0
         budget = Config::Defaults::MAX_MESSAGE_TOOL_RESULTS_CHARS
@@ -62,6 +63,7 @@ module RubynCode
           notify_tool_result(field(tool_call, :name), result, is_error)
           record_tool_result(tool_call, result, is_error)
         end
+        @decision_compactor&.signal_edit_batch_complete!
       end
 
       def run_single_tool(tool_call)

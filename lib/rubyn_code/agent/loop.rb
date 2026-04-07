@@ -224,6 +224,7 @@ module RubynCode
         @conversation.add_assistant_message(get_content(response))
         process_tool_calls(tool_calls)
         drain_background_notifications
+        @decision_compactor&.check!(@conversation)
         run_maintenance(iteration)
         nil
       end
