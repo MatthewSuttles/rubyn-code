@@ -50,6 +50,7 @@ module RubynCode
       # @param user_input [String]
       # @return [String] the final assistant text response
       def send_message(user_input)
+        initialize_session!
         check_user_feedback(user_input)
         drain_background_notifications
         inject_skill_listing unless @skills_injected
@@ -92,12 +93,39 @@ module RubynCode
         @project_root       = opts[:project_root]
         @decision_compactor = build_decision_compactor
         @skill_ttl          = Skills::TtlManager.new
+        @session_initialized = false
       end
 
       def build_decision_compactor
         Context::DecisionCompactor.new(context_manager: @context_manager)
       rescue StandardError
         nil
+      end
+
+      # One-time session initialization: build project profile and
+      # codebase index so the AI doesn't have to explore from scratch.
+      def initialize_session!
+        return if @session_initialized || !@project_root
+
+        @session_initialized = true
+        build_project_profile!
+        build_codebase_index!
+      end
+
+      def build_project_profile!
+        profile = Config::ProjectProfile.new(project_root: @project_root)
+        profile.load_or_detect!
+        RubynCode::Debug.agent("Project profile loaded (#{profile.data.size} keys)")
+      rescue StandardError => e
+        RubynCode::Debug.warn("Project profile failed: #{e.message}")
+      end
+
+      def build_codebase_index!
+        index = Index::CodebaseIndex.new(project_root: @project_root)
+        index.load_or_build!
+        RubynCode::Debug.agent("Codebase index: #{index.stats[:nodes]} nodes, #{index.stats[:files_indexed]} files")
+      rescue StandardError => e
+        RubynCode::Debug.warn("Codebase index failed: #{e.message}")
       end
 
       def assign_callbacks(opts)
