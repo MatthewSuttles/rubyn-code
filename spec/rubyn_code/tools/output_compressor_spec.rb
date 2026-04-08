@@ -55,7 +55,7 @@ RSpec.describe RubynCode::Tools::OutputCompressor do
     context 'with an unknown tool name' do
       it 'uses the default threshold and head_tail strategy' do
         max_chars = described_class::DEFAULT_THRESHOLD[:max_tokens] * described_class::CHARS_PER_TOKEN
-        lines = Array.new(100) { 'x' * 100 + "\n" }
+        lines = Array.new(100) { "#{'x' * 100}\n" }
         output = lines.join
         next unless output.length > max_chars
 
@@ -87,13 +87,28 @@ RSpec.describe RubynCode::Tools::OutputCompressor do
       end
     end
 
+    context 'with no recognizable summary or failures' do
+      it 'returns the original output instead of an empty string' do
+        # Spec output that has no "N examples" summary and no numbered failures
+        output = "Running specs...\n#{'.' * 3000}\nDone.\n"
+        result = compressor.compress(tool_name, output)
+        expect(result).to eq(output)
+      end
+
+      it 'returns the original when find_summary_line is nil and extract_spec_failures is empty' do
+        # Output without standard RSpec format
+        output = "#{'A' * 3000}\nsome non-spec output\n"
+        result = compressor.compress(tool_name, output)
+        expect(result).to eq(output)
+      end
+    end
+
     context 'with more than 10 failures' do
       it 'shows first 10 failures and omitted count' do
         failures = (1..12).map do |i|
           "  #{i}) Something fails ##{i}\n     Failure/Error: expect(true).to eq(false)\n\n"
         end
-        output = "Running specs...\n" + ('.' * 3000) + "\n" +
-                 "Failures:\n\n" + failures.join + "\n12 examples, 12 failures\n"
+        output = "Running specs...\n#{'.' * 3000}\nFailures:\n\n#{failures.join}\n12 examples, 12 failures\n"
 
         result = compressor.compress(tool_name, output)
         expect(result).to include('2 more failures omitted')

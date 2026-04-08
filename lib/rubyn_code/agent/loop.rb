@@ -143,6 +143,7 @@ module RubynCode
 
       def run_iteration(iteration)
         log_iteration(iteration)
+        @context_manager.advance_turn!
         compact_if_needed # ensure context is under threshold before LLM call
         response   = call_llm
         tool_calls = extract_tool_calls(response)
