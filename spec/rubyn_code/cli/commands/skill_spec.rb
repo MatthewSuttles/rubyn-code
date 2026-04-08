@@ -11,9 +11,15 @@ RSpec.describe RubynCode::CLI::Commands::Skill do
       conversation: conversation
     )
   end
-  let(:renderer) { instance_double('Renderer', info: nil, error: nil) }
+  let(:renderer) { instance_double('Renderer', info: nil, error: nil, warning: nil) }
   let(:conversation) { instance_double('Conversation', add_user_message: nil) }
-  let(:catalog) { instance_double('Catalog', list: %w[rspec factory-bot]) }
+  let(:catalog) do
+    instance_double('Catalog',
+                    list: %w[rspec factory-bot],
+                    search: [],
+                    by_category: [],
+                    categories: %w[rails rspec])
+  end
   let(:skill_loader) { instance_double('SkillLoader', catalog: catalog, load: '# Skill content') }
 
   describe '.command_name' do
@@ -50,6 +56,49 @@ RSpec.describe RubynCode::CLI::Commands::Skill do
       it 'shows error message' do
         command.execute(['nonexistent'], ctx)
         expect(renderer).to have_received(:error).with(/not found/)
+      end
+    end
+
+    context 'with search sub-command' do
+      it 'searches for matching skills' do
+        allow(catalog).to receive(:search).with('test').and_return(
+          [{ name: 'rspec', description: 'Testing with RSpec', relevance: 3 }]
+        )
+
+        expect { command.execute(%w[search test], ctx) }.to output(/rspec/).to_stdout
+        expect(catalog).to have_received(:search).with('test')
+      end
+
+      it 'shows no results message when nothing matches' do
+        allow(catalog).to receive(:search).with('zzzz').and_return([])
+        command.execute(%w[search zzzz], ctx)
+        expect(renderer).to have_received(:info).with(/No skills found/)
+      end
+
+      it 'shows usage when no search term provided' do
+        command.execute(%w[search], ctx)
+        expect(renderer).to have_received(:warning).with(/Usage/)
+      end
+    end
+
+    context 'with list sub-command' do
+      it 'lists categories when no category given' do
+        expect { command.execute(%w[list], ctx) }.to output(/rails/).to_stdout
+      end
+
+      it 'lists skills in the specified category' do
+        allow(catalog).to receive(:by_category).with('rails').and_return(
+          [{ name: 'service-objects', description: 'Rails: Service Objects' }]
+        )
+
+        expect { command.execute(%w[list rails], ctx) }.to output(/service-objects/).to_stdout
+        expect(catalog).to have_received(:by_category).with('rails')
+      end
+
+      it 'shows no results for empty category' do
+        allow(catalog).to receive(:by_category).with('nonexistent').and_return([])
+        command.execute(%w[list nonexistent], ctx)
+        expect(renderer).to have_received(:info).with(/No skills found in category/)
       end
     end
   end
