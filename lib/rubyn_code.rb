@@ -220,6 +220,9 @@ module RubynCode
     autoload :Shortcut, 'rubyn_code/learning/shortcut'
   end
 
+  # Self-Test
+  autoload :SelfTest, 'rubyn_code/self_test'
+
   # Codebase Index
   module Index
     autoload :CodebaseIndex, 'rubyn_code/index/codebase_index'

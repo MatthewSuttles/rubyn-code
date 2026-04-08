@@ -63,7 +63,12 @@ module RubynCode
         failures = extract_spec_failures(lines)
         return summary_line.strip if failures.empty? && summary_line
 
-        assemble_failure_report(failures, summary_line)
+        result = assemble_failure_report(failures, summary_line)
+
+        # Guard: if compression produced an empty string (no summary line
+        # and no extractable failures), return the original output so the
+        # agent still sees spec results.
+        result.nil? || result.strip.empty? ? output : result
       end
 
       def find_summary_line(lines)

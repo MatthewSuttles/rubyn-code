@@ -11,7 +11,8 @@ RSpec.describe RubynCode::Agent::Loop do
       check_compaction!: nil,
       track_usage: nil,
       estimated_tokens: 0,
-      needs_compaction?: false
+      needs_compaction?: false,
+      advance_turn!: nil
     )
   end
   let(:hook_runner)     { instance_double(RubynCode::Hooks::Runner, fire: nil) }
