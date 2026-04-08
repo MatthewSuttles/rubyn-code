@@ -25,8 +25,9 @@ module RubynCode
 
       attr_reader :loaded_files, :signature_files, :tokens_used
 
-      def initialize(budget: DEFAULT_BUDGET)
+      def initialize(budget: DEFAULT_BUDGET, codebase_index: nil)
         @budget = budget
+        @codebase_index = codebase_index
         @loaded_files = []
         @signature_files = []
         @tokens_used = 0
@@ -34,6 +35,10 @@ module RubynCode
 
       # Load context for a primary file, filling budget with related files.
       # Returns array of { file:, content:, mode: :full|:signatures }
+      #
+      # When a codebase_index is available and no related_files are supplied,
+      # uses impact_analysis to auto-discover related files (specs,
+      # associated models, controllers, etc.).
       def load_for(file_path, related_files: [])
         results = []
 
@@ -45,6 +50,9 @@ module RubynCode
         @tokens_used = primary_tokens
         @loaded_files << file_path
         results << { file: file_path, content: primary_content, mode: :full }
+
+        # Auto-discover related files from the index when none supplied
+        related_files = discover_related_files(file_path) if related_files.empty? && @codebase_index
 
         # Sort related files by priority and fill remaining budget
         sorted = prioritize(related_files)
@@ -80,6 +88,13 @@ module RubynCode
       end
 
       private
+
+      def discover_related_files(file_path)
+        analysis = @codebase_index.impact_analysis(file_path)
+        analysis[:affected_files].reject { |f| f == file_path }
+      rescue StandardError
+        []
+      end
 
       def load_full_files(sorted, results, remaining)
         sorted.each do |rel_path|
