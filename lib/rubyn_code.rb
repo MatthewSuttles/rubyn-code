@@ -260,6 +260,7 @@ module RubynCode
       autoload :Plan, 'rubyn_code/cli/commands/plan'
       autoload :ContextInfo, 'rubyn_code/cli/commands/context_info'
       autoload :Diff, 'rubyn_code/cli/commands/diff'
+      autoload :Mcp, 'rubyn_code/cli/commands/mcp'
       autoload :Model, 'rubyn_code/cli/commands/model'
       autoload :NewSession, 'rubyn_code/cli/commands/new_session'
     end
