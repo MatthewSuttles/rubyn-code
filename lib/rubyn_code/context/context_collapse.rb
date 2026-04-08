@@ -20,7 +20,7 @@ module RubynCode
       # @param threshold [Integer] target token count
       # @param keep_recent [Integer] number of recent messages to preserve
       # @return [Array<Hash>, nil] collapsed messages or nil if not sufficient
-      def self.call(messages, threshold:, keep_recent: 6) # rubocop:disable Metrics/AbcSize -- anchor detection adds branches
+      def self.call(messages, threshold:, keep_recent: 6)
         return nil if messages.size <= keep_recent + 2
 
         # Always preserve the very first message (may contain critical
@@ -51,19 +51,22 @@ module RubynCode
       def self.build_anchors(messages)
         first = messages.first
         anchors = [first]
+        return anchors unless system_injection?(first)
 
-        # If the first message is a system injection, find and keep the
-        # first real user message too.
-        content = first[:content]
-        text = content.is_a?(String) ? content : nil
-        if text&.start_with?('[system]')
-          user_msg = messages[1..].find do |msg|
-            msg[:role] == 'user' && !(msg[:content].is_a?(String) && msg[:content].start_with?('[system]'))
-          end
-          anchors << user_msg if user_msg
-        end
-
+        user_msg = first_real_user_message(messages)
+        anchors << user_msg if user_msg
         anchors
+      end
+
+      def self.system_injection?(msg)
+        content = msg[:content]
+        content.is_a?(String) && content.start_with?('[system]')
+      end
+
+      def self.first_real_user_message(messages)
+        messages[1..].find do |msg|
+          msg[:role] == 'user' && !system_injection?(msg)
+        end
       end
 
       private_class_method :build_anchors
