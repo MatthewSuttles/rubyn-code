@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "database-explorer": {
+      "command": "ruby",
+      "args": ["examples/mcp-servers/database-explorer/server.rb"],
+      "env": {
+        "DATABASE_PATH": "db/development.sqlite3"
+      }
+    },
+    "rubygems": {
+      "command": "ruby",
+      "args": ["examples/mcp-servers/rubygems-lookup/server.rb"]
+    },
+    "rails-routes": {
+      "command": "ruby",
+      "args": ["examples/mcp-servers/rails-routes/server.rb"],
+      "env": {
+        "RAILS_ROOT": "${PWD}"
+      }
+    }
+  }
+}
