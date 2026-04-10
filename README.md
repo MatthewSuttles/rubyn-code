@@ -333,6 +333,8 @@ rubyn-code --help             # Show help
 | `/budget [amt]` | Show or set session budget |
 | `/skill [name]` | Load or list available skills |
 | `/resume [id]` | Resume or list sessions |
+| `/provider` | Add or list providers |
+| `/model` | Show/switch model and provider |
 
 ## Authentication
 
@@ -354,13 +356,50 @@ export OPENAI_API_KEY=sk-...
 
 Available models: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-4o`, `gpt-4o-mini`, `o3`, `o4-mini`
 
-### OpenAI-Compatible Providers (Groq, Together, Ollama, etc.)
+### Other Providers (Groq, Together, Ollama, etc.)
 
-Set the provider-specific API key and configure via `config.yml`:
+Set the API key as an environment variable in your shell profile (`~/.zshrc`, `~/.bashrc`):
 
 ```bash
 export GROQ_API_KEY=gsk-...
+export TOGETHER_API_KEY=...
 ```
+
+The env var name comes from the `env_key` field in your config. If omitted, Rubyn derives it
+from the provider name: `<PROVIDER>_API_KEY` (uppercased, hyphens become underscores).
+For example, provider `bedrock-proxy` looks for `BEDROCK_PROXY_API_KEY`.
+
+Add providers interactively or via config:
+
+```bash
+# Via slash command
+/provider add groq https://api.groq.com/openai/v1 --env-key GROQ_API_KEY --models llama-3.3-70b
+
+# For Anthropic-format proxies (e.g., Bedrock, custom proxies)
+/provider add my-proxy https://proxy.example.com/v1 --format anthropic --env-key PROXY_API_KEY --models claude-sonnet-4-6
+
+# List configured providers
+/provider list
+```
+
+Or add directly to `~/.rubyn-code/config.yml`:
+
+```yaml
+providers:
+  groq:
+    base_url: https://api.groq.com/openai/v1
+    env_key: GROQ_API_KEY
+    models:
+      top: llama-3.3-70b
+  my-proxy:
+    api_format: anthropic        # 'openai' (default) or 'anthropic'
+    base_url: https://proxy.example.com/v1
+    env_key: PROXY_API_KEY
+    models:
+      top: claude-sonnet-4-6
+```
+
+Then switch with `/model groq:llama-3.3-70b`.
 
 Local providers (Ollama, LM Studio) running on `localhost`/`127.0.0.1` don't require an API key.
 
@@ -406,15 +445,9 @@ permission_mode: autonomous
 # provider: openai
 # model: gpt-4o
 
-# Use an OpenAI-compatible provider
+# Use a custom provider (add via /provider add or under providers: key)
 # provider: groq
-# provider_base_url: https://api.groq.com/openai/v1
 # model: llama-3.3-70b
-
-# Local Ollama (no API key needed)
-# provider: ollama
-# provider_base_url: http://localhost:11434/v1
-# model: llama3
 ```
 
 ### Multi-Provider Model Routing

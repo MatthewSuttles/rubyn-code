@@ -114,10 +114,11 @@ module RubynCode
       # @param env_key [String, nil] environment variable for the API key
       # @param models [Array<String>] available model names
       # @param pricing [Hash] model => [input_rate, output_rate]
-      def add_provider(name, base_url:, env_key: nil, models: [], pricing: {})
+      # @param api_format [String, nil] API format ('openai' or 'anthropic')
+      def add_provider(name, base_url:, env_key: nil, models: [], pricing: {}, api_format: nil)
         @data['providers'] ||= {}
         @data['providers'][name.to_s] = build_provider_hash(
-          base_url: base_url, env_key: env_key, models: models, pricing: pricing
+          base_url: base_url, env_key: env_key, models: models, pricing: pricing, api_format: api_format
         )
         save!
       end
@@ -176,8 +177,9 @@ module RubynCode
         nil
       end
 
-      def build_provider_hash(base_url:, env_key:, models:, pricing:)
+      def build_provider_hash(base_url:, env_key:, models:, pricing:, api_format: nil)
         hash = { 'base_url' => base_url }
+        hash['api_format'] = api_format if api_format
         hash['env_key'] = env_key if env_key
         hash['models'] = models unless models.empty?
         hash['pricing'] = pricing unless pricing.empty?

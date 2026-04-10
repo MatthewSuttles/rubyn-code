@@ -94,7 +94,7 @@ cost_records, hooks, skills_cache, teammates, mailbox_messages, instincts
 
 ## Slash Commands
 
-19 commands, each in its own file under `lib/rubyn_code/cli/commands/`. Registry-based
+20 commands, each in its own file under `lib/rubyn_code/cli/commands/`. Registry-based
 dispatch with tab-completion. Infrastructure: `Base` (abstract), `Registry` (dispatch),
 `Context` (Data.define with all deps).
 
@@ -107,6 +107,7 @@ dispatch with tab-completion. Infrastructure: `Base` (abstract), `Registry` (dis
 | `/context` | Visual context window usage bar |
 | `/diff` | Quick git diff |
 | `/model` | Show/switch model (supports provider:model syntax) |
+| `/provider` | Add or list providers |
 | `/review` | PR review against best practices |
 | `/skill` | Load/list skills |
 | `/tasks` | List active tasks |
@@ -149,10 +150,70 @@ Commands return optional **action hashes** for state changes the REPL processes
 5. Add autoload entry in `lib/rubyn_code.rb` under `module Adapters`
 6. Add spec in `spec/rubyn_code/llm/adapters/` — include `it_behaves_like 'an LLM adapter'`
 
+## Adding a Custom Provider
+
+Use the `/provider` command or edit `~/.rubyn-code/config.yml` directly.
+
+### Via slash command
+
+```
+/provider add groq https://api.groq.com/openai/v1 --env-key GROQ_API_KEY --models llama-3.3-70b,mixtral-8x7b
+```
+
+For providers that use the Anthropic Messages API format instead of OpenAI:
+
+```
+/provider add bedrock-proxy https://proxy.example.com/v1 --format anthropic --env-key PROXY_API_KEY --models claude-sonnet-4-6
+```
+
+### Via config.yml
+
+```yaml
+providers:
+  groq:
+    base_url: https://api.groq.com/openai/v1
+    env_key: GROQ_API_KEY
+    models:
+      cheap: llama-3.3-70b
+      top: llama-3.3-70b
+  bedrock-proxy:
+    api_format: anthropic          # 'openai' (default) or 'anthropic'
+    base_url: https://proxy.example.com/v1
+    env_key: PROXY_API_KEY
+    models:
+      top: claude-sonnet-4-6
+```
+
+### Setting up the API key
+
+Rubyn Code resolves API keys from the environment variable named in `env_key`. Set it in
+your shell profile (`~/.zshrc`, `~/.bashrc`, etc.):
+
+```bash
+export GROQ_API_KEY="gsk-your-key-here"
+export OPENAI_API_KEY="sk-your-key-here"
+```
+
+If `env_key` is not specified in the config, Rubyn derives it from the provider name:
+`<PROVIDER_NAME>_API_KEY` (uppercased, hyphens become underscores). For example, provider
+`bedrock-proxy` looks for `BEDROCK_PROXY_API_KEY`.
+
+Local providers (localhost / 127.0.0.1) skip the API key requirement entirely.
+
+### Switching providers
+
+```
+/model groq:llama-3.3-70b          # switch provider and model
+/model groq:                        # switch provider, keep current model
+/model                              # show current + all configured providers
+/provider list                      # list all providers with their models
+```
+
 **Key files in the adapter layer:**
 - `adapters/base.rb` — abstract contract (chat, provider_name, models)
 - `adapters/anthropic.rb` — Anthropic Claude (OAuth + API key, prompt caching, SSE streaming)
 - `adapters/openai.rb` — OpenAI Chat Completions (Bearer auth, function calling, SSE streaming)
+- `adapters/anthropic_compatible.rb` — inherits Anthropic, overrides base_url/provider/models/auth (for Anthropic-format proxies)
 - `adapters/openai_compatible.rb` — inherits OpenAI, overrides base_url/provider/models/auth
 - `adapters/openai_message_translator.rb` — translates Anthropic-format messages to OpenAI format
 - `adapters/openai_streaming.rb` — SSE parser for OpenAI `choices[0].delta` format
@@ -197,6 +258,15 @@ bundle install && ruby -Ilib exe/rubyn-code   # from source
 bundle exec rspec                               # tests
 bundle exec rubocop                             # lint
 ```
+
+## Agent Loop Changes
+
+Any modification to the agent loop (`lib/rubyn_code/agent/loop.rb`, `llm_caller.rb`,
+`tool_processor.rb`, or `context/manager.rb`) **must** be followed by running the
+self-test skill (`/skill self-test`) to verify Rubyn isn't broken. The self-test runs
+25+ automated checks across all major subsystems — file ops, search, bash, git, specs,
+the efficiency engine, skills, memory, config, codebase index, slash commands, and
+architecture integrity. If the self-test fails, fix the regression before committing.
 
 ## Pre-Commit Checklist
 
