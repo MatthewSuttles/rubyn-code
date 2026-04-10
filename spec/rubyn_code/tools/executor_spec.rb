@@ -294,6 +294,118 @@ RSpec.describe RubynCode::Tools::Executor do
         expect(result).to eq('callback=true')
       end
     end
+    
+    it 'invalidates file cache entries when bash uses redirect operators' do
+      bash_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'bash')
+        const_set(:DESCRIPTION, 'Run bash')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :write)
+
+        def execute(command: '')
+          "ran: #{command}"
+        end
+      end
+      RubynCode::Tools::Registry.register(bash_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        cache = executor.file_cache
+
+        # Pre-populate a cache entry
+        test_file = File.join(dir, 'test.txt')
+        File.write(test_file, 'original')
+        cache.read(test_file)
+        expect(cache.cache.key?(test_file)).to be true
+
+        # Execute a bash command that writes to the file via redirect
+        executor.execute('bash', { 'command' => "echo hello > #{test_file}" })
+
+        # The cache entry should have been invalidated
+        expect(cache.cache.key?(test_file)).to be false
+      end
+    end
+
+    it 'invalidates file cache entries when bash uses append redirect' do
+      bash_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'bash')
+        const_set(:DESCRIPTION, 'Run bash')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :write)
+
+        def execute(command: '')
+          "ran: #{command}"
+        end
+      end
+      RubynCode::Tools::Registry.register(bash_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        cache = executor.file_cache
+
+        test_file = File.join(dir, 'test.txt')
+        File.write(test_file, 'original')
+        cache.read(test_file)
+        expect(cache.cache.key?(test_file)).to be true
+
+        executor.execute('bash', { 'command' => "echo more >> #{test_file}" })
+        expect(cache.cache.key?(test_file)).to be false
+      end
+    end
+
+    it 'invalidates file cache entries when bash uses tee' do
+      bash_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'bash')
+        const_set(:DESCRIPTION, 'Run bash')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :write)
+
+        def execute(command: '')
+          "ran: #{command}"
+        end
+      end
+      RubynCode::Tools::Registry.register(bash_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        cache = executor.file_cache
+
+        test_file = File.join(dir, 'output.log')
+        File.write(test_file, 'original')
+        cache.read(test_file)
+        expect(cache.cache.key?(test_file)).to be true
+
+        executor.execute('bash', { 'command' => "echo data | tee #{test_file}" })
+        expect(cache.cache.key?(test_file)).to be false
+      end
+    end
+
+    it 'invalidates file cache entries when bash uses sed -i' do
+      bash_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'bash')
+        const_set(:DESCRIPTION, 'Run bash')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :write)
+
+        def execute(command: '')
+          "ran: #{command}"
+        end
+      end
+      RubynCode::Tools::Registry.register(bash_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        cache = executor.file_cache
+
+        test_file = File.join(dir, 'config.yml')
+        File.write(test_file, 'original')
+        cache.read(test_file)
+        expect(cache.cache.key?(test_file)).to be true
+
+        executor.execute('bash', { 'command' => "sed -i 's/old/new/' #{test_file}" })
+        expect(cache.cache.key?(test_file)).to be false
+      end
+    end
 
     it 'does not inject dependencies for ordinary tools' do
       plain_tool = Class.new(RubynCode::Tools::Base) do

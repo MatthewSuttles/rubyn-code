@@ -9,9 +9,10 @@ module RubynCode
     # Stores classes, modules, methods, associations, and Rails edges in a
     # JSON file for fast session startup. First build scans all .rb files;
     # incremental updates re-index only changed files.
-    class CodebaseIndex
+    class CodebaseIndex # rubocop:disable Metrics/ClassLength -- structural summary methods
       INDEX_DIR = '.rubyn-code'
       INDEX_FILE = 'codebase_index.json'
+      CHARS_PER_TOKEN = 4
 
       attr_reader :nodes, :edges, :index_path
 
@@ -103,6 +104,20 @@ module RubynCode
         lines.join("\n")
       end
 
+      # Structural map for system prompt: model names with associations,
+      # controllers, and service objects. Capped to stay within token budget.
+      def to_structural_summary(max_tokens: 500)
+        budget = max_tokens * CHARS_PER_TOKEN
+        lines = ['Codebase Structure:']
+
+        append_model_section(lines)
+        append_controller_section(lines)
+        append_service_section(lines)
+        append_stats_section(lines)
+
+        truncate_to_budget(lines, budget)
+      end
+
       def stats
         {
           files_indexed: @file_mtimes.size,
@@ -112,6 +127,57 @@ module RubynCode
       end
 
       private
+
+      def append_model_section(lines)
+        models = @nodes.select { |n| n['type'] == 'model' && (n['name'] || '').match?(/\A[A-Z]/) }
+        return if models.empty?
+
+        lines << 'Models:'
+        models.each do |model|
+          assocs = associations_for_file(model['file'])
+          desc = assocs.empty? ? model['name'] : "#{model['name']} #{assocs.join(', ')}"
+          lines << "  #{desc}"
+        end
+      end
+
+      def append_controller_section(lines)
+        controllers = @nodes.select { |n| n['type'] == 'controller' && (n['name'] || '').match?(/\A[A-Z]/) }
+        return if controllers.empty?
+
+        lines << 'Controllers:'
+        controllers.each { |c| lines << "  #{c['name']} (#{c['file']})" }
+      end
+
+      def append_service_section(lines)
+        services = @nodes.select { |n| n['type'] == 'service' && (n['name'] || '').match?(/\A[A-Z]/) }
+        return if services.empty?
+
+        lines << 'Services:'
+        services.each { |s| lines << "  #{s['name']} (#{s['file']})" }
+      end
+
+      def append_stats_section(lines)
+        counts = node_type_counts
+        lines << "Stats: #{counts['class'] || 0} classes, #{counts['method'] || 0} methods, #{@edges.size} edges"
+      end
+
+      def associations_for_file(file)
+        @edges.select { |e| e['from'] == file && e['relationship'] == 'association' }
+              .map { |e| "#{e['type']} :#{e['to']}" }
+      end
+
+      def truncate_to_budget(lines, budget)
+        result = []
+        total = 0
+        lines.each do |line|
+          line_size = line.bytesize + 1 # +1 for newline
+          break if total + line_size > budget
+
+          result << line
+          total += line_size
+        end
+        result.join("\n")
+      end
 
       def edges_involving(names)
         @edges.select do |e|

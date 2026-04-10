@@ -10,6 +10,7 @@ module RubynCode
       def in_progress? = status == 'in_progress'
       def completed? = status == 'completed'
       def blocked? = status == 'blocked'
+      def failed? = status == 'failed'
 
       def to_h
         {

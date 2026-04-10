@@ -6,16 +6,19 @@ module RubynCode
     # Uses optimistic locking to handle race conditions when multiple
     # agents attempt to claim the same task concurrently.
     module TaskClaimer
-      # Finds the first ready (pending, unowned) task, claims it for the
-      # given agent, and returns the updated Task. Returns nil if no work
-      # is available.
+      MAX_RETRIES = 3
+
+      # Finds the first ready (pending, unowned) task that hasn't exceeded
+      # max retries, claims it for the given agent, and returns the updated
+      # Task. Returns nil if no work is available.
       #
       # @param task_manager [#db, #update_task, #list_tasks] task persistence layer
       # @param agent_name [String] unique identifier of the claiming agent
+      # @param max_retries [Integer] maximum retry count before skipping a task
       # @return [Tasks::Task, nil] the claimed task, or nil if none available
-      def self.call(task_manager:, agent_name:)
+      def self.call(task_manager:, agent_name:, max_retries: MAX_RETRIES)
         db = task_manager.db
-        claim_next_pending_task(db, agent_name)
+        claim_next_pending_task(db, agent_name, max_retries)
         fetch_claimed_task(db, agent_name)
       rescue StandardError => e
         RubynCode.logger.warn("TaskClaimer: failed to claim task: #{e.message}") if RubynCode.respond_to?(:logger)
@@ -25,17 +28,20 @@ module RubynCode
       class << self
         private
 
-        def claim_next_pending_task(db, agent_name)
-          db.execute(<<~SQL, [agent_name])
+        def claim_next_pending_task(db, agent_name, max_retries)
+          db.execute(<<~SQL, [agent_name, max_retries])
             UPDATE tasks
             SET owner = ?,
                 status = 'in_progress',
                 updated_at = datetime('now')
             WHERE id = (
-              SELECT id FROM tasks
-              WHERE status = 'pending'
-                AND (owner IS NULL OR owner = '')
-              ORDER BY priority DESC, created_at ASC
+              SELECT t.id FROM tasks t
+              WHERE t.status = 'pending'
+                AND (t.owner IS NULL OR t.owner = '')
+                AND COALESCE(
+                  json_extract(t.metadata, '$.retry_count'), 0
+                ) < ?
+              ORDER BY t.priority DESC, t.created_at ASC
               LIMIT 1
             )
             AND status = 'pending'

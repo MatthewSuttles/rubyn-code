@@ -98,7 +98,7 @@ module RubynCode
         @stream_formatter&.feed(text)
       end
 
-      def handle_message(input)
+      def handle_message(input) # rubocop:disable Metrics/AbcSize -- sequential steps with interrupt rescue
         @spinner.start
         @streaming_first_chunk = true
 
@@ -113,6 +113,11 @@ module RubynCode
           puts
         end
 
+        save_session!
+      rescue Interrupt
+        @spinner.stop
+        puts
+        @renderer.warning('Interrupted — session state preserved')
         save_session!
       rescue BudgetExceededError => e
         @spinner.error

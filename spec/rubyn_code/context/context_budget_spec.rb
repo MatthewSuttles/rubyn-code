@@ -158,6 +158,68 @@ RSpec.describe RubynCode::Context::ContextBudget do
     end
   end
 
+  describe '#load_for with codebase_index' do
+    let(:token_budget) { 100_000 }
+
+    it 'discovers related files from the index when none supplied' do
+      primary = write_file('app/models/user.rb', <<~RUBY)
+        class User < ApplicationRecord
+          has_many :posts
+        end
+      RUBY
+      write_file('spec/models/user_spec.rb', <<~RUBY)
+        RSpec.describe User do
+        end
+      RUBY
+
+      index = RubynCode::Index::CodebaseIndex.new(project_root: @tmpdir)
+      debug_mod = Module.new { def self.warn(_msg); end }
+      stub_const('RubynCode::Debug', debug_mod)
+      index.build!
+
+      budget_with_index = described_class.new(budget: token_budget, codebase_index: index)
+      results = budget_with_index.load_for(primary)
+
+      files_loaded = results.map { |r| r[:file] }
+      expect(files_loaded).to include(primary)
+      expect(files_loaded.size).to be >= 1
+    end
+
+    it 'does not auto-discover when related_files are explicitly provided' do
+      primary = write_file('app/models/user.rb', "class User\nend\n")
+      explicit = write_file('lib/helper.rb', "module Helper\nend\n")
+
+      mock_index = instance_double(RubynCode::Index::CodebaseIndex)
+      budget_with_index = described_class.new(budget: token_budget, codebase_index: mock_index)
+
+      results = budget_with_index.load_for(primary, related_files: [explicit])
+
+      files_loaded = results.map { |r| r[:file] }
+      expect(files_loaded).to eq([primary, explicit])
+    end
+
+    it 'falls back gracefully if impact_analysis raises' do
+      primary = write_file('app/models/user.rb', "class User\nend\n")
+
+      mock_index = instance_double(RubynCode::Index::CodebaseIndex)
+      allow(mock_index).to receive(:impact_analysis).and_raise(StandardError, 'boom')
+
+      budget_with_index = described_class.new(budget: token_budget, codebase_index: mock_index)
+      results = budget_with_index.load_for(primary)
+
+      expect(results.size).to eq(1)
+      expect(results.first[:file]).to eq(primary)
+    end
+
+    it 'works normally when no codebase_index is provided' do
+      primary = write_file('primary.rb', 'class Foo; end')
+      results = budget.load_for(primary)
+
+      expect(results.size).to eq(1)
+      expect(results.first[:file]).to eq(primary)
+    end
+  end
+
   describe '#extract_signatures' do
     it 'returns method and class definitions without bodies' do
       content = <<~RUBY

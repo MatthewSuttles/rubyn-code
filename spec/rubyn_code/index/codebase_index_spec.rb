@@ -241,6 +241,79 @@ RSpec.describe RubynCode::Index::CodebaseIndex do
     end
   end
 
+  describe '#to_structural_summary' do
+    it 'includes models with their associations' do
+      create_model_file('user', <<~RUBY)
+        class User < ApplicationRecord
+          has_many :posts
+          belongs_to :organization
+        end
+      RUBY
+      index.build!
+
+      result = index.to_structural_summary
+      expect(result).to include('Codebase Structure:')
+      expect(result).to include('Models:')
+      expect(result).to include('User')
+      expect(result).to include('has_many :posts')
+      expect(result).to include('belongs_to :organization')
+    end
+
+    it 'includes controllers' do
+      create_controller_file('users_controller', <<~RUBY)
+        class UsersController < ApplicationController
+        end
+      RUBY
+      index.build!
+
+      result = index.to_structural_summary
+      expect(result).to include('Controllers:')
+      expect(result).to include('UsersController')
+    end
+
+    it 'includes service objects' do
+      create_service_file('create_user', <<~RUBY)
+        class CreateUser
+          def call; end
+        end
+      RUBY
+      index.build!
+
+      result = index.to_structural_summary
+      expect(result).to include('Services:')
+      expect(result).to include('CreateUser')
+    end
+
+    it 'includes stats line' do
+      create_model_file('user', "class User\nend\n")
+      index.build!
+
+      result = index.to_structural_summary
+      expect(result).to include('Stats:')
+      expect(result).to match(/\d+ classes/)
+      expect(result).to match(/\d+ methods/)
+      expect(result).to match(/\d+ edges/)
+    end
+
+    it 'truncates output to respect max_tokens' do
+      10.times do |i|
+        create_model_file("model_#{i}", "class Model#{i} < ApplicationRecord\nend\n")
+      end
+      index.build!
+
+      short = index.to_structural_summary(max_tokens: 10) # ~40 chars budget
+      full  = index.to_structural_summary(max_tokens: 5000)
+      expect(short.length).to be < full.length
+    end
+
+    it 'returns structure header even with empty index' do
+      index.build!
+      result = index.to_structural_summary
+      expect(result).to include('Codebase Structure:')
+      expect(result).to include('Stats:')
+    end
+  end
+
   describe '#save!' do
     it 'creates the index file' do
       index.build!

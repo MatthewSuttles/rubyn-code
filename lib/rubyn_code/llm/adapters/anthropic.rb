@@ -48,6 +48,10 @@ module RubynCode
 
         private
 
+        def api_url
+          API_URL
+        end
+
         # -- Auth ---------------------------------------------------------
 
         def oauth_token?
@@ -88,7 +92,7 @@ module RubynCode
         end
 
         def post_request(body)
-          connection.post(API_URL) do |req|
+          connection.post(api_url) do |req|
             apply_headers(req)
             req.body = JSON.generate(body)
           end
@@ -113,7 +117,7 @@ module RubynCode
           streamer = build_streamer(on_text)
           error_chunks = []
 
-          response = streaming_connection.post(API_URL) do |req|
+          response = streaming_connection.post(api_url) do |req|
             apply_headers(req)
             req.body = JSON.generate(body)
             req.options.on_data = on_data_proc(streamer, error_chunks)

@@ -64,13 +64,19 @@ module RubynCode
       def append_codebase_index(parts)
         return unless @project_root
 
-        index = Index::CodebaseIndex.new(project_root: @project_root)
-        loaded = index.load
-        return unless loaded && index.nodes.any?
+        index = resolve_codebase_index
+        return unless index&.nodes&.any?
 
-        parts << "\n## #{index.to_prompt_summary}"
+        parts << "\n## #{index.to_structural_summary}"
       rescue StandardError
         nil
+      end
+
+      def resolve_codebase_index
+        return @codebase_index if defined?(@codebase_index) && @codebase_index
+
+        idx = Index::CodebaseIndex.new(project_root: @project_root)
+        idx.load
       end
 
       def append_memories(parts)
