@@ -89,7 +89,7 @@ function renderMarkdownText(text: string): React.ReactNode[] {
 
   const flushList = () => {
     if (listItems.length > 0 && listType) {
-      const Tag = listType;
+      const Tag: React.ElementType = listType;
       elements.push(
         <Tag key={`list-${keyCounter++}`}>
           {listItems.map((item, i) => (
@@ -108,7 +108,7 @@ function renderMarkdownText(text: string): React.ReactNode[] {
     if (headerMatch) {
       flushList();
       const level = headerMatch[1].length as 1 | 2 | 3 | 4;
-      const Tag = `h${level}` as keyof JSX.IntrinsicElements;
+      const Tag = `h${level}` as React.ElementType;
       elements.push(<Tag key={`h-${keyCounter++}`}>{renderInline(headerMatch[2])}</Tag>);
       continue;
     }

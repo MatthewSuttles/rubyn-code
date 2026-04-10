@@ -62,7 +62,7 @@ export const ToolApproval: React.FC<ToolApprovalProps> = ({
       {expanded && (
         <div className="tool-card-body">
           {/* Bash command highlight */}
-          {isBash && args.command && (
+          {isBash && !!args.command && (
             <div className="tool-card-bash-cmd">
               {String(args.command)}
             </div>

@@ -242,7 +242,7 @@ export async function activate(
 
   // 7. Register status bar.
   try {
-    const statusBarDisposable = createStatusBar(context, bridge);
+    const statusBarDisposable = createStatusBar(bridge);
     context.subscriptions.push(statusBarDisposable);
   } catch {
     // Status bar module may not be available yet (being built by another agent).

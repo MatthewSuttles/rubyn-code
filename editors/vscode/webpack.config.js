@@ -50,7 +50,12 @@ const webviewConfig = {
       {
         test: /\.tsx?$/,
         exclude: /node_modules/,
-        use: 'ts-loader',
+        use: {
+          loader: 'ts-loader',
+          options: {
+            configFile: path.resolve(__dirname, 'tsconfig.webview.json'),
+          },
+        },
       },
       {
         test: /\.css$/,

@@ -44,7 +44,7 @@ export class Bridge extends EventEmitter {
   private pending = new Map<number, PendingRequest>();
 
   /** Notification listeners keyed by method name. */
-  private listeners = new Map<string, Set<NotificationListener>>();
+  private notificationListeners = new Map<string, Set<NotificationListener>>();
 
   /** Partial line buffer for stdout parsing. */
   private buffer = '';
@@ -122,19 +122,19 @@ export class Bridge extends EventEmitter {
    * Register a listener for incoming notifications with the given method.
    * Multiple listeners per method are supported.
    */
-  on(method: string, callback: NotificationListener): this;
   on(event: 'error', callback: (err: Error) => void): this;
   on(event: 'close', callback: () => void): this;
-  on(event: string, callback: (...args: unknown[]) => void): this {
+  on(method: string, callback: NotificationListener): this;
+  on(event: string, callback: (...args: any[]) => void): this {
     // 'error' and 'close' are EventEmitter events — delegate to super.
     if (event === 'error' || event === 'close') {
       return super.on(event, callback);
     }
 
-    let set = this.listeners.get(event);
+    let set = this.notificationListeners.get(event);
     if (!set) {
       set = new Set();
-      this.listeners.set(event, set);
+      this.notificationListeners.set(event, set);
     }
     set.add(callback as NotificationListener);
     return this;
@@ -143,19 +143,19 @@ export class Bridge extends EventEmitter {
   /**
    * Unregister a previously registered notification listener.
    */
-  off(method: string, callback: NotificationListener): this;
   off(event: 'error', callback: (err: Error) => void): this;
   off(event: 'close', callback: () => void): this;
-  off(event: string, callback: (...args: unknown[]) => void): this {
+  off(method: string, callback: NotificationListener): this;
+  off(event: string, callback: (...args: any[]) => void): this {
     if (event === 'error' || event === 'close') {
       return super.off(event, callback);
     }
 
-    const set = this.listeners.get(event);
+    const set = this.notificationListeners.get(event);
     if (set) {
       set.delete(callback as NotificationListener);
       if (set.size === 0) {
-        this.listeners.delete(event);
+        this.notificationListeners.delete(event);
       }
     }
     return this;
@@ -179,7 +179,7 @@ export class Bridge extends EventEmitter {
     }
 
     // Clear notification listeners.
-    this.listeners.clear();
+    this.notificationListeners.clear();
 
     // Remove our data/end listeners from stdout.
     this.stdout.removeAllListeners('data');
@@ -267,7 +267,7 @@ export class Bridge extends EventEmitter {
 
   /** Dispatch an incoming notification to all registered listeners. */
   private handleNotification(notif: RpcNotification): void {
-    const set = this.listeners.get(notif.method);
+    const set = this.notificationListeners.get(notif.method);
     if (!set || set.size === 0) {
       return;
     }
