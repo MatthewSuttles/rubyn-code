@@ -239,6 +239,7 @@ module RubynCode
     autoload :Spinner, 'rubyn_code/cli/spinner'
     autoload :StreamFormatter, 'rubyn_code/cli/stream_formatter'
     autoload :Setup, 'rubyn_code/cli/setup'
+    autoload :FirstRun, 'rubyn_code/cli/first_run'
     autoload :DaemonRunner, 'rubyn_code/cli/daemon_runner'
     autoload :VersionCheck, 'rubyn_code/cli/version_check'
 

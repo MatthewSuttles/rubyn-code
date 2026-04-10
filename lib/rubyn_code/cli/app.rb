@@ -57,7 +57,7 @@ module RubynCode
         '--help' => :help, '-h' => :help,
         '--auth' => :auth, '--setup' => :setup
       }.freeze
-      BOOLEAN_FLAGS = { '--yolo' => :yolo, '--debug' => :debug }.freeze
+      BOOLEAN_FLAGS = { '--yolo' => :yolo, '--debug' => :debug, '--skip-setup' => :skip_setup }.freeze
       DAEMON_INT_FLAGS = { '--max-runs' => :max_runs, '--idle-timeout' => :idle_timeout,
                            '--poll-interval' => :poll_interval }.freeze
       DAEMON_STR_FLAGS = { '--name' => :agent_name, '--role' => :role }.freeze
@@ -193,11 +193,19 @@ module RubynCode
       end
 
       def run_repl
+        maybe_first_run!
         REPL.new(
           session_id: @options[:session_id],
           project_root: Dir.pwd,
           yolo: @options[:yolo]
         ).run
+      end
+
+      def maybe_first_run!
+        return unless FirstRun.needed?
+        return if FirstRun.skipped?(skip_flag: @options[:skip_setup])
+
+        FirstRun.new.run
       end
 
       def display_help

@@ -14,6 +14,9 @@ module RubynCode
           check_auth
           check_skills
           check_project
+          check_mcp
+          check_codebase_index
+          check_skill_catalog
         ].freeze
 
         def execute(_args, ctx)
@@ -95,6 +98,76 @@ module RubynCode
 
           type = detect_project_type(ctx.project_root)
           ['Project detected', true, "#{type} at #{ctx.project_root}"]
+        end
+
+        def check_mcp(ctx)
+          config_path = File.join(ctx.project_root, MCP::Config::CONFIG_FILENAME)
+          return ['MCP connectivity', false, 'mcp.json not found'] unless File.exist?(config_path)
+
+          servers = MCP::Config.load(ctx.project_root)
+          return ['MCP connectivity', false, 'no servers configured'] if servers.empty?
+
+          reachable = servers.count { |s| mcp_server_reachable?(s) }
+          detail = "#{reachable}/#{servers.size} servers reachable"
+          ['MCP connectivity', reachable == servers.size, detail]
+        rescue StandardError => e
+          ['MCP connectivity', false, e.message]
+        end
+
+        def mcp_server_reachable?(server)
+          command = server[:command]
+          return false if command.nil? || command.empty?
+
+          # Check if the command binary exists on PATH
+          system("command -v #{command} > /dev/null 2>&1")
+        end
+
+        def check_codebase_index(ctx)
+          index_path = File.join(ctx.project_root, Index::CodebaseIndex::INDEX_DIR,
+                                 Index::CodebaseIndex::INDEX_FILE)
+          return ['Codebase index', false, 'index not found'] unless File.exist?(index_path)
+
+          mtime = File.mtime(index_path)
+          age_hours = ((Time.now - mtime) / 3600).round(1)
+          stale = age_hours > 24
+          detail = "#{age_hours}h old#{' (stale — consider reindexing)' if stale}"
+          ['Codebase index', !stale, detail]
+        rescue StandardError => e
+          ['Codebase index', false, e.message]
+        end
+
+        def check_skill_catalog(ctx)
+          catalog = ctx.skill_loader.catalog
+          entries = catalog.available
+          return ['Skill catalog', false, 'no skills found'] if entries.empty?
+
+          malformed = count_malformed_skills(catalog.skills_dirs)
+          detail = "#{entries.size} skills loaded"
+          detail += ", #{malformed} malformed" if malformed.positive?
+          ['Skill catalog', malformed.zero?, detail]
+        rescue StandardError => e
+          ['Skill catalog', false, e.message]
+        end
+
+        def count_malformed_skills(skills_dirs)
+          count = 0
+          skills_dirs.each do |dir|
+            next unless File.directory?(dir)
+
+            Dir.glob(File.join(dir, '**/*.md')).each do |path|
+              count += 1 unless valid_skill_file?(path)
+            end
+          end
+          count
+        end
+
+        def valid_skill_file?(path)
+          content = File.read(path, 1024, encoding: 'UTF-8')
+                        .encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
+          doc = Skills::Document.parse(content, filename: path)
+          !doc.name.nil? && !doc.name.empty?
+        rescue StandardError
+          false
         end
 
         def detect_project_type(root)
