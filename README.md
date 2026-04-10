@@ -373,9 +373,13 @@ Add a provider and its API key in one command:
 /provider list
 ```
 
-API keys are stored securely in `~/.rubyn-code/tokens.yml` (permissions `0600`).
-Environment variables also work as a fallback — set `GROQ_API_KEY`, `TOGETHER_API_KEY`, etc.
-in your shell profile if you prefer that approach.
+API keys are **encrypted at rest** using AES-256-GCM. The encryption key is derived from
+your machine identity (username, hostname, home directory) via PBKDF2, so keys are only
+decryptable on the same machine by the same user. Rubyn decrypts them automatically at
+runtime and re-encrypts on save — no manual steps required.
+
+Keys stored via environment variables (`GROQ_API_KEY`, `TOGETHER_API_KEY`, etc.) also work
+as a fallback if you prefer that approach.
 
 Or add directly to `~/.rubyn-code/config.yml`:
 
@@ -496,6 +500,35 @@ providers:
 | **top** | Architecture, security review, complex refactors, planning | `claude-opus-4-6` |
 
 You can also set custom pricing per model so `/cost` reports accurate spending for third-party providers.
+
+## Security
+
+### Credential Storage
+
+All provider API keys are encrypted at rest using **AES-256-GCM** (authenticated encryption).
+Keys are never stored as plaintext on disk.
+
+| Layer | Detail |
+|-------|--------|
+| **Cipher** | AES-256-GCM (authenticated — detects tampering) |
+| **Key derivation** | PBKDF2-HMAC-SHA256, 100,000 iterations |
+| **Machine binding** | Key derived from username + hostname + home directory |
+| **Salt** | Random 32-byte salt, generated once, stored in `~/.rubyn-code/.encryption_salt` |
+| **File permissions** | `tokens.yml` and `.encryption_salt` are `0600` (owner read/write only) |
+
+This means:
+- Keys copied to another machine or user account cannot be decrypted
+- The encryption key is never stored — it is derived at runtime
+- Plaintext keys from older versions are automatically encrypted on first read
+
+### File Permissions
+
+| File | Permissions | Contents |
+|------|------------|----------|
+| `~/.rubyn-code/` | `0700` | Home directory |
+| `~/.rubyn-code/tokens.yml` | `0600` | Encrypted API keys, OAuth tokens |
+| `~/.rubyn-code/.encryption_salt` | `0600` | PBKDF2 salt (not secret alone, but protected) |
+| `~/.rubyn-code/config.yml` | `0600` | Provider config (no secrets) |
 
 ## Development
 
