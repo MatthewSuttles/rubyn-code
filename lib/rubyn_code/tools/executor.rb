@@ -136,7 +136,7 @@ module RubynCode
       rescue StandardError => e
         RubynCode::Debug.warn("CodebaseIndex incremental update failed: #{e.message}")
       end
-      
+
       # Detect file paths that a bash command may have written to and
       # invalidate them from the file cache.
       def invalidate_bash_write_targets(params)
