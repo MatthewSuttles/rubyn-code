@@ -29,6 +29,7 @@ module RubynCode
   # Auth
   module Auth
     autoload :OAuth, 'rubyn_code/auth/oauth'
+    autoload :KeyEncryption, 'rubyn_code/auth/key_encryption'
     autoload :TokenStore, 'rubyn_code/auth/token_store'
     autoload :Server, 'rubyn_code/auth/server'
   end
@@ -45,6 +46,7 @@ module RubynCode
       autoload :JsonParsing, 'rubyn_code/llm/adapters/json_parsing'
       autoload :PromptCaching, 'rubyn_code/llm/adapters/prompt_caching'
       autoload :Anthropic, 'rubyn_code/llm/adapters/anthropic'
+      autoload :AnthropicCompatible, 'rubyn_code/llm/adapters/anthropic_compatible'
       autoload :AnthropicStreaming, 'rubyn_code/llm/adapters/anthropic_streaming'
       autoload :OpenAI, 'rubyn_code/llm/adapters/openai'
       autoload :OpenAIStreaming, 'rubyn_code/llm/adapters/openai_streaming'
@@ -265,6 +267,7 @@ module RubynCode
       autoload :Diff, 'rubyn_code/cli/commands/diff'
       autoload :Model, 'rubyn_code/cli/commands/model'
       autoload :NewSession, 'rubyn_code/cli/commands/new_session'
+      autoload :Provider, 'rubyn_code/cli/commands/provider'
     end
   end
 

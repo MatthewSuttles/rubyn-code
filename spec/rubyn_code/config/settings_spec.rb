@@ -187,6 +187,20 @@ RSpec.describe RubynCode::Config::Settings do
       expect(cfg).not_to have_key('env_key')
       expect(cfg).not_to have_key('models')
       expect(cfg).not_to have_key('pricing')
+      expect(cfg).not_to have_key('api_format')
+    end
+
+    it 'persists api_format when provided' do
+      settings = described_class.new(config_path: config_path)
+      settings.add_provider('proxy',
+                            base_url: 'https://proxy.example.com/v1',
+                            api_format: 'anthropic',
+                            models: %w[claude-sonnet-4-6])
+
+      reloaded = described_class.new(config_path: config_path)
+      cfg = reloaded.provider_config('proxy')
+      expect(cfg['api_format']).to eq('anthropic')
+      expect(cfg['base_url']).to eq('https://proxy.example.com/v1')
     end
   end
 

@@ -333,6 +333,8 @@ rubyn-code --help             # Show help
 | `/budget [amt]` | Show or set session budget |
 | `/skill [name]` | Load or list available skills |
 | `/resume [id]` | Resume or list sessions |
+| `/provider` | Add or list providers |
+| `/model` | Show/switch model and provider |
 
 ## Authentication
 
@@ -354,13 +356,49 @@ export OPENAI_API_KEY=sk-...
 
 Available models: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-4o`, `gpt-4o-mini`, `o3`, `o4-mini`
 
-### OpenAI-Compatible Providers (Groq, Together, Ollama, etc.)
+### Other Providers (Groq, Together, Ollama, etc.)
 
-Set the provider-specific API key and configure via `config.yml`:
+Add a provider and its API key in one command:
 
 ```bash
-export GROQ_API_KEY=gsk-...
+/provider add groq https://api.groq.com/openai/v1 --key gsk-xxx --models llama-3.3-70b
+
+# For Anthropic-format proxies (e.g., Bedrock, custom gateways)
+/provider add my-proxy https://proxy.example.com/v1 --format anthropic --key sk-xxx --models claude-sonnet-4-6
+
+# Update a key later
+/provider set-key groq gsk-new-key
+
+# List configured providers
+/provider list
 ```
+
+API keys are **encrypted at rest** using AES-256-GCM. The encryption key is derived from
+your machine identity (username, hostname, home directory) via PBKDF2, so keys are only
+decryptable on the same machine by the same user. Rubyn decrypts them automatically at
+runtime and re-encrypts on save — no manual steps required.
+
+Keys stored via environment variables (`GROQ_API_KEY`, `TOGETHER_API_KEY`, etc.) also work
+as a fallback if you prefer that approach.
+
+Or add directly to `~/.rubyn-code/config.yml`:
+
+```yaml
+providers:
+  groq:
+    base_url: https://api.groq.com/openai/v1
+    env_key: GROQ_API_KEY
+    models:
+      top: llama-3.3-70b
+  my-proxy:
+    api_format: anthropic        # 'openai' (default) or 'anthropic'
+    base_url: https://proxy.example.com/v1
+    env_key: PROXY_API_KEY
+    models:
+      top: claude-sonnet-4-6
+```
+
+Then switch with `/model groq:llama-3.3-70b`.
 
 Local providers (Ollama, LM Studio) running on `localhost`/`127.0.0.1` don't require an API key.
 
@@ -406,15 +444,9 @@ permission_mode: autonomous
 # provider: openai
 # model: gpt-4o
 
-# Use an OpenAI-compatible provider
+# Use a custom provider (add via /provider add or under providers: key)
 # provider: groq
-# provider_base_url: https://api.groq.com/openai/v1
 # model: llama-3.3-70b
-
-# Local Ollama (no API key needed)
-# provider: ollama
-# provider_base_url: http://localhost:11434/v1
-# model: llama3
 ```
 
 ### Multi-Provider Model Routing
@@ -468,6 +500,35 @@ providers:
 | **top** | Architecture, security review, complex refactors, planning | `claude-opus-4-6` |
 
 You can also set custom pricing per model so `/cost` reports accurate spending for third-party providers.
+
+## Security
+
+### Credential Storage
+
+All provider API keys are encrypted at rest using **AES-256-GCM** (authenticated encryption).
+Keys are never stored as plaintext on disk.
+
+| Layer | Detail |
+|-------|--------|
+| **Cipher** | AES-256-GCM (authenticated — detects tampering) |
+| **Key derivation** | PBKDF2-HMAC-SHA256, 100,000 iterations |
+| **Machine binding** | Key derived from username + hostname + home directory |
+| **Salt** | Random 32-byte salt, generated once, stored in `~/.rubyn-code/.encryption_salt` |
+| **File permissions** | `tokens.yml` and `.encryption_salt` are `0600` (owner read/write only) |
+
+This means:
+- Keys copied to another machine or user account cannot be decrypted
+- The encryption key is never stored — it is derived at runtime
+- Plaintext keys from older versions are automatically encrypted on first read
+
+### File Permissions
+
+| File | Permissions | Contents |
+|------|------------|----------|
+| `~/.rubyn-code/` | `0700` | Home directory |
+| `~/.rubyn-code/tokens.yml` | `0600` | Encrypted API keys, OAuth tokens |
+| `~/.rubyn-code/.encryption_salt` | `0600` | PBKDF2 salt (not secret alone, but protected) |
+| `~/.rubyn-code/config.yml` | `0600` | Provider config (no secrets) |
 
 ## Development
 

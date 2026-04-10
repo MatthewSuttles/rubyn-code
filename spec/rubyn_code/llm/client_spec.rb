@@ -49,6 +49,37 @@ RSpec.describe RubynCode::LLM::Client do
       expect(groq_client.adapter).to be_a(RubynCode::LLM::Adapters::OpenAICompatible)
     end
 
+    it 'resolves anthropic-format providers to AnthropicCompatible adapter' do
+      settings = instance_double(
+        RubynCode::Config::Settings,
+        provider_config: {
+          'base_url' => 'https://proxy.example.com/v1',
+          'api_format' => 'anthropic',
+          'models' => { 'top' => 'claude-opus-4-6' }
+        }
+      )
+      allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+
+      proxy_client = described_class.new(provider: 'proxy')
+      expect(proxy_client.provider_name).to eq('proxy')
+      expect(proxy_client.adapter).to be_a(RubynCode::LLM::Adapters::AnthropicCompatible)
+      expect(proxy_client.models).to eq(%w[claude-opus-4-6])
+    end
+
+    it 'defaults to OpenAICompatible when api_format is not set' do
+      settings = instance_double(
+        RubynCode::Config::Settings,
+        provider_config: {
+          'base_url' => 'https://api.together.xyz/v1',
+          'models' => %w[meta-llama/Llama-3-70b]
+        }
+      )
+      allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+
+      together_client = described_class.new(provider: 'together')
+      expect(together_client.adapter).to be_a(RubynCode::LLM::Adapters::OpenAICompatible)
+    end
+
     it 'raises ConfigError when provider has no config' do
       settings = instance_double(RubynCode::Config::Settings, provider_config: nil)
       allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
@@ -65,7 +96,7 @@ RSpec.describe RubynCode::LLM::Client do
       allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
 
       expect { described_class.new(provider: 'incomplete') }
-        .to raise_error(RubynCode::ConfigError, /Unknown provider/)
+        .to raise_error(RubynCode::ConfigError, /missing base_url/)
     end
   end
 

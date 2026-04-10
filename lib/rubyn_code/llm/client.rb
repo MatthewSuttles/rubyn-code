@@ -65,6 +65,22 @@ module RubynCode
 
       private
 
+      def build_custom_adapter(provider, config, base_url, available_models)
+        case config.fetch('api_format', 'openai')
+        when 'anthropic'
+          Adapters::AnthropicCompatible.new(provider: provider, base_url: base_url, available_models: available_models)
+        else
+          Adapters::OpenAICompatible.new(provider: provider, base_url: base_url, available_models: available_models)
+        end
+      end
+
+      def extract_model_names(config)
+        raw = config&.dig('models')
+        return [] unless raw
+
+        raw.is_a?(Hash) ? raw.values : Array(raw)
+      end
+
       # Builds the appropriate adapter for a given provider name.
       def resolve_adapter(provider)
         case provider
@@ -74,12 +90,20 @@ module RubynCode
           config = Config::Settings.new.provider_config(provider)
           base_url = config&.fetch('base_url', nil)
 
-          unless base_url
+          if config.nil?
             raise ConfigError,
-                  "Unknown provider '#{provider}'. Add base_url to config.yml under providers.#{provider}"
+                  "Unknown provider '#{provider}'. " \
+                  "Add it to config.yml under providers.#{provider} with base_url, env_key, and models."
           end
 
-          Adapters::OpenAICompatible.new(provider: provider, base_url: base_url)
+          unless base_url
+            raise ConfigError,
+                  "Provider '#{provider}' is missing base_url in config.yml. " \
+                  "Add base_url under providers.#{provider} (e.g., base_url: https://api.#{provider}.com/v1)"
+          end
+
+          available_models = extract_model_names(config)
+          build_custom_adapter(provider, config, base_url, available_models)
         end
       end
     end

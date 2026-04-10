@@ -60,6 +60,33 @@ RSpec.describe RubynCode::LLM::Adapters::OpenAICompatible do
   end
 
   describe 'API key resolution' do
+    before do
+      allow(RubynCode::Auth::TokenStore).to receive(:load_provider_key).and_return(nil)
+    end
+
+    it 'uses stored key from TokenStore' do
+      allow(RubynCode::Auth::TokenStore).to receive(:load_provider_key)
+        .with('groq').and_return('gsk-stored-key')
+
+      keyless = described_class.new(
+        provider: 'groq',
+        base_url: 'https://api.groq.com/openai/v1',
+        available_models: %w[llama-3.3-70b]
+      )
+
+      stub_request(:post, 'https://api.groq.com/openai/v1/chat/completions')
+        .with(headers: { 'Authorization' => 'Bearer gsk-stored-key' })
+        .to_return(status: 200, body: success_body)
+
+      response = keyless.chat(
+        messages: [{ role: 'user', content: 'Hi' }],
+        model: 'llama-3.3-70b',
+        max_tokens: 1024
+      )
+
+      expect(response.text).to eq('Hello from Groq!')
+    end
+
     it 'falls back to PROVIDER_API_KEY env var' do
       original = ENV.delete('GROQ_API_KEY')
       ENV['GROQ_API_KEY'] = 'gsk-env-key'
@@ -96,7 +123,7 @@ RSpec.describe RubynCode::LLM::Adapters::OpenAICompatible do
 
       expect do
         keyless.chat(messages: [{ role: 'user', content: 'Hi' }], model: 'llama-3.3-70b', max_tokens: 100)
-      end.to raise_error(RubynCode::LLM::Client::AuthExpiredError, /GROQ_API_KEY/)
+      end.to raise_error(RubynCode::LLM::Client::AuthExpiredError, /set-key/)
     ensure
       ENV['GROQ_API_KEY'] = original if original
     end
