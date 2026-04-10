@@ -98,7 +98,13 @@ Score: 18/22 (82%) — 4 failures
 ### 11. Slash Commands (report only — don't execute)
 - Report which slash commands are registered by reading `lib/rubyn_code/cli/commands/registry.rb` or the help output. PASS if at least 15 commands found.
 
-### 12. Architecture Integrity
+### 12. MCP Integration
+- **grep**: Search for `url:.*server_def` in `lib/rubyn_code/mcp/config.rb`. PASS if at least 1 match found (confirms SSE url is extracted — a critical bug was shipped without this).
+- **grep**: Search for `autoload.*Mcp` in `lib/rubyn_code.rb`. PASS if found (confirms `/mcp` command is wired up).
+- **run_specs**: Run `bundle exec rspec spec/rubyn_code/mcp/config_spec.rb --format progress`. PASS if output contains `0 failures`.
+- **bash**: Check if `.rubyn-code/mcp.json` exists in the project root. PASS if exists, SKIP if not (MCP is optional per-project).
+
+### 13. Architecture Integrity
 - **grep**: Search for `autoload` in `lib/rubyn_code.rb`. PASS if at least 40 autoload entries found.
 - **glob**: Check that all 16 layer directories exist under `lib/rubyn_code/`. PASS if at least 14 found.
 - **read_file**: Read `lib/rubyn_code.rb` and verify it has modules for Agent, Tools, Context, Skills, Memory, Observability, Learning. PASS if all 7 found.
