@@ -22,9 +22,9 @@ module RubynCode
         end
 
         def list_skills(ctx)
-          skills = ctx.skill_loader.catalog.list
+          skills = ctx.skill_loader.catalog.available
           ctx.renderer.info("Available skills (#{skills.size}):")
-          skills.each { |skill| puts "  /#{skill}" }
+          skills.each { |skill| puts "  /#{skill[:name]}: #{skill[:description]}" }
         end
       end
     end
