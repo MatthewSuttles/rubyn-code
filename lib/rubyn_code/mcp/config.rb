@@ -49,7 +49,8 @@ module RubynCode
         def parse_servers(servers)
           servers.map do |name, server_def|
             { name: name, command: server_def['command'],
-              args: Array(server_def['args']), env: expand_env(server_def['env'] || {}) }
+              args: Array(server_def['args']), env: expand_env(server_def['env'] || {}),
+              url: server_def['url'], timeout: server_def['timeout'] }
           end
         end
 

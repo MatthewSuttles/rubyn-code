@@ -44,6 +44,9 @@ module RubynCode
       # @return [Boolean]
       attr_accessor :plan_mode
 
+      # @return [Index::CodebaseIndex, nil]
+      attr_reader :codebase_index
+
       # Send a user message and run the agent loop until a final text
       # response is produced or the iteration limit is reached.
       #
@@ -123,6 +126,7 @@ module RubynCode
       def build_codebase_index!
         index = Index::CodebaseIndex.new(project_root: @project_root)
         index.load_or_build!
+        @codebase_index = index
         RubynCode::Debug.agent("Codebase index: #{index.stats[:nodes]} nodes, #{index.stats[:files_indexed]} files")
       rescue StandardError => e
         RubynCode::Debug.warn("Codebase index failed: #{e.message}")
@@ -143,6 +147,7 @@ module RubynCode
 
       def run_iteration(iteration)
         log_iteration(iteration)
+        @context_manager.advance_turn!
         compact_if_needed # ensure context is under threshold before LLM call
         response   = call_llm
         tool_calls = extract_tool_calls(response)

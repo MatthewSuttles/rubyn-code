@@ -271,6 +271,142 @@ RSpec.describe RubynCode::Tools::Executor do
       end
     end
 
+    it 'injects ask_user_callback for ask_user tool' do
+      ask_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'ask_user')
+        const_set(:DESCRIPTION, 'Ask user')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :read)
+
+        attr_accessor :prompt_callback
+
+        def execute(**_params)
+          "callback=#{!prompt_callback.nil?}"
+        end
+      end
+      RubynCode::Tools::Registry.register(ask_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        executor.ask_user_callback = :fake_callback
+
+        result = executor.execute('ask_user', {})
+        expect(result).to eq('callback=true')
+      end
+    end
+    
+    it 'invalidates file cache entries when bash uses redirect operators' do
+      bash_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'bash')
+        const_set(:DESCRIPTION, 'Run bash')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :write)
+
+        def execute(command: '')
+          "ran: #{command}"
+        end
+      end
+      RubynCode::Tools::Registry.register(bash_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        cache = executor.file_cache
+
+        # Pre-populate a cache entry
+        test_file = File.join(dir, 'test.txt')
+        File.write(test_file, 'original')
+        cache.read(test_file)
+        expect(cache.cache.key?(test_file)).to be true
+
+        # Execute a bash command that writes to the file via redirect
+        executor.execute('bash', { 'command' => "echo hello > #{test_file}" })
+
+        # The cache entry should have been invalidated
+        expect(cache.cache.key?(test_file)).to be false
+      end
+    end
+
+    it 'invalidates file cache entries when bash uses append redirect' do
+      bash_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'bash')
+        const_set(:DESCRIPTION, 'Run bash')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :write)
+
+        def execute(command: '')
+          "ran: #{command}"
+        end
+      end
+      RubynCode::Tools::Registry.register(bash_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        cache = executor.file_cache
+
+        test_file = File.join(dir, 'test.txt')
+        File.write(test_file, 'original')
+        cache.read(test_file)
+        expect(cache.cache.key?(test_file)).to be true
+
+        executor.execute('bash', { 'command' => "echo more >> #{test_file}" })
+        expect(cache.cache.key?(test_file)).to be false
+      end
+    end
+
+    it 'invalidates file cache entries when bash uses tee' do
+      bash_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'bash')
+        const_set(:DESCRIPTION, 'Run bash')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :write)
+
+        def execute(command: '')
+          "ran: #{command}"
+        end
+      end
+      RubynCode::Tools::Registry.register(bash_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        cache = executor.file_cache
+
+        test_file = File.join(dir, 'output.log')
+        File.write(test_file, 'original')
+        cache.read(test_file)
+        expect(cache.cache.key?(test_file)).to be true
+
+        executor.execute('bash', { 'command' => "echo data | tee #{test_file}" })
+        expect(cache.cache.key?(test_file)).to be false
+      end
+    end
+
+    it 'invalidates file cache entries when bash uses sed -i' do
+      bash_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'bash')
+        const_set(:DESCRIPTION, 'Run bash')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :write)
+
+        def execute(command: '')
+          "ran: #{command}"
+        end
+      end
+      RubynCode::Tools::Registry.register(bash_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        cache = executor.file_cache
+
+        test_file = File.join(dir, 'config.yml')
+        File.write(test_file, 'original')
+        cache.read(test_file)
+        expect(cache.cache.key?(test_file)).to be true
+
+        executor.execute('bash', { 'command' => "sed -i 's/old/new/' #{test_file}" })
+        expect(cache.cache.key?(test_file)).to be false
+      end
+    end
+
     it 'does not inject dependencies for ordinary tools' do
       plain_tool = Class.new(RubynCode::Tools::Base) do
         const_set(:TOOL_NAME, 'plain_tool')
@@ -293,6 +429,116 @@ RSpec.describe RubynCode::Tools::Executor do
 
         result = executor.execute('plain_tool', {})
         expect(result).to eq('client=nil,worker=nil')
+      end
+    end
+  end
+
+  describe 'incremental codebase index update' do
+    let(:write_tool) do
+      Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'write_file')
+        const_set(:DESCRIPTION, 'Write a file')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :write)
+
+        def execute(path:, content: '')
+          File.write(path, content)
+          "Wrote #{path}"
+        end
+      end
+    end
+
+    let(:edit_tool) do
+      Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'edit_file')
+        const_set(:DESCRIPTION, 'Edit a file')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :write)
+
+        def execute(path:, **_rest)
+          "Edited #{path}"
+        end
+      end
+    end
+
+    before do
+      RubynCode::Tools::Registry.register(write_tool)
+      RubynCode::Tools::Registry.register(edit_tool)
+    end
+
+    it 'calls update! on the codebase index after writing a .rb file' do
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        index = instance_double(RubynCode::Index::CodebaseIndex)
+        allow(index).to receive(:update!)
+        executor.codebase_index = index
+
+        rb_path = File.join(dir, 'test.rb')
+        executor.execute('write_file', { 'path' => rb_path, 'content' => 'class Foo; end' })
+        expect(index).to have_received(:update!).once
+      end
+    end
+
+    it 'calls update! on the codebase index after editing a .rb file' do
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        index = instance_double(RubynCode::Index::CodebaseIndex)
+        allow(index).to receive(:update!)
+        executor.codebase_index = index
+
+        rb_path = File.join(dir, 'test.rb')
+        executor.execute('edit_file', { 'path' => rb_path })
+        expect(index).to have_received(:update!).once
+      end
+    end
+
+    it 'does not call update! for non-Ruby files' do
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        index = instance_double(RubynCode::Index::CodebaseIndex)
+        allow(index).to receive(:update!)
+        executor.codebase_index = index
+
+        txt_path = File.join(dir, 'readme.txt')
+        executor.execute('write_file', { 'path' => txt_path, 'content' => 'hello' })
+        expect(index).not_to have_received(:update!)
+      end
+    end
+
+    it 'does not call update! when no codebase index is set' do
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        rb_path = File.join(dir, 'test.rb')
+        # Should not raise
+        expect do
+          executor.execute('write_file', { 'path' => rb_path, 'content' => 'class Foo; end' })
+        end.not_to raise_error
+      end
+    end
+
+    it 'logs and continues when index update fails' do
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir)
+        index = instance_double(RubynCode::Index::CodebaseIndex)
+        allow(index).to receive(:update!).and_raise(StandardError, 'index error')
+        executor.codebase_index = index
+
+        debug_mod = Module.new do
+          @messages = []
+          class << self
+            attr_reader :messages
+
+            def warn(msg)
+              @messages << msg
+            end
+          end
+        end
+        stub_const('RubynCode::Debug', debug_mod)
+
+        rb_path = File.join(dir, 'test.rb')
+        result = executor.execute('write_file', { 'path' => rb_path, 'content' => 'class Foo; end' })
+        expect(result).to include('Wrote')
+        expect(debug_mod.messages.last).to include('index error')
       end
     end
   end

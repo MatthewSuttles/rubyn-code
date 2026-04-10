@@ -42,6 +42,12 @@ RSpec.describe RubynCode::Context::Manager do
     end
   end
 
+  describe '#advance_turn!' do
+    it 'increments the current turn counter' do
+      expect { manager.advance_turn! }.to change(manager, :current_turn).by(1)
+    end
+  end
+
   describe '#reset!' do
     it 'zeroes the counters' do
       manager.track_usage(double(input_tokens: 50, output_tokens: 25))
@@ -49,6 +55,14 @@ RSpec.describe RubynCode::Context::Manager do
 
       expect(manager.total_input_tokens).to eq(0)
       expect(manager.total_output_tokens).to eq(0)
+    end
+
+    it 'resets the turn counter' do
+      manager.advance_turn!
+      manager.advance_turn!
+      manager.reset!
+
+      expect(manager.current_turn).to eq(0)
     end
   end
 
@@ -72,6 +86,43 @@ RSpec.describe RubynCode::Context::Manager do
         manager.check_compaction!(conversation)
 
         expect(RubynCode::Context::MicroCompact).not_to have_received(:call)
+      end
+    end
+
+    context 'compaction deduplication' do
+      let(:manager) { described_class.new(threshold: 10) }
+
+      it 'skips compaction on duplicate calls within the same turn' do
+        conversation.add_user_message('x' * 200)
+
+        allow(RubynCode::Context::MicroCompact).to receive(:call).and_return(0)
+        allow(RubynCode::Context::ContextCollapse).to receive(:call).and_return(nil)
+
+        manager.advance_turn!
+        manager.check_compaction!(conversation)
+
+        # Second call in the same turn should be skipped
+        expect(RubynCode::Context::MicroCompact).to have_received(:call).once
+
+        # Calling again without advance_turn! should not trigger
+        manager.check_compaction!(conversation)
+        expect(RubynCode::Context::MicroCompact).to have_received(:call).once
+      end
+
+      it 'allows compaction again after advancing the turn' do
+        conversation.add_user_message('x' * 200)
+
+        allow(RubynCode::Context::MicroCompact).to receive(:call).and_return(0)
+        allow(RubynCode::Context::ContextCollapse).to receive(:call).and_return(nil)
+
+        manager.advance_turn!
+        manager.check_compaction!(conversation)
+        expect(RubynCode::Context::MicroCompact).to have_received(:call).once
+
+        # Advance turn and call again — should run
+        manager.advance_turn!
+        manager.check_compaction!(conversation)
+        expect(RubynCode::Context::MicroCompact).to have_received(:call).twice
       end
     end
 
@@ -119,6 +170,68 @@ RSpec.describe RubynCode::Context::Manager do
         # so apply_compacted_messages is currently a no-op. This tests that
         # the compaction logic runs without error, not that messages are replaced.
         expect { manager.check_compaction!(conversation) }.not_to raise_error
+      end
+    end
+
+    context 'provider-aware micro-compact ratio' do
+      let(:conversation) { RubynCode::Agent::Conversation.new }
+
+      it 'uses 0.7 ratio (cached) by default when no llm_client is set' do
+        # threshold=200, 0.7 * 200 = 140 tokens ≈ 560 chars
+        mgr = described_class.new(threshold: 200)
+        conversation.add_user_message('x' * 700)
+
+        allow(RubynCode::Context::MicroCompact).to receive(:call).and_return(0)
+        mgr.check_compaction!(conversation)
+        expect(RubynCode::Context::MicroCompact).to have_received(:call)
+      end
+
+      it 'uses 0.7 ratio for Anthropic provider (has prompt caching)' do
+        anthropic_client = double('llm_client', provider_name: 'anthropic')
+        # threshold=200, 0.7 * 200 = 140 tokens ≈ 560 chars
+        mgr = described_class.new(threshold: 200, llm_client: anthropic_client)
+        conversation.add_user_message('x' * 700)
+
+        allow(RubynCode::Context::MicroCompact).to receive(:call).and_return(0)
+        mgr.check_compaction!(conversation)
+        expect(RubynCode::Context::MicroCompact).to have_received(:call)
+      end
+
+      it 'uses 0.5 ratio for OpenAI provider (no prompt caching)' do
+        openai_client = double('llm_client', provider_name: 'openai')
+        # With OpenAI: threshold=200, 0.5 * 200 = 100 tokens trigger
+        # With Anthropic: threshold=200, 0.7 * 200 = 140 tokens trigger
+        # We want est between 100 and 140 so it fires for OpenAI but not Anthropic
+        mgr = described_class.new(threshold: 200, llm_client: openai_client)
+        # ~480 chars JSON => ~120 estimated tokens (between 100 and 140)
+        conversation.add_user_message('x' * 450)
+
+        allow(RubynCode::Context::MicroCompact).to receive(:call).and_return(0)
+        mgr.check_compaction!(conversation)
+        expect(RubynCode::Context::MicroCompact).to have_received(:call)
+      end
+
+      it 'does not fire micro-compact with Anthropic at the same token level' do
+        anthropic_client = double('llm_client', provider_name: 'anthropic')
+        # Same threshold and content as the OpenAI test above
+        # Anthropic ratio 0.7 * 200 = 140 trigger, est ~120 < 140
+        mgr = described_class.new(threshold: 200, llm_client: anthropic_client)
+        conversation.add_user_message('x' * 450)
+
+        allow(RubynCode::Context::MicroCompact).to receive(:call).and_return(0)
+        mgr.check_compaction!(conversation)
+        expect(RubynCode::Context::MicroCompact).not_to have_received(:call)
+      end
+
+      it 'does not run micro-compact when below the OpenAI 0.5 ratio threshold' do
+        openai_client = double('llm_client', provider_name: 'openai')
+        mgr = described_class.new(threshold: 1000, llm_client: openai_client)
+        # threshold=1000, 0.5 * 1000 = 500 tokens ≈ 2000 chars
+        conversation.add_user_message('x' * 100) # well below
+
+        allow(RubynCode::Context::MicroCompact).to receive(:call).and_return(0)
+        mgr.check_compaction!(conversation)
+        expect(RubynCode::Context::MicroCompact).not_to have_received(:call)
       end
     end
   end

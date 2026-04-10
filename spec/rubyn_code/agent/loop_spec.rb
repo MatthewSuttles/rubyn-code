@@ -11,7 +11,8 @@ RSpec.describe RubynCode::Agent::Loop do
       check_compaction!: nil,
       track_usage: nil,
       estimated_tokens: 0,
-      needs_compaction?: false
+      needs_compaction?: false,
+      advance_turn!: nil
     )
   end
   let(:hook_runner)     { instance_double(RubynCode::Hooks::Runner, fire: nil) }
@@ -239,6 +240,32 @@ RSpec.describe RubynCode::Agent::Loop do
           m[:role] == 'user' && m[:content].is_a?(String) && m[:content].downcase.include?('repeating')
         end
         expect(nudge_present).to be true
+      end
+    end
+
+    context 'codebase index caching' do
+      it 'exposes codebase_index as nil before session init' do
+        expect(agent_loop.codebase_index).to be_nil
+      end
+
+      it 'stores the built index on @codebase_index after initialize_session!' do
+        Dir.mktmpdir do |tmpdir|
+          loop_with_root = described_class.new(
+            llm_client: llm_client,
+            tool_executor: tool_executor,
+            context_manager: context_manager,
+            hook_runner: hook_runner,
+            conversation: conversation,
+            permission_tier: RubynCode::Permissions::Tier::UNRESTRICTED,
+            stall_detector: stall_detector,
+            project_root: tmpdir
+          )
+
+          allow(llm_client).to receive(:chat).and_return(text_response('Hello!'))
+          loop_with_root.send_message('hi')
+
+          expect(loop_with_root.codebase_index).to be_a(RubynCode::Index::CodebaseIndex)
+        end
       end
     end
 

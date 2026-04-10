@@ -31,8 +31,10 @@ module RubynCode
         #
         # @param task_context [Symbol, nil] detected task type
         # @param discovered_tools [Set<String>] tools already discovered this session
+        # @param codebase_index [RubynCode::Index::CodebaseIndex, nil] optional index for deeper context detection
+        # @param message [String, nil] original user message for index-based matching
         # @return [Array<String>] tool names to include in the schema
-        def active_tools(task_context: nil, discovered_tools: Set.new)
+        def active_tools(task_context: nil, discovered_tools: Set.new, codebase_index: nil, message: nil)
           tools = BASE_TOOLS.dup
 
           # Always include interaction tools
@@ -45,6 +47,12 @@ module RubynCode
             tools.concat(context_tools)
           end
 
+          # Add index-aware tools when a codebase index and message are available
+          if codebase_index && message
+            index_contexts = detect_index_contexts(message, codebase_index)
+            index_contexts.each { |ctx| tools.concat(resolve_context_tools(ctx)) }
+          end
+
           # Always include previously discovered tools
           tools.concat(discovered_tools.to_a)
 
@@ -54,8 +62,9 @@ module RubynCode
         # Detect task context from a user message.
         #
         # @param message [String]
+        # @param codebase_index [RubynCode::Index::CodebaseIndex, nil] optional index for deeper detection
         # @return [Symbol, nil]
-        def detect_context(message) # rubocop:disable Metrics/CyclomaticComplexity -- context detection dispatch
+        def detect_context(message, codebase_index: nil) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- context detection dispatch
           msg = message.to_s.downcase
           return :testing if msg.match?(/\b(test|spec|rspec)\b/)
           return :git     if msg.match?(/\b(commit|push|diff|branch|merge|git)\b/)
@@ -65,7 +74,27 @@ module RubynCode
           return :explore if msg.match?(/\b(explore|architecture|structure)\b/)
           return :teams   if msg.match?(/\b(team|spawn|message|inbox)\b/)
 
-          nil
+          # Fall back to index-based detection when keyword matching yields nothing
+          return nil unless codebase_index
+
+          index_contexts = detect_index_contexts(message, codebase_index)
+          index_contexts.first
+        end
+
+        # Detect additional tool contexts based on codebase index content.
+        #
+        # @param message [String] user message
+        # @param codebase_index [RubynCode::Index::CodebaseIndex] codebase index instance
+        # @return [Array<Symbol>] detected context symbols
+        def detect_index_contexts(message, codebase_index)
+          contexts = []
+          return contexts unless codebase_index
+
+          contexts << :rails if message_mentions_model?(message, codebase_index)
+          contexts << :testing if message_mentions_specced_file?(message, codebase_index)
+          contexts.uniq
+        rescue StandardError
+          []
         end
 
         # Filter full tool definitions to only include active tools.
@@ -91,6 +120,30 @@ module RubynCode
             context.flat_map { |c| TASK_TOOLS.fetch(c, []) }
           else
             []
+          end
+        end
+
+        # Check if the user message mentions a model name from the index.
+        def message_mentions_model?(message, codebase_index)
+          model_names = codebase_index.nodes
+                                      .select { |n| n['type'] == 'model' }
+                                      .map { |n| n['name'] }
+          return false if model_names.empty?
+
+          msg_lower = message.to_s.downcase
+          model_names.any? { |name| msg_lower.include?(name.downcase) }
+        end
+
+        # Check if the user message mentions a file that has specs in the index.
+        def message_mentions_specced_file?(message, codebase_index)
+          spec_edges = codebase_index.edges.select { |e| e['relationship'] == 'tests' }
+          return false if spec_edges.empty?
+
+          tested_files = spec_edges.map { |e| e['to'] }.compact
+          msg_lower = message.to_s.downcase
+          tested_files.any? do |file|
+            basename = File.basename(file, '.rb')
+            msg_lower.include?(basename)
           end
         end
       end

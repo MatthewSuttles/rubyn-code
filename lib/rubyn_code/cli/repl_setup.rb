@@ -11,6 +11,7 @@ module RubynCode
         setup_services!
         setup_executor_callbacks!
         setup_hooks!
+        setup_mcp_servers!
         setup_agent_loop!
       end
 
@@ -139,6 +140,41 @@ module RubynCode
         user_skills = File.join(Config::Defaults::HOME_DIR, 'skills')
         dirs << user_skills if Dir.exist?(user_skills)
         dirs
+      end
+
+      # ── MCP Server Wiring ─────────────────────────────────────────
+
+      def setup_mcp_servers!
+        @mcp_clients = []
+        server_configs = MCP::Config.load(@project_root)
+        return if server_configs.empty?
+
+        server_configs.each do |config|
+          connect_mcp_server(config)
+        end
+
+        at_exit { disconnect_mcp_clients! unless defined?(RSpec) }
+      end
+
+      def connect_mcp_server(config)
+        client = MCP::Client.from_config(config)
+        client.connect!
+        MCP::ToolBridge.bridge(client)
+        @mcp_clients << client
+        @renderer.info("MCP server '#{config[:name]}' connected (#{client.tools.size} tools)")
+      rescue StandardError => e
+        warn "[MCP] Failed to connect '#{config[:name]}': #{e.message}"
+      end
+
+      def disconnect_mcp_clients!
+        return if @mcp_clients.nil? || @mcp_clients.empty?
+
+        @mcp_clients.each do |client|
+          client.disconnect!
+        rescue StandardError => e
+          warn "[MCP] Error disconnecting '#{client.name}': #{e.message}"
+        end
+        @mcp_clients.clear
       end
     end
   end
