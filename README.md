@@ -358,29 +358,24 @@ Available models: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-4o`, `gpt-4o-m
 
 ### Other Providers (Groq, Together, Ollama, etc.)
 
-Set the API key as an environment variable in your shell profile (`~/.zshrc`, `~/.bashrc`):
+Add a provider and its API key in one command:
 
 ```bash
-export GROQ_API_KEY=gsk-...
-export TOGETHER_API_KEY=...
-```
+/provider add groq https://api.groq.com/openai/v1 --key gsk-xxx --models llama-3.3-70b
 
-The env var name comes from the `env_key` field in your config. If omitted, Rubyn derives it
-from the provider name: `<PROVIDER>_API_KEY` (uppercased, hyphens become underscores).
-For example, provider `bedrock-proxy` looks for `BEDROCK_PROXY_API_KEY`.
+# For Anthropic-format proxies (e.g., Bedrock, custom gateways)
+/provider add my-proxy https://proxy.example.com/v1 --format anthropic --key sk-xxx --models claude-sonnet-4-6
 
-Add providers interactively or via config:
-
-```bash
-# Via slash command
-/provider add groq https://api.groq.com/openai/v1 --env-key GROQ_API_KEY --models llama-3.3-70b
-
-# For Anthropic-format proxies (e.g., Bedrock, custom proxies)
-/provider add my-proxy https://proxy.example.com/v1 --format anthropic --env-key PROXY_API_KEY --models claude-sonnet-4-6
+# Update a key later
+/provider set-key groq gsk-new-key
 
 # List configured providers
 /provider list
 ```
+
+API keys are stored securely in `~/.rubyn-code/tokens.yml` (permissions `0600`).
+Environment variables also work as a fallback — set `GROQ_API_KEY`, `TOGETHER_API_KEY`, etc.
+in your shell profile if you prefer that approach.
 
 Or add directly to `~/.rubyn-code/config.yml`:
 

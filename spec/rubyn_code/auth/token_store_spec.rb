@@ -86,5 +86,52 @@ RSpec.describe RubynCode::Auth::TokenStore do
       tokens = described_class.load_for_provider('myai')
       expect(tokens[:access_token]).to eq('key-123')
     end
+
+    it 'returns stored key before checking env var' do
+      described_class.save_provider_key('groq', 'stored-key')
+      tokens = described_class.load_for_provider('groq')
+      expect(tokens[:access_token]).to eq('stored-key')
+      expect(tokens[:source]).to eq(:stored)
+    end
+
+    it 'falls back to env when no stored key exists' do
+      allow(ENV).to receive(:fetch).with('GROQ_API_KEY', nil).and_return('env-key')
+      tokens = described_class.load_for_provider('groq')
+      expect(tokens[:access_token]).to eq('env-key')
+      expect(tokens[:source]).to eq(:env)
+    end
+  end
+
+  describe '.save_provider_key and .load_provider_key' do
+    it 'stores and retrieves a provider API key' do
+      described_class.save_provider_key('groq', 'gsk-test-key')
+      expect(described_class.load_provider_key('groq')).to eq('gsk-test-key')
+    end
+
+    it 'stores multiple provider keys' do
+      described_class.save_provider_key('groq', 'gsk-key')
+      described_class.save_provider_key('together', 'tog-key')
+      expect(described_class.load_provider_key('groq')).to eq('gsk-key')
+      expect(described_class.load_provider_key('together')).to eq('tog-key')
+    end
+
+    it 'returns nil for unknown providers' do
+      expect(described_class.load_provider_key('unknown')).to be_nil
+    end
+
+    it 'does not clobber existing Anthropic tokens' do
+      described_class.save(access_token: 'abc', refresh_token: 'xyz', expires_at: Time.now + 3600)
+      described_class.save_provider_key('groq', 'gsk-key')
+
+      tokens = described_class.load
+      expect(tokens[:access_token]).to eq('abc')
+      expect(described_class.load_provider_key('groq')).to eq('gsk-key')
+    end
+
+    it 'sets restrictive file permissions' do
+      described_class.save_provider_key('groq', 'gsk-key')
+      mode = File.stat(tokens_file).mode & 0o777
+      expect(mode).to eq(0o600)
+    end
   end
 end

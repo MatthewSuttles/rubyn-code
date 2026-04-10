@@ -186,17 +186,20 @@ providers:
 
 ### Setting up the API key
 
-Rubyn Code resolves API keys from the environment variable named in `env_key`. Set it in
-your shell profile (`~/.zshrc`, `~/.bashrc`, etc.):
+Pass `--key` when adding a provider, or set it separately:
 
-```bash
-export GROQ_API_KEY="gsk-your-key-here"
-export OPENAI_API_KEY="sk-your-key-here"
+```
+/provider add groq https://api.groq.com/openai/v1 --key gsk-your-key --models llama-3.3-70b
+/provider set-key groq gsk-new-key
 ```
 
-If `env_key` is not specified in the config, Rubyn derives it from the provider name:
+Keys are stored in `~/.rubyn-code/tokens.yml` (permissions `0600`).
+
+**Resolution order:** stored key in tokens.yml → environment variable → error.
+
+Environment variables work as a fallback. Rubyn checks `env_key` from config, or derives
 `<PROVIDER_NAME>_API_KEY` (uppercased, hyphens become underscores). For example, provider
-`bedrock-proxy` looks for `BEDROCK_PROXY_API_KEY`.
+`bedrock-proxy` checks `BEDROCK_PROXY_API_KEY`.
 
 Local providers (localhost / 127.0.0.1) skip the API key requirement entirely.
 

@@ -128,6 +128,33 @@ RSpec.describe RubynCode::LLM::Adapters::AnthropicCompatible do
   end
 
   describe 'API key resolution' do
+    before do
+      allow(RubynCode::Auth::TokenStore).to receive(:load_provider_key).and_return(nil)
+    end
+
+    it 'uses stored key from TokenStore' do
+      allow(RubynCode::Auth::TokenStore).to receive(:load_provider_key)
+        .with('bedrock-proxy').and_return('bp-stored-key')
+
+      keyless = described_class.new(
+        provider: 'bedrock-proxy',
+        base_url: 'https://proxy.example.com/v1',
+        available_models: %w[claude-sonnet-4-6]
+      )
+
+      stub_request(:post, 'https://proxy.example.com/v1/messages')
+        .with(headers: { 'x-api-key' => 'bp-stored-key' })
+        .to_return(status: 200, body: success_body)
+
+      response = keyless.chat(
+        messages: [{ role: 'user', content: 'Hi' }],
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024
+      )
+
+      expect(response.text).to eq('Hello from proxy!')
+    end
+
     it 'falls back to PROVIDER_API_KEY env var' do
       original = ENV.delete('BEDROCK_PROXY_API_KEY')
       ENV['BEDROCK_PROXY_API_KEY'] = 'bp-env-key'
@@ -164,7 +191,7 @@ RSpec.describe RubynCode::LLM::Adapters::AnthropicCompatible do
 
       expect do
         keyless.chat(messages: [{ role: 'user', content: 'Hi' }], model: 'claude-sonnet-4-6', max_tokens: 100)
-      end.to raise_error(RubynCode::LLM::Client::AuthExpiredError, /BEDROCK_PROXY_API_KEY/)
+      end.to raise_error(RubynCode::LLM::Client::AuthExpiredError, /set-key/)
     ensure
       ENV['BEDROCK_PROXY_API_KEY'] = original if original
     end

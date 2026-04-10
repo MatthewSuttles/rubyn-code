@@ -21,12 +21,32 @@ module RubynCode
         end
 
         # Load API key for a given provider. Anthropic uses the full fallback chain.
+        # Other providers: stored key → env var.
         def load_for_provider(provider)
           return load if provider == 'anthropic'
+
+          stored = load_provider_key(provider)
+          return { access_token: stored, type: :api_key, source: :stored } if stored
 
           env_key = resolve_env_key(provider)
           api_key = ENV.fetch(env_key, nil)
           api_key&.empty? == false ? { access_token: api_key, type: :api_key, source: :env } : nil
+        end
+
+        # Store an API key for a provider in tokens.yml.
+        def save_provider_key(provider, key)
+          ensure_directory!
+          data = load_tokens_file || {}
+          data['provider_keys'] ||= {}
+          data['provider_keys'][provider.to_s] = key
+          File.write(tokens_path, YAML.dump(data))
+          File.chmod(0o600, tokens_path)
+        end
+
+        # Retrieve a stored API key for a provider.
+        def load_provider_key(provider)
+          data = load_tokens_file
+          data&.dig('provider_keys', provider.to_s)
         end
 
         def save(access_token:, refresh_token:, expires_at:)
@@ -116,6 +136,15 @@ module RubynCode
           return nil unless api_key && !api_key.empty?
 
           { access_token: api_key, refresh_token: nil, expires_at: nil, type: :api_key, source: :env }
+        end
+
+        def load_tokens_file
+          return nil unless File.exist?(tokens_path)
+
+          data = YAML.safe_load_file(tokens_path, permitted_classes: [Time])
+          data.is_a?(Hash) ? data : nil
+        rescue Psych::SyntaxError, Errno::EACCES
+          nil
         end
 
         def tokens_path = Config::Defaults::TOKENS_FILE

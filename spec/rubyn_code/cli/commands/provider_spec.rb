@@ -156,6 +156,46 @@ RSpec.describe RubynCode::CLI::Commands::Provider do
 
         expect(renderer).to have_received(:info).with(%r{/model groq:llama-3.3-70b})
       end
+
+      it 'stores API key via --key flag' do
+        allow(settings).to receive(:add_provider)
+        allow(RubynCode::Auth::TokenStore).to receive(:save_provider_key)
+
+        command.execute(%w[add groq https://api.groq.com/openai/v1 --key gsk-secret --models llama-3.3-70b], ctx)
+
+        expect(RubynCode::Auth::TokenStore).to have_received(:save_provider_key).with('groq', 'gsk-secret')
+        expect(renderer).to have_received(:info).with(/api_key: stored/)
+      end
+
+      it 'does not store key when --key is not provided' do
+        allow(settings).to receive(:add_provider)
+        allow(RubynCode::Auth::TokenStore).to receive(:save_provider_key)
+
+        command.execute(%w[add groq https://api.groq.com/openai/v1], ctx)
+
+        expect(RubynCode::Auth::TokenStore).not_to have_received(:save_provider_key)
+      end
+    end
+
+    context 'with "set-key"' do
+      it 'stores the API key for a provider' do
+        allow(RubynCode::Auth::TokenStore).to receive(:save_provider_key)
+
+        command.execute(%w[set-key groq gsk-new-key], ctx)
+
+        expect(RubynCode::Auth::TokenStore).to have_received(:save_provider_key).with('groq', 'gsk-new-key')
+        expect(renderer).to have_received(:success).with(/API key stored for 'groq'/)
+      end
+
+      it 'requires name and key' do
+        command.execute(%w[set-key groq], ctx)
+        expect(renderer).to have_received(:warning).with(/Usage:/)
+      end
+
+      it 'requires name' do
+        command.execute(%w[set-key], ctx)
+        expect(renderer).to have_received(:warning).with(/Usage:/)
+      end
     end
   end
 end
