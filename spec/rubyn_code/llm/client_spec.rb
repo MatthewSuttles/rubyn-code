@@ -31,6 +31,18 @@ RSpec.describe RubynCode::LLM::Client do
       expect(custom_client.provider_name).to eq('test')
     end
 
+    it 'reads provider and model from config when not passed' do
+      settings = instance_double(
+        RubynCode::Config::Settings,
+        model: 'custom-model', provider: 'openai'
+      )
+      allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
+
+      config_client = described_class.new
+      expect(config_client.provider_name).to eq('openai')
+      expect(config_client.model).to eq('custom-model')
+    end
+
     it 'resolves openai provider' do
       openai_client = described_class.new(provider: 'openai')
       expect(openai_client.provider_name).to eq('openai')
@@ -40,6 +52,7 @@ RSpec.describe RubynCode::LLM::Client do
     it 'resolves providers configured in config.yml' do
       settings = instance_double(
         RubynCode::Config::Settings,
+        model: 'claude-opus-4-6', provider: 'anthropic',
         provider_config: { 'base_url' => 'https://api.groq.com/openai/v1' }
       )
       allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
@@ -52,6 +65,7 @@ RSpec.describe RubynCode::LLM::Client do
     it 'resolves anthropic-format providers to AnthropicCompatible adapter' do
       settings = instance_double(
         RubynCode::Config::Settings,
+        model: 'claude-opus-4-6', provider: 'anthropic',
         provider_config: {
           'base_url' => 'https://proxy.example.com/v1',
           'api_format' => 'anthropic',
@@ -69,6 +83,7 @@ RSpec.describe RubynCode::LLM::Client do
     it 'defaults to OpenAICompatible when api_format is not set' do
       settings = instance_double(
         RubynCode::Config::Settings,
+        model: 'claude-opus-4-6', provider: 'anthropic',
         provider_config: {
           'base_url' => 'https://api.together.xyz/v1',
           'models' => %w[meta-llama/Llama-3-70b]
@@ -81,7 +96,11 @@ RSpec.describe RubynCode::LLM::Client do
     end
 
     it 'raises ConfigError when provider has no config' do
-      settings = instance_double(RubynCode::Config::Settings, provider_config: nil)
+      settings = instance_double(
+        RubynCode::Config::Settings,
+        model: 'claude-opus-4-6', provider: 'anthropic',
+        provider_config: nil
+      )
       allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
 
       expect { described_class.new(provider: 'martian-ai') }
@@ -91,6 +110,7 @@ RSpec.describe RubynCode::LLM::Client do
     it 'raises ConfigError when provider config has no base_url' do
       settings = instance_double(
         RubynCode::Config::Settings,
+        model: 'claude-opus-4-6', provider: 'anthropic',
         provider_config: { 'models' => ['some-model'] }
       )
       allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
