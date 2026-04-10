@@ -222,6 +222,16 @@ module RubynCode
     autoload :Shortcut, 'rubyn_code/learning/shortcut'
   end
 
+  # IDE (VS Code extension server)
+  module IDE
+    autoload :Protocol, 'rubyn_code/ide/protocol'
+    autoload :Server, 'rubyn_code/ide/server'
+
+    module Adapters
+      autoload :ToolOutput, 'rubyn_code/ide/adapters/tool_output'
+    end
+  end
+
   # Self-Test
   autoload :SelfTest, 'rubyn_code/self_test'
 

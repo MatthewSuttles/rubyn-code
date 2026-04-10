@@ -1,0 +1,137 @@
+{
+  "name": "rubyn-code",
+  "displayName": "Rubyn Code",
+  "description": "Ruby & Rails agentic coding assistant",
+  "publisher": "rubyn",
+  "version": "0.1.0",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.98.0"
+  },
+  "activationEvents": [
+    "onLanguage:ruby",
+    "workspaceContains:Gemfile",
+    "workspaceContains:.rubyn-code"
+  ],
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Linters"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "rubyn-code.openChat",
+        "title": "Rubyn Code: Open Chat"
+      },
+      {
+        "command": "rubyn-code.reviewPR",
+        "title": "Rubyn Code: Review PR"
+      },
+      {
+        "command": "rubyn-code.refactorSelection",
+        "title": "Rubyn Code: Refactor Selection"
+      },
+      {
+        "command": "rubyn-code.generateSpecs",
+        "title": "Rubyn Code: Generate Specs"
+      },
+      {
+        "command": "rubyn-code.explainCode",
+        "title": "Rubyn Code: Explain Code"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "rubyn-code",
+          "title": "Rubyn Code",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "rubyn-code": [
+        {
+          "id": "rubyn-code.chat",
+          "name": "Chat",
+          "type": "webview"
+        },
+        {
+          "id": "rubyn-code.sessions",
+          "name": "Sessions"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Rubyn Code",
+      "properties": {
+        "rubyn-code.yoloMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable YOLO mode to auto-approve all tool calls without confirmation."
+        },
+        "rubyn-code.executablePath": {
+          "type": "string",
+          "default": "rubyn-code",
+          "description": "Path to the rubyn-code CLI executable."
+        },
+        "rubyn-code.sessionBudget": {
+          "type": "number",
+          "default": 5.00,
+          "description": "Maximum dollar budget per session."
+        },
+        "rubyn-code.model": {
+          "type": "string",
+          "default": "claude-sonnet-4-6",
+          "enum": [
+            "claude-opus-4-6",
+            "claude-sonnet-4-6"
+          ],
+          "description": "Claude model to use for completions."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "rubyn-code.openChat",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r"
+      },
+      {
+        "command": "rubyn-code.refactorSelection",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e",
+        "when": "editorHasSelection"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "webpack --mode production",
+    "watch": "webpack --mode development --watch",
+    "package": "vsce package",
+    "lint": "eslint src/ --ext .ts,.tsx",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/vscode": "^1.98.0",
+    "@vscode/test-electron": "^2.4.0",
+    "@vscode/vsce": "^3.2.0",
+    "css-loader": "^7.1.0",
+    "eslint": "^9.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "webpack": "^5.97.0",
+    "webpack-cli": "^6.0.0"
+  }
+}

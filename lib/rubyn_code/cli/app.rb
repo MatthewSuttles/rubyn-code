@@ -26,6 +26,7 @@ module RubynCode
           rubyn-code --resume [ID]      Resume a previous session
           rubyn-code --setup            Pin rubyn-code to bypass rbenv/rvm
           rubyn-code --auth             Authenticate with Claude
+          rubyn-code --ide              Start IDE server (VS Code extension)
           rubyn-code --version          Show version
           rubyn-code --help             Show this help
 
@@ -57,7 +58,7 @@ module RubynCode
         '--help' => :help, '-h' => :help,
         '--auth' => :auth, '--setup' => :setup
       }.freeze
-      BOOLEAN_FLAGS = { '--yolo' => :yolo, '--debug' => :debug, '--skip-setup' => :skip_setup }.freeze
+      BOOLEAN_FLAGS = { '--yolo' => :yolo, '--debug' => :debug, '--skip-setup' => :skip_setup, '--ide' => :ide }.freeze
       DAEMON_INT_FLAGS = { '--max-runs' => :max_runs, '--idle-timeout' => :idle_timeout,
                            '--poll-interval' => :poll_interval }.freeze
       DAEMON_STR_FLAGS = { '--name' => :agent_name, '--role' => :role }.freeze
@@ -71,18 +72,20 @@ module RubynCode
         when :setup   then run_setup
         when :help    then display_help
         when :run     then run_single_prompt(@options[:prompt])
+        when :ide     then run_ide
         when :daemon  then run_daemon
         when :repl    then run_repl
         end
       end
 
-      def parse_options(argv)
+      def parse_options(argv) # rubocop:disable Metrics/AbcSize -- option parsing
         options = { command: :repl }
         idx = 0
         while idx < argv.length
           idx = parse_single_option(argv, idx, options)
           idx += 1
         end
+        options[:command] = :ide if options[:ide]
         options
       end
 
@@ -186,6 +189,10 @@ module RubynCode
         # Non-interactive: send one message and exit
         response = repl.instance_variable_get(:@agent_loop).send_message(prompt)
         puts response
+      end
+
+      def run_ide
+        IDE::Server.new.run
       end
 
       def run_daemon
