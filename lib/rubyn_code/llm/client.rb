@@ -18,9 +18,8 @@ module RubynCode
       attr_accessor :model
 
       def initialize(model: nil, provider: nil, adapter: nil)
-        settings = Config::Settings.new
-        @model = model || settings.model
-        @provider = provider || settings.provider
+        @model = model || Config::Defaults::DEFAULT_MODEL
+        @provider = provider || Config::Defaults::DEFAULT_PROVIDER
         @adapter = adapter || resolve_adapter(@provider)
       end
 
