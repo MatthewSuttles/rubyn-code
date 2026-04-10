@@ -429,24 +429,21 @@ Local providers (Ollama, LM Studio) running on `localhost`/`127.0.0.1` don't req
 
 ## Configuration
 
+The `provider` and `model` keys at the top set the **default provider and model** used at startup.
+These must match a provider defined in the `providers` section (or a built-in like `anthropic`/`openai`).
+
 ```yaml
 # ~/.rubyn-code/config.yml (global)
-model: claude-opus-4-6
+provider: anthropic              # default provider on startup
+model: claude-opus-4-6           # default model on startup
 permission_mode: allow_read
 session_budget: 5.00
 daily_budget: 10.00
 
 # .rubyn-code/config.yml (project — overrides global)
-model: claude-sonnet-4-6
+provider: minimax                # this project uses MiniMax by default
+model: MiniMax-M2.7-highspeed
 permission_mode: autonomous
-
-# Use OpenAI instead of Anthropic
-# provider: openai
-# model: gpt-4o
-
-# Use a custom provider (add via /provider add or under providers: key)
-# provider: groq
-# model: llama-3.3-70b
 ```
 
 ### Multi-Provider Model Routing
