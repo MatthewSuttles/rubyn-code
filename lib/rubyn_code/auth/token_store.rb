@@ -33,33 +33,32 @@ module RubynCode
           api_key&.empty? == false ? { access_token: api_key, type: :api_key, source: :env } : nil
         end
 
-        # Store an API key for a provider in tokens.yml.
+        # Store an API key for a provider in tokens.yml (encrypted at rest).
         def save_provider_key(provider, key)
           ensure_directory!
           data = load_tokens_file || {}
           data['provider_keys'] ||= {}
-          data['provider_keys'][provider.to_s] = key
-          File.write(tokens_path, YAML.dump(data))
-          File.chmod(0o600, tokens_path)
+          data['provider_keys'][provider.to_s] = KeyEncryption.encrypt(key)
+          write_tokens_file(data)
         end
 
-        # Retrieve a stored API key for a provider.
+        # Retrieve a stored API key for a provider (decrypted transparently).
         def load_provider_key(provider)
           data = load_tokens_file
-          data&.dig('provider_keys', provider.to_s)
+          value = data&.dig('provider_keys', provider.to_s)
+          return nil unless value
+
+          migrate_plaintext_key!(data, provider, value) unless KeyEncryption.encrypted?(value)
+          KeyEncryption.decrypt(value)
         end
 
         def save(access_token:, refresh_token:, expires_at:)
           ensure_directory!
-
-          data = {
-            'access_token' => access_token,
-            'refresh_token' => refresh_token,
-            'expires_at' => expires_at.is_a?(Time) ? expires_at.iso8601 : expires_at.to_s
-          }
-
-          File.write(tokens_path, YAML.dump(data))
-          File.chmod(0o600, tokens_path)
+          data = load_tokens_file || {}
+          data['access_token'] = access_token
+          data['refresh_token'] = refresh_token
+          data['expires_at'] = expires_at.is_a?(Time) ? expires_at.iso8601 : expires_at.to_s
+          write_tokens_file(data)
           data
         end
 
@@ -136,6 +135,19 @@ module RubynCode
           return nil unless api_key && !api_key.empty?
 
           { access_token: api_key, refresh_token: nil, expires_at: nil, type: :api_key, source: :env }
+        end
+
+        def write_tokens_file(data)
+          File.write(tokens_path, YAML.dump(data))
+          File.chmod(0o600, tokens_path)
+        end
+
+        # Auto-encrypt a plaintext key from a pre-encryption install.
+        def migrate_plaintext_key!(data, provider, plaintext)
+          data['provider_keys'][provider.to_s] = KeyEncryption.encrypt(plaintext)
+          write_tokens_file(data)
+        rescue StandardError
+          nil # don't break reads if migration fails
         end
 
         def load_tokens_file

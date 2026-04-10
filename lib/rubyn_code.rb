@@ -29,6 +29,7 @@ module RubynCode
   # Auth
   module Auth
     autoload :OAuth, 'rubyn_code/auth/oauth'
+    autoload :KeyEncryption, 'rubyn_code/auth/key_encryption'
     autoload :TokenStore, 'rubyn_code/auth/token_store'
     autoload :Server, 'rubyn_code/auth/server'
   end

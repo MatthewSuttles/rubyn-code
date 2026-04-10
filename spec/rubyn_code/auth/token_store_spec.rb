@@ -9,6 +9,7 @@ RSpec.describe RubynCode::Auth::TokenStore do
 
   before do
     stub_const("RubynCode::Config::Defaults::TOKENS_FILE", tokens_file)
+    stub_const("RubynCode::Config::Defaults::HOME_DIR", tmpdir)
     # Bypass macOS Keychain — without this, .load finds real Claude tokens
     # and the TOKENS_FILE stub becomes meaningless
     allow(described_class).to receive(:load_from_keychain).and_return(nil)
@@ -132,6 +133,27 @@ RSpec.describe RubynCode::Auth::TokenStore do
       described_class.save_provider_key('groq', 'gsk-key')
       mode = File.stat(tokens_file).mode & 0o777
       expect(mode).to eq(0o600)
+    end
+
+    it 'stores keys encrypted on disk' do
+      described_class.save_provider_key('groq', 'gsk-secret')
+      raw = YAML.safe_load_file(tokens_file)
+      stored_value = raw.dig('provider_keys', 'groq')
+      expect(stored_value).to start_with('enc:v1:')
+      expect(stored_value).not_to include('gsk-secret')
+    end
+
+    it 'auto-migrates plaintext keys to encrypted on read' do
+      # Simulate a pre-encryption tokens.yml with a plaintext key
+      data = { 'provider_keys' => { 'groq' => 'gsk-plaintext' } }
+      File.write(tokens_file, YAML.dump(data))
+
+      # Reading should return the plaintext value
+      expect(described_class.load_provider_key('groq')).to eq('gsk-plaintext')
+
+      # And the file should now be encrypted
+      raw = YAML.safe_load_file(tokens_file)
+      expect(raw.dig('provider_keys', 'groq')).to start_with('enc:v1:')
     end
   end
 end
