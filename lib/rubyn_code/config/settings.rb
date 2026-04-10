@@ -115,7 +115,7 @@ module RubynCode
       # @param models [Array<String>] available model names
       # @param pricing [Hash] model => [input_rate, output_rate]
       # @param api_format [String, nil] API format ('openai' or 'anthropic')
-      def add_provider(name, base_url:, env_key: nil, models: [], pricing: {}, api_format: nil)
+      def add_provider(name, base_url:, env_key: nil, models: [], pricing: {}, api_format: nil) # rubocop:disable Metrics/ParameterLists -- all optional kwargs with defaults
         @data['providers'] ||= {}
         @data['providers'][name.to_s] = build_provider_hash(
           base_url: base_url, env_key: env_key, models: models, pricing: pricing, api_format: api_format

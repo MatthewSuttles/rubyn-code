@@ -7,7 +7,7 @@ require 'time'
 
 module RubynCode
   module Auth
-    module TokenStore
+    module TokenStore # rubocop:disable Metrics/ModuleLength -- single-responsibility credential store
       EXPIRY_BUFFER_SECONDS = 300 # 5 minutes
       KEYCHAIN_SERVICE = 'Claude Code-credentials'
 

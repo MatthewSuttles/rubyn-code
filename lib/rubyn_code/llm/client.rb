@@ -92,7 +92,8 @@ module RubynCode
 
           if config.nil?
             raise ConfigError,
-                  "Unknown provider '#{provider}'. Add it to config.yml under providers.#{provider} with base_url, env_key, and models."
+                  "Unknown provider '#{provider}'. " \
+                  "Add it to config.yml under providers.#{provider} with base_url, env_key, and models."
           end
 
           unless base_url

@@ -74,19 +74,21 @@ module RubynCode
         end
 
         def show_other_providers(current_provider, ctx)
-          settings = Config::Settings.new
-          providers = settings.data['providers']
-          return unless providers.is_a?(Hash)
-
-          others = providers.reject { |name, _| name == current_provider }
+          others = other_provider_entries(current_provider)
           return if others.empty?
 
           ctx.renderer.info('')
           ctx.renderer.info('Other providers:')
-          others.each do |name, cfg|
+          others.each { |label| ctx.renderer.info("  #{label}") }
+        end
+
+        def other_provider_entries(current_provider)
+          providers = Config::Settings.new.data['providers']
+          return [] unless providers.is_a?(Hash)
+
+          providers.reject { |name, _| name == current_provider }.map do |name, cfg|
             models = extract_config_models(cfg)
-            label = models.empty? ? name : "#{name}: #{models.join(', ')}"
-            ctx.renderer.info("  #{label}")
+            models.empty? ? name : "#{name}: #{models.join(', ')}"
           end
         end
 
