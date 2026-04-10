@@ -92,8 +92,8 @@ Every tool call (file read, file write, shell command) requires your approval be
 
 ## Full Documentation
 
-For comprehensive docs — configuration details, troubleshooting, YOLO mode guide, and development setup — see the [full extension documentation](../../docs/vscode-extension.md).
+For comprehensive docs — configuration details, troubleshooting, YOLO mode guide, and development setup — see the [full extension documentation](https://github.com/MatthewSuttles/rubyn-code/blob/main/docs/vscode-extension.md).
 
 ## License
 
-MIT License — see [LICENSE](../../LICENSE) for details.
+MIT License — see [LICENSE](https://github.com/MatthewSuttles/rubyn-code/blob/main/LICENSE) for details.
