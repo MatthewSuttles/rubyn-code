@@ -29,6 +29,8 @@ module RubynCode
         @renderer.error("Daemon failed: #{e.message}")
         RubynCode::Debug.warn(e.backtrace&.first(5)&.join("\n")) if @options[:debug]
         exit(1)
+      ensure
+        disconnect_mcp_clients!
       end
 
       private
@@ -37,6 +39,7 @@ module RubynCode
         ensure_home_dir!
         ensure_auth!
         setup_database!
+        setup_mcp_servers!
         display_banner!
       end
 
@@ -140,6 +143,39 @@ module RubynCode
         @renderer.info("  Final state:    #{status[:state]}")
         @renderer.info("  Tasks completed: #{status[:runs_completed]}")
         @renderer.info(format('  Total cost:     $%.4f', status[:total_cost]))
+      end
+
+      # ── MCP Server Wiring ─────────────────────────────────────────
+
+      def setup_mcp_servers!
+        @mcp_clients = []
+        server_configs = MCP::Config.load(@project_root)
+        return if server_configs.empty?
+
+        server_configs.each do |config|
+          connect_mcp_server(config)
+        end
+      end
+
+      def connect_mcp_server(config)
+        client = MCP::Client.from_config(config)
+        client.connect!
+        MCP::ToolBridge.bridge(client)
+        @mcp_clients << client
+        @renderer.info("  MCP server '#{config[:name]}' connected (#{client.tools.size} tools)")
+      rescue StandardError => e
+        warn "[MCP] Failed to connect '#{config[:name]}': #{e.message}"
+      end
+
+      def disconnect_mcp_clients!
+        return if @mcp_clients.nil? || @mcp_clients.empty?
+
+        @mcp_clients.each do |client|
+          client.disconnect!
+        rescue StandardError => e
+          warn "[MCP] Error disconnecting '#{client.name}': #{e.message}"
+        end
+        @mcp_clients.clear
       end
     end
   end

@@ -21,7 +21,8 @@ module RubynCode
           Commands::Version, Commands::Review, Commands::Resume,
           Commands::Spawn, Commands::Doctor, Commands::Tokens,
           Commands::Plan, Commands::ContextInfo, Commands::Diff,
-          Commands::Model, Commands::NewSession, Commands::Mcp
+          Commands::Model, Commands::NewSession, Commands::Mcp,
+          Commands::Provider
         ].each { |cmd| @command_registry.register(cmd) }
       end
 

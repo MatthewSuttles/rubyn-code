@@ -48,6 +48,7 @@ module RubynCode
         @renderer.info('Saving session...')
         save_session!
         @background_worker&.shutdown!
+        disconnect_mcp_clients!
         extract_learnings_if_needed
         decay_instincts
         @renderer.info("Session saved. Rubyn out. \u270C\uFE0F")

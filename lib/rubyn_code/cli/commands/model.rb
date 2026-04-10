@@ -68,7 +68,28 @@ module RubynCode
           current = client.model
           ctx.renderer.info("Provider: #{provider}")
           ctx.renderer.info("Current model: #{current}")
-          show_available(ctx)
+          ctx.renderer.info("Available: #{client.models.join(', ')}")
+          show_other_providers(provider, ctx)
+          ctx.renderer.info('Tip: /model provider:model to switch providers (e.g., /model openai:gpt-4o)')
+        end
+
+        def show_other_providers(current_provider, ctx)
+          others = other_provider_entries(current_provider)
+          return if others.empty?
+
+          ctx.renderer.info('')
+          ctx.renderer.info('Other providers:')
+          others.each { |label| ctx.renderer.info("  #{label}") }
+        end
+
+        def other_provider_entries(current_provider)
+          providers = Config::Settings.new.data['providers']
+          return [] unless providers.is_a?(Hash)
+
+          providers.reject { |name, _| name == current_provider }.map do |name, cfg|
+            models = extract_config_models(cfg)
+            models.empty? ? name : "#{name}: #{models.join(', ')}"
+          end
         end
 
         def show_available(ctx)
@@ -85,8 +106,17 @@ module RubynCode
           case provider
           when 'anthropic' then LLM::Adapters::Anthropic::AVAILABLE_MODELS
           when 'openai' then LLM::Adapters::OpenAI::AVAILABLE_MODELS
-          else []
+          else
+            cfg = Config::Settings.new.provider_config(provider)
+            extract_config_models(cfg)
           end
+        end
+
+        def extract_config_models(cfg)
+          raw = cfg&.dig('models')
+          return [] unless raw
+
+          raw.is_a?(Hash) ? raw.values : Array(raw)
         end
       end
     end

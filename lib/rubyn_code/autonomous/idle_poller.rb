@@ -53,26 +53,6 @@ module RubynCode
         @interrupted = true
       end
 
-      # Re-injects the agent's identity message when the conversation
-      # context has been compressed (i.e. the messages array is very short).
-      # This ensures the agent still knows who it is after compaction.
-      #
-      # @param messages [Array<Hash>] the current conversation messages
-      # @param identity [String] the identity/system prompt to re-inject
-      # @param threshold [Integer] message count below which re-injection triggers (default 3)
-      # @return [void]
-      def self.reinject_identity(messages, identity:, threshold: 3)
-        return if messages.length >= threshold
-        return if identity.nil? || identity.empty?
-
-        # Only re-inject if the identity is not already present as the
-        # first user message.
-        first_user = messages.find { |m| m[:role] == 'user' }
-        return if first_user && first_user[:content].to_s.include?(identity[0, 100])
-
-        messages.unshift({ role: 'user', content: identity })
-      end
-
       private
 
       # @return [Boolean]

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Build and install rubyn-code gem from the current branch.
+# Usage: bin/dev-install
+set -euo pipefail
+
+GEM_NAME="rubyn-code"
+VERSION=$(ruby -r ./lib/rubyn_code/version -e "puts RubynCode::VERSION")
+GEM_FILE="${GEM_NAME}-${VERSION}.gem"
+
+echo "==> Building ${GEM_NAME} v${VERSION} from $(git branch --show-current)..."
+gem build "${GEM_NAME}.gemspec" --quiet
+
+echo "==> Installing..."
+gem install "${GEM_FILE}" --no-document
+
+rm -f "${GEM_FILE}"
+echo "==> Done. Run 'rubyn-code' to test."

@@ -68,7 +68,7 @@ module RubynCode
         ]
 
         options = {}
-        options[:model] = 'claude-sonnet-4-20250514' if llm_client.respond_to?(:chat)
+        options[:model] = 'claude-sonnet-4-6' if llm_client.respond_to?(:chat)
 
         response = llm_client.chat(messages: summary_messages, **options)
 

@@ -134,6 +134,32 @@ RSpec.describe RubynCode::Agent::Conversation do
       expect(result_block[:content]).to include('[interrupted]')
       expect(result_block[:is_error]).to be true
     end
+
+    it 'inserts orphan repair before subsequent user messages' do
+      conversation.add_user_message('do something')
+      conversation.add_assistant_message(
+        'Calling tool...',
+        tool_calls: [
+          { type: 'tool_use', id: 'toolu_orphan', name: 'bash', input: { command: 'ls' } }
+        ]
+      )
+      # Simulate Ctrl-C: no tool_result, user sends a new message
+      conversation.add_user_message('never mind, just read the file')
+
+      formatted = conversation.to_api_format
+
+      # The repair should be inserted right after the assistant message,
+      # before the subsequent user message
+      assistant_idx = formatted.index { |m| m[:role] == 'assistant' }
+      repair_msg = formatted[assistant_idx + 1]
+      next_user_msg = formatted[assistant_idx + 2]
+
+      expect(repair_msg[:role]).to eq('user')
+      expect(repair_msg[:content].first[:type]).to eq('tool_result')
+      expect(repair_msg[:content].first[:tool_use_id]).to eq('toolu_orphan')
+      expect(next_user_msg[:role]).to eq('user')
+      expect(next_user_msg[:content]).to eq('never mind, just read the file')
+    end
   end
 
   describe '#replace!' do
