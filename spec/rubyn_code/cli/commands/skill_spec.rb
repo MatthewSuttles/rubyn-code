@@ -13,7 +13,12 @@ RSpec.describe RubynCode::CLI::Commands::Skill do
   end
   let(:renderer) { instance_double('Renderer', info: nil, error: nil) }
   let(:conversation) { instance_double('Conversation', add_user_message: nil) }
-  let(:catalog) { instance_double('Catalog', list: %w[rspec factory-bot]) }
+  let(:catalog) do
+    instance_double('Catalog', available: [
+      { name: 'rspec', description: 'RSpec testing' },
+      { name: 'factory-bot', description: 'FactoryBot gem' }
+    ])
+  end
   let(:skill_loader) { instance_double('SkillLoader', catalog: catalog, load: '# Skill content') }
 
   describe '.command_name' do
