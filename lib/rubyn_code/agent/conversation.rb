@@ -126,17 +126,46 @@ module RubynCode
 
       # Ensure every tool_use block has a matching tool_result.
       # If a tool_use is orphaned (e.g. from Ctrl-C interruption),
-      # inject a synthetic tool_result so the API doesn't reject the request.
+      # inject a synthetic tool_result immediately after the assistant
+      # message that contains the orphaned tool_use.
       def repair_orphaned_tool_uses(formatted)
         orphaned = collect_tool_use_ids(formatted) - collect_tool_result_ids(formatted)
         return formatted if orphaned.empty?
 
-        orphan_results = orphaned.map do |id|
+        insert_orphan_results(formatted, orphaned)
+      end
+
+      # Walk backwards to find the assistant message containing each orphaned
+      # tool_use and insert a user/tool_result message right after it.
+      # -- walks messages to find insertion point
+      def insert_orphan_results(formatted, orphaned)
+        orphan_set = orphaned.to_a.to_set
+        insert_idx = find_orphan_insert_index(formatted, orphan_set)
+
+        results = orphaned.map do |id|
           { type: 'tool_result', tool_use_id: id, content: '[interrupted]', is_error: true }
         end
 
-        formatted << { role: 'user', content: orphan_results }
+        formatted.insert(insert_idx, { role: 'user', content: results })
         formatted
+      end
+
+      # Find the index right after the last assistant message that contains
+      # any of the orphaned tool_use IDs.
+      def find_orphan_insert_index(formatted, orphan_set)
+        formatted.each_with_index.reverse_each do |msg, idx|
+          next unless msg[:role] == 'assistant' && msg[:content].is_a?(Array)
+          return idx + 1 if assistant_has_orphan?(msg, orphan_set)
+        end
+
+        formatted.length # fallback: append at end
+      end
+
+      def assistant_has_orphan?(msg, orphan_set)
+        msg[:content].any? do |block|
+          block.is_a?(Hash) && block_matches_type?(block, 'tool_use') &&
+            orphan_set.include?(block[:id] || block['id'])
+        end
       end
 
       def collect_tool_use_ids(formatted)
