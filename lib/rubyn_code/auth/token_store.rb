@@ -89,12 +89,17 @@ module RubynCode
         end
 
         def load_from_keychain
-          return nil unless RUBY_PLATFORM.include?('darwin')
+          if RUBY_PLATFORM.include?('darwin')
+            output = `security find-generic-password -s "#{KEYCHAIN_SERVICE}" -w 2>/dev/null`.strip
+            return nil if output.empty?
+            oauth = JSON.parse(output)['claudeAiOauth']
+          else
+            # Linux: Claude Code stores OAuth tokens in ~/.claude/.credentials.json
+            credentials_path = File.expand_path('~/.claude/.credentials.json')
+            return nil unless File.exist?(credentials_path)
+            oauth = JSON.parse(File.read(credentials_path))['claudeAiOauth']
+          end
 
-          output = `security find-generic-password -s "#{KEYCHAIN_SERVICE}" -w 2>/dev/null`.strip
-          return nil if output.empty?
-
-          oauth = JSON.parse(output)['claudeAiOauth']
           return nil unless oauth&.dig('accessToken')
 
           build_keychain_tokens(oauth)
