@@ -11,23 +11,19 @@ module RubynCode
       class AcceptEditHandler
         def initialize(server)
           @server = server
-          @pending = {}    # editId => { mutex:, cond:, accepted: }
+          @pending = {} # editId => { mutex:, cond:, accepted: }
           @mutex = Mutex.new
         end
 
         def call(params)
-          edit_id  = params["editId"]
-          accepted = params["accepted"]
+          edit_id  = params['editId']
+          accepted = params['accepted']
 
-          unless edit_id
-            return { "applied" => false, "error" => "Missing editId" }
-          end
+          return { 'applied' => false, 'error' => 'Missing editId' } unless edit_id
 
           entry = @mutex.synchronize { @pending[edit_id] }
 
-          unless entry
-            return { "applied" => false, "error" => "No pending edit: #{edit_id}" }
-          end
+          return { 'applied' => false, 'error' => "No pending edit: #{edit_id}" } unless entry
 
           entry[:mutex].synchronize do
             entry[:accepted] = accepted
@@ -36,7 +32,7 @@ module RubynCode
 
           @mutex.synchronize { @pending.delete(edit_id) }
 
-          { "applied" => accepted }
+          { 'applied' => accepted }
         end
 
         # Register a pending edit for user approval. Called by the agent
@@ -48,18 +44,18 @@ module RubynCode
         # @return [Boolean] whether the edit was accepted
         def wait_for_acceptance(edit_id, file_path, diff)
           entry = {
-            mutex:    Mutex.new,
-            cond:     ConditionVariable.new,
+            mutex: Mutex.new,
+            cond: ConditionVariable.new,
             accepted: nil
           }
 
           @mutex.synchronize { @pending[edit_id] = entry }
 
-          @server.notify("edit/proposed", {
-            "editId"   => edit_id,
-            "filePath" => file_path,
-            "diff"     => diff
-          })
+          @server.notify('edit/proposed', {
+                           'editId' => edit_id,
+                           'filePath' => file_path,
+                           'diff' => diff
+                         })
 
           # Block until the IDE extension responds
           entry[:mutex].synchronize do

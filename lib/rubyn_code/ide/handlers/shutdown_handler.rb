@@ -13,12 +13,12 @@ module RubynCode
         end
 
         def call(_params)
-          $stderr.puts "[ShutdownHandler] shutdown requested"
+          warn '[ShutdownHandler] shutdown requested'
 
           save_session!
           @server.stop!
 
-          { "shutdown" => true }
+          { 'shutdown' => true }
         end
 
         private
@@ -29,7 +29,7 @@ module RubynCode
           persistence = @server.session_persistence
           persistence&.save
         rescue StandardError => e
-          $stderr.puts "[ShutdownHandler] session save failed: #{e.message}"
+          warn "[ShutdownHandler] session save failed: #{e.message}"
         end
       end
     end

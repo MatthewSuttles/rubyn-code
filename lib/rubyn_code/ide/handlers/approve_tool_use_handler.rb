@@ -12,23 +12,19 @@ module RubynCode
       class ApproveToolUseHandler
         def initialize(server)
           @server = server
-          @pending = {}    # requestId => { mutex:, cond:, approved: }
+          @pending = {} # requestId => { mutex:, cond:, approved: }
           @mutex = Mutex.new
         end
 
         def call(params)
-          request_id = params["requestId"]
-          approved   = params["approved"]
+          request_id = params['requestId']
+          approved   = params['approved']
 
-          unless request_id
-            return { "resolved" => false, "error" => "Missing requestId" }
-          end
+          return { 'resolved' => false, 'error' => 'Missing requestId' } unless request_id
 
           entry = @mutex.synchronize { @pending[request_id] }
 
-          unless entry
-            return { "resolved" => false, "error" => "No pending request: #{request_id}" }
-          end
+          return { 'resolved' => false, 'error' => "No pending request: #{request_id}" } unless entry
 
           entry[:mutex].synchronize do
             entry[:approved] = approved
@@ -37,7 +33,7 @@ module RubynCode
 
           @mutex.synchronize { @pending.delete(request_id) }
 
-          { "resolved" => true, "requestId" => request_id }
+          { 'resolved' => true, 'requestId' => request_id }
         end
 
         # Register a pending tool approval. Called by the agent thread
@@ -49,18 +45,18 @@ module RubynCode
         # @return [Boolean] whether the tool use was approved
         def wait_for_approval(request_id, tool_name, tool_params)
           entry = {
-            mutex:    Mutex.new,
-            cond:     ConditionVariable.new,
+            mutex: Mutex.new,
+            cond: ConditionVariable.new,
             approved: nil
           }
 
           @mutex.synchronize { @pending[request_id] = entry }
 
-          @server.notify("tool/approval_required", {
-            "requestId" => request_id,
-            "tool"      => tool_name,
-            "params"    => tool_params
-          })
+          @server.notify('tool/approval_required', {
+                           'requestId' => request_id,
+                           'tool' => tool_name,
+                           'params' => tool_params
+                         })
 
           # Block until the IDE extension responds
           entry[:mutex].synchronize do

@@ -13,10 +13,10 @@ module RubynCode
           @server = server
         end
 
-        def call(params)
-          workspace = params["workspacePath"]
-          extension_version = params["extensionVersion"]
-          client_caps = params["capabilities"] || {}
+        def call(params) # rubocop:disable Metrics/MethodLength -- builds full capability handshake response
+          workspace = params['workspacePath']
+          extension_version = params['extensionVersion']
+          client_caps = params['capabilities'] || {}
 
           if workspace && Dir.exist?(workspace)
             Dir.chdir(workspace)
@@ -30,18 +30,18 @@ module RubynCode
           skill_count = skill_count!
 
           {
-            "serverVersion"    => RubynCode::VERSION,
-            "protocolVersion"  => "1.0",
-            "workspacePath"    => Dir.pwd,
-            "capabilities"     => {
-              "tools"          => tool_count,
-              "skills"         => skill_count,
-              "streaming"      => true,
-              "review"         => true,
-              "memory"         => true,
-              "teams"          => true,
-              "toolApproval"   => true,
-              "editApproval"   => true
+            'serverVersion' => RubynCode::VERSION,
+            'protocolVersion' => '1.0',
+            'workspacePath' => Dir.pwd,
+            'capabilities' => {
+              'tools' => tool_count,
+              'skills' => skill_count,
+              'streaming' => true,
+              'review' => true,
+              'memory' => true,
+              'teams' => true,
+              'toolApproval' => true,
+              'editApproval' => true
             }
           }
         end

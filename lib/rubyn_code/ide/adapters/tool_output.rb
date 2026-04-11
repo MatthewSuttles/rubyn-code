@@ -39,23 +39,17 @@ module RubynCode
         #     executor.execute("write_file", params)
         #   end
         #
-        def wrap_execution(tool_name, args, &original_execute)
+        def wrap_execution(tool_name, args, &)
           request_id = generate_id
 
-          if read_only?(tool_name)
-            return execute_and_notify(request_id, tool_name, args, &original_execute)
-          end
+          return execute_and_notify(request_id, tool_name, args, &) if read_only?(tool_name)
 
-          if tool_name == "run_specs"
-            return execute_streaming(request_id, tool_name, args, &original_execute)
-          end
+          return execute_streaming(request_id, tool_name, args, &) if tool_name == 'run_specs'
 
-          if file_write?(tool_name)
-            return execute_with_edit_gate(request_id, tool_name, args, &original_execute)
-          end
+          return execute_with_edit_gate(request_id, tool_name, args, &) if file_write?(tool_name)
 
           # bash and other mutating tools: emit tool/use, optionally wait for approval
-          execute_with_approval(request_id, tool_name, args, &original_execute)
+          execute_with_approval(request_id, tool_name, args, &)
         end
 
         # Called by ApproveToolUseHandler when the IDE client responds.
@@ -108,7 +102,7 @@ module RubynCode
 
         # ── File write tools (write_file, edit_file) ─────────────────────
 
-        def execute_with_edit_gate(request_id, tool_name, args)
+        def execute_with_edit_gate(request_id, tool_name, args) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength -- approval gate with notification flow
           emit_tool_use(request_id, tool_name, args, requires_approval: false)
 
           if @yolo
@@ -119,14 +113,14 @@ module RubynCode
 
           # Emit a file/edit or file/create notification and wait for acceptance
           edit_id = generate_id
-          notification_method = file_exists?(tool_name, args) ? "file/edit" : "file/create"
+          notification_method = file_exists?(tool_name, args) ? 'file/edit' : 'file/create'
 
           @server.notify(notification_method, {
-            "editId"   => edit_id,
-            "toolName" => tool_name,
-            "path"     => args["path"] || args[:path],
-            "args"     => args
-          })
+                           'editId' => edit_id,
+                           'toolName' => tool_name,
+                           'path' => args['path'] || args[:path],
+                           'args' => args
+                         })
 
           accepted = wait_for_edit(edit_id)
 
@@ -159,7 +153,7 @@ module RubynCode
           approved = wait_for_approval(request_id)
 
           unless approved
-            summary = "Tool execution denied by IDE user"
+            summary = 'Tool execution denied by IDE user'
             emit_tool_result(request_id, tool_name, summary, success: false)
             return summary
           end
@@ -175,23 +169,23 @@ module RubynCode
         # ── Notifications ────────────────────────────────────────────────
 
         def emit_tool_use(request_id, tool_name, args, requires_approval:)
-          @server.notify("tool/use", {
-            "requestId"        => request_id,
-            "toolName"         => tool_name,
-            "args"             => args,
-            "requiresApproval" => requires_approval
-          })
+          @server.notify('tool/use', {
+                           'requestId' => request_id,
+                           'toolName' => tool_name,
+                           'args' => args,
+                           'requiresApproval' => requires_approval
+                         })
         end
 
         def emit_tool_result(request_id, tool_name, result, success:)
           summary = result.is_a?(String) ? result[0, 500] : result.to_s[0, 500]
 
-          @server.notify("tool/result", {
-            "requestId" => request_id,
-            "toolName"  => tool_name,
-            "success"   => success,
-            "summary"   => summary
-          })
+          @server.notify('tool/result', {
+                           'requestId' => request_id,
+                           'toolName' => tool_name,
+                           'success' => success,
+                           'summary' => summary
+                         })
         end
 
         # ── Blocking waits ───────────────────────────────────────────────
@@ -251,9 +245,9 @@ module RubynCode
         end
 
         def file_exists?(tool_name, args)
-          return true if tool_name == "edit_file"
+          return true if tool_name == 'edit_file'
 
-          path = args["path"] || args[:path]
+          path = args['path'] || args[:path]
           path && File.exist?(path)
         end
 

@@ -13,19 +13,15 @@ module RubynCode
         end
 
         def call(params)
-          session_id = params["sessionId"]
+          session_id = params['sessionId']
 
-          unless session_id
-            return { "cancelled" => false, "error" => "Missing sessionId" }
-          end
+          return { 'cancelled' => false, 'error' => 'Missing sessionId' } unless session_id
 
           # Delegate to the PromptHandler which owns the session threads
           prompt_handler = @server.handler_instance(:prompt)
-          if prompt_handler
-            prompt_handler.cancel_session(session_id)
-          end
+          prompt_handler&.cancel_session(session_id)
 
-          { "cancelled" => true, "sessionId" => session_id }
+          { 'cancelled' => true, 'sessionId' => session_id }
         end
       end
     end

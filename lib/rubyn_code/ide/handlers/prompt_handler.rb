@@ -16,9 +16,9 @@ module RubynCode
         end
 
         def call(params)
-          text       = params["text"] || ""
-          context    = params["context"] || {}
-          session_id = params["sessionId"] || SecureRandom.uuid
+          text       = params['text'] || ''
+          context    = params['context'] || {}
+          session_id = params['sessionId'] || SecureRandom.uuid
 
           # Cancel any existing agent thread for this session
           cancel_session(session_id)
@@ -28,7 +28,7 @@ module RubynCode
             run_agent(session_id, text, context)
           end
 
-          { "accepted" => true, "sessionId" => session_id }
+          { 'accepted' => true, 'sessionId' => session_id }
         end
 
         # Called by CancelHandler to stop a running session.
@@ -42,47 +42,47 @@ module RubynCode
 
         private
 
-        def run_agent(session_id, text, context)
-          @server.notify("agent/status", {
-            "sessionId" => session_id,
-            "status"    => "thinking"
-          })
+        def run_agent(session_id, text, context) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength -- orchestrates agent lifecycle with notifications
+          @server.notify('agent/status', {
+                           'sessionId' => session_id,
+                           'status' => 'thinking'
+                         })
 
-          workspace = context["workspacePath"] || @server.workspace_path || Dir.pwd
+          workspace = context['workspacePath'] || @server.workspace_path || Dir.pwd
           agent_loop = build_agent_loop(session_id, workspace)
 
           enriched_input = build_enriched_input(text, context)
 
-          @server.notify("agent/status", {
-            "sessionId" => session_id,
-            "status"    => "streaming"
-          })
+          @server.notify('agent/status', {
+                           'sessionId' => session_id,
+                           'status' => 'streaming'
+                         })
 
           response = agent_loop.send_message(enriched_input)
 
-          @server.notify("agent/status", {
-            "sessionId" => session_id,
-            "status"    => "done"
-          })
+          @server.notify('agent/status', {
+                           'sessionId' => session_id,
+                           'status' => 'done'
+                         })
 
-          @server.notify("stream/text", {
-            "sessionId" => session_id,
-            "text"      => response,
-            "final"     => true
-          })
+          @server.notify('stream/text', {
+                           'sessionId' => session_id,
+                           'text' => response,
+                           'final' => true
+                         })
         rescue Interrupt
-          @server.notify("agent/status", {
-            "sessionId" => session_id,
-            "status"    => "cancelled"
-          })
+          @server.notify('agent/status', {
+                           'sessionId' => session_id,
+                           'status' => 'cancelled'
+                         })
         rescue StandardError => e
-          $stderr.puts "[PromptHandler] error: #{e.message}"
-          $stderr.puts e.backtrace&.first(5)&.join("\n")
-          @server.notify("agent/status", {
-            "sessionId" => session_id,
-            "status"    => "error",
-            "error"     => e.message
-          })
+          warn "[PromptHandler] error: #{e.message}"
+          warn e.backtrace&.first(5)&.join("\n")
+          @server.notify('agent/status', {
+                           'sessionId' => session_id,
+                           'status' => 'error',
+                           'error' => e.message
+                         })
         ensure
           @sessions.delete(session_id)
         end
@@ -101,79 +101,75 @@ module RubynCode
           tool_executor.llm_client = llm_client
 
           Agent::Loop.new(
-            llm_client:      llm_client,
-            tool_executor:   tool_executor,
+            llm_client: llm_client,
+            tool_executor: tool_executor,
             context_manager: context_manager,
-            hook_runner:     hook_runner,
-            conversation:    conversation,
+            hook_runner: hook_runner,
+            conversation: conversation,
             permission_tier: :allow_read,
-            deny_list:       Permissions::DenyList.new,
-            stall_detector:  stall_detector,
-            on_tool_call:    build_tool_call_callback(session_id),
-            on_tool_result:  build_tool_result_callback(session_id),
-            on_text:         build_text_callback(session_id),
-            project_root:    workspace
+            deny_list: Permissions::DenyList.new,
+            stall_detector: stall_detector,
+            on_tool_call: build_tool_call_callback(session_id),
+            on_tool_result: build_tool_result_callback(session_id),
+            on_text: build_text_callback(session_id),
+            project_root: workspace
           )
         end
 
         def build_tool_call_callback(session_id)
           lambda { |name, params|
-            @server.notify("agent/status", {
-              "sessionId" => session_id,
-              "status"    => "tool_use"
-            })
-            @server.notify("tool/use", {
-              "sessionId" => session_id,
-              "tool"      => name,
-              "params"    => params
-            })
+            @server.notify('agent/status', {
+                             'sessionId' => session_id,
+                             'status' => 'tool_use'
+                           })
+            @server.notify('tool/use', {
+                             'sessionId' => session_id,
+                             'tool' => name,
+                             'params' => params
+                           })
           }
         end
 
         def build_tool_result_callback(session_id)
           lambda { |name, result, _is_error = false|
-            @server.notify("tool/result", {
-              "sessionId" => session_id,
-              "tool"      => name,
-              "result"    => result.to_s[0, 4096]
-            })
-            @server.notify("agent/status", {
-              "sessionId" => session_id,
-              "status"    => "thinking"
-            })
+            @server.notify('tool/result', {
+                             'sessionId' => session_id,
+                             'tool' => name,
+                             'result' => result.to_s[0, 4096]
+                           })
+            @server.notify('agent/status', {
+                             'sessionId' => session_id,
+                             'status' => 'thinking'
+                           })
           }
         end
 
         def build_text_callback(session_id)
           lambda { |text|
-            @server.notify("agent/status", {
-              "sessionId" => session_id,
-              "status"    => "streaming"
-            })
-            @server.notify("stream/text", {
-              "sessionId" => session_id,
-              "text"      => text,
-              "final"     => false
-            })
+            @server.notify('agent/status', {
+                             'sessionId' => session_id,
+                             'status' => 'streaming'
+                           })
+            @server.notify('stream/text', {
+                             'sessionId' => session_id,
+                             'text' => text,
+                             'final' => false
+                           })
           }
         end
 
-        def build_enriched_input(text, context)
+        def build_enriched_input(text, context) # rubocop:disable Metrics/AbcSize -- assembles context parts from multiple optional fields
           parts = []
 
-          if context["activeFile"]
-            parts << "[Active file: #{context['activeFile']}]"
-          end
+          parts << "[Active file: #{context['activeFile']}]" if context['activeFile']
 
-          if context["selection"]
-            sel = context["selection"]
+          if context['selection']
+            sel = context['selection']
             range = "lines #{sel['startLine']}-#{sel['endLine']}"
             parts << "[Selection (#{range}):\n#{sel['text']}\n]"
           end
 
-          if context["openFiles"]&.any?
-            parts << "[Open files: #{context['openFiles'].join(', ')}]"
-          end
+          parts << "[Open files: #{context['openFiles'].join(', ')}]" if context['openFiles']&.any?
 
           if parts.any?
             "#{parts.join("\n")}\n\n#{text}"

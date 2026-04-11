@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 
-require "json"
+require 'json'
 
 module RubynCode
   module IDE
     # JSON-RPC 2.0 protocol layer for the IDE server.
     # Pure data — no side effects, no I/O beyond JSON serialisation.
     module Protocol
-      JSONRPC_VERSION = "2.0"
+      JSONRPC_VERSION = '2.0'
 
       # ── Standard JSON-RPC 2.0 error codes ──────────────────────────────
       PARSE_ERROR      = -32_700
@@ -25,31 +25,29 @@ module RubynCode
 
       # Parse a JSON string into a request hash.
       # Returns either a valid request hash or an error response hash.
-      def parse(line)
+      def parse(line) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- JSON-RPC validation checks
         begin
           data = JSON.parse(line)
         rescue JSON::ParserError
-          return error(nil, PARSE_ERROR, "Parse error: invalid JSON")
+          return error(nil, PARSE_ERROR, 'Parse error: invalid JSON')
         end
 
-        unless data.is_a?(Hash)
-          return error(nil, INVALID_REQUEST, "Invalid request: expected JSON object")
-        end
+        return error(nil, INVALID_REQUEST, 'Invalid request: expected JSON object') unless data.is_a?(Hash)
 
-        unless data["jsonrpc"] == JSONRPC_VERSION
-          return error(data["id"], INVALID_REQUEST, 'Invalid request: missing or wrong "jsonrpc" version')
+        unless data['jsonrpc'] == JSONRPC_VERSION
+          return error(data['id'], INVALID_REQUEST, 'Invalid request: missing or wrong "jsonrpc" version')
         end
 
         # Response objects (containing "result" or "error") are valid
         # JSON-RPC 2.0 messages that don't carry a "method".
-        is_response = data.key?("result") || data.key?("error")
+        is_response = data.key?('result') || data.key?('error')
 
-        unless is_response || data["method"].is_a?(String)
-          return error(data["id"], INVALID_REQUEST, 'Invalid request: "method" must be a string')
+        unless is_response || data['method'].is_a?(String)
+          return error(data['id'], INVALID_REQUEST, 'Invalid request: "method" must be a string')
         end
 
-        if data.key?("params") && !data["params"].is_a?(Hash) && !data["params"].is_a?(Array)
-          return error(data["id"], INVALID_PARAMS, 'Invalid params: "params" must be an object or array')
+        if data.key?('params') && !data['params'].is_a?(Hash) && !data['params'].is_a?(Array)
+          return error(data['id'], INVALID_PARAMS, 'Invalid params: "params" must be an object or array')
         end
 
         data
@@ -58,20 +56,20 @@ module RubynCode
       # Build a success response hash.
       def response(id, result)
         {
-          "jsonrpc" => JSONRPC_VERSION,
-          "id"      => id,
-          "result"  => stringify_keys_deep(result)
+          'jsonrpc' => JSONRPC_VERSION,
+          'id' => id,
+          'result' => stringify_keys_deep(result)
         }
       end
 
       # Build an error response hash.
       def error(id, code, message)
         {
-          "jsonrpc" => JSONRPC_VERSION,
-          "id"      => id,
-          "error"   => {
-            "code"    => code,
-            "message" => message
+          'jsonrpc' => JSONRPC_VERSION,
+          'id' => id,
+          'error' => {
+            'code' => code,
+            'message' => message
           }
         }
       end
@@ -79,15 +77,15 @@ module RubynCode
       # Build a notification hash (no id).
       def notification(method, params)
         {
-          "jsonrpc" => JSONRPC_VERSION,
-          "method"  => method,
-          "params"  => stringify_keys_deep(params)
+          'jsonrpc' => JSONRPC_VERSION,
+          'method' => method,
+          'params' => stringify_keys_deep(params)
         }
       end
 
       # Serialise a hash to a JSON string terminated by a newline.
       def serialize(hash)
-        JSON.generate(hash) + "\n"
+        "#{JSON.generate(hash)}\n"
       end
 
       # ── Helpers ────────────────────────────────────────────────────────

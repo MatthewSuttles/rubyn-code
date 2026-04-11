@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "json"
-require_relative "protocol"
-require_relative "handlers"
+require 'json'
+require_relative 'protocol'
+require_relative 'handlers'
 
 module RubynCode
   module IDE
@@ -35,7 +35,7 @@ module RubynCode
         @running = true
         setup_signal_traps!
 
-        $stderr.puts "[IDE::Server] started (pid=#{Process.pid})"
+        warn "[IDE::Server] started (pid=#{Process.pid})"
         $stdout.sync = true
 
         read_loop
@@ -90,33 +90,31 @@ module RubynCode
         msg = Protocol.parse(line)
 
         # Protocol.parse returns an error response hash when parsing fails.
-        if msg.key?("error")
+        if msg.key?('error')
           write(msg)
           return
         end
 
         dispatch(msg)
       rescue StandardError => e
-        $stderr.puts "[IDE::Server] error handling message: #{e.message}"
-        $stderr.puts e.backtrace&.first(5)&.join("\n")
+        warn "[IDE::Server] error handling message: #{e.message}"
+        warn e.backtrace&.first(5)&.join("\n")
 
-        id = msg.is_a?(Hash) ? msg["id"] : nil
+        id = msg.is_a?(Hash) ? msg['id'] : nil
         write(Protocol.error(id, Protocol::INTERNAL_ERROR, "Internal error: #{e.message}"))
       end
 
       # ── Dispatch ────────────────────────────────────────────────────
 
       def dispatch(msg)
-        method = msg["method"]
-        params = msg["params"] || {}
-        id     = msg["id"]
+        method = msg['method']
+        params = msg['params'] || {}
+        id     = msg['id']
 
         handler = @handlers[method]
 
         unless handler
-          if id
-            write(Protocol.error(id, Protocol::METHOD_NOT_FOUND, "Method not found: #{method}"))
-          end
+          write(Protocol.error(id, Protocol::METHOD_NOT_FOUND, "Method not found: #{method}")) if id
           return
         end
 
@@ -142,7 +140,7 @@ module RubynCode
       def setup_signal_traps!
         %w[TERM INT].each do |sig|
           trap(sig) do
-            $stderr.puts "[IDE::Server] received SIG#{sig}, shutting down"
+            warn "[IDE::Server] received SIG#{sig}, shutting down"
             @running = false
           end
         end
@@ -151,17 +149,15 @@ module RubynCode
       # ── Shutdown ────────────────────────────────────────────────────
 
       def graceful_shutdown!
-        $stderr.puts "[IDE::Server] shutting down"
+        warn '[IDE::Server] shutting down'
         save_session!
       end
 
       def save_session!
         # Delegate to Memory::SessionPersistence if available.
-        if defined?(RubynCode::Memory::SessionPersistence) && @session_persistence
-          @session_persistence.save
-        end
+        @session_persistence.save if defined?(RubynCode::Memory::SessionPersistence) && @session_persistence
       rescue StandardError => e
-        $stderr.puts "[IDE::Server] session save failed: #{e.message}"
+        warn "[IDE::Server] session save failed: #{e.message}"
       end
     end
   end
