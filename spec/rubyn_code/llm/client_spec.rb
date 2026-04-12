@@ -6,8 +6,8 @@ RSpec.describe RubynCode::LLM::Client do
   subject(:client) { described_class.new(model: 'claude-sonnet-4-20250514') }
 
   before do
-    allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(true)
-    allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(
+    allow(RubynCode::Auth::TokenStore).to receive(:valid_for?).with('anthropic').and_return(true)
+    allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(
       {
         access_token: 'sk-ant-oat-test-token',
         expires_at: Time.now + 3600,
@@ -201,7 +201,7 @@ RSpec.describe RubynCode::LLM::Client do
     end
 
     it 'calls on_text callback with text content for non-streaming (API key auth)' do
-      allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(
+      allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(
         {
           access_token: 'sk-ant-api01-test-key',
           expires_at: Time.now + 3600,
@@ -287,7 +287,7 @@ RSpec.describe RubynCode::LLM::Client do
 
   describe '#ensure_valid_token! with expired OAuth' do
     it 'raises AuthExpiredError when no valid auth exists' do
-      allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(false)
+      allow(RubynCode::Auth::TokenStore).to receive(:valid_for?).with('anthropic').and_return(false)
 
       expect { client.chat(messages: [{ role: 'user', content: 'Hi' }]) }
         .to raise_error(RubynCode::LLM::Client::AuthExpiredError, /No valid authentication/)

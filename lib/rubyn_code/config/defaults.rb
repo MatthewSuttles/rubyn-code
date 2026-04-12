@@ -9,6 +9,7 @@ module RubynCode
       TOKENS_FILE = File.join(HOME_DIR, 'tokens.yml')
       SESSIONS_DIR = File.join(HOME_DIR, 'sessions')
       MEMORIES_DIR = File.join(HOME_DIR, 'memories')
+      CLAUDE_CREDENTIALS_FILE = File.expand_path('~/.claude/.credentials.json')
 
       DEFAULT_PROVIDER = 'anthropic'
       DEFAULT_MODEL = 'claude-opus-4-6'

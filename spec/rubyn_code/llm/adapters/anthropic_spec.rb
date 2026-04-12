@@ -26,8 +26,8 @@ RSpec.describe RubynCode::LLM::Adapters::Anthropic do
   end
 
   before do
-    allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(true)
-    allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(oauth_token)
+    allow(RubynCode::Auth::TokenStore).to receive(:valid_for?).with('anthropic').and_return(true)
+    allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(oauth_token)
   end
 
   describe '#chat' do
@@ -54,7 +54,7 @@ RSpec.describe RubynCode::LLM::Adapters::Anthropic do
     end
 
     it 'uses x-api-key header for non-OAuth tokens' do
-      allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(api_key_token)
+      allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(api_key_token)
 
       stub_request(:post, 'https://api.anthropic.com/v1/messages')
         .with(headers: { 'x-api-key' => 'sk-ant-api01-test-key' })
@@ -174,7 +174,7 @@ RSpec.describe RubynCode::LLM::Adapters::Anthropic do
     end
 
     it 'raises AuthExpiredError when no valid auth exists' do
-      allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(false)
+      allow(RubynCode::Auth::TokenStore).to receive(:valid_for?).with('anthropic').and_return(false)
 
       expect do
         adapter.chat(messages: [{ role: 'user', content: 'Hi' }], model: 'test', max_tokens: 100)
@@ -182,7 +182,7 @@ RSpec.describe RubynCode::LLM::Adapters::Anthropic do
     end
 
     it 'calls on_text callback for non-streaming responses' do
-      allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(api_key_token)
+      allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(api_key_token)
 
       stub_request(:post, 'https://api.anthropic.com/v1/messages')
         .to_return(status: 200, body: success_body)

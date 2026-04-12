@@ -31,8 +31,8 @@ RSpec.describe RubynCode::CLI::Commands::Doctor do
   describe '#execute' do
     before do
       allow(db).to receive(:query).and_return([{ 'c' => 10 }])
-      allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(true)
-      allow(RubynCode::Auth::TokenStore).to receive(:load).and_return({ source: :api_key })
+      allow(RubynCode::Auth::TokenStore).to receive(:valid_for?).with('anthropic').and_return(true)
+      allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return({ source: :api_key })
     end
 
     it 'runs all health checks without raising' do

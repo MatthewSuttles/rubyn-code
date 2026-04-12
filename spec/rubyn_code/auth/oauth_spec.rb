@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-RSpec.describe RubynCode::Auth::OAuth do
+RSpec.describe RubynCode::Auth::AnthropicOAuth do
   subject(:oauth) { described_class.new }
 
   let(:token_url) { RubynCode::Config::Defaults::OAUTH_TOKEN_URL }
@@ -26,7 +26,7 @@ RSpec.describe RubynCode::Auth::OAuth do
   before do
     allow(RubynCode::Auth::Server).to receive(:new).and_return(mock_server)
     allow(RubynCode::Auth::TokenStore).to receive(:save)
-    allow(RubynCode::Auth::TokenStore).to receive(:load)
+    allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic')
     allow(oauth).to receive(:system)
     allow(SecureRandom).to receive(:hex).with(24).and_return(state)
   end
@@ -253,7 +253,7 @@ RSpec.describe RubynCode::Auth::OAuth do
     end
 
     before do
-      allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(stored_tokens)
+      allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(stored_tokens)
     end
 
     context 'happy path' do
@@ -306,7 +306,7 @@ RSpec.describe RubynCode::Auth::OAuth do
 
     context 'when no stored token is available' do
       before do
-        allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(nil)
+        allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(nil)
       end
 
       it 'raises RefreshError' do
@@ -319,7 +319,7 @@ RSpec.describe RubynCode::Auth::OAuth do
 
     context 'when stored token has no refresh_token' do
       before do
-        allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(
+        allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(
           { access_token: 'some-token', refresh_token: nil }
         )
       end

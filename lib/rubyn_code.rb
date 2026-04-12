@@ -28,9 +28,19 @@ module RubynCode
 
   # Auth
   module Auth
-    autoload :OAuth, 'rubyn_code/auth/oauth'
+    autoload :AnthropicOAuth, 'rubyn_code/auth/oauth'
     autoload :TokenStore, 'rubyn_code/auth/token_store'
+    autoload :TokenResult, 'rubyn_code/auth/token_result'
     autoload :Server, 'rubyn_code/auth/server'
+
+    # Strategy chain for loading tokens from various sources
+    module Strategies
+      autoload :Base, 'rubyn_code/auth/strategies/base'
+      autoload :Keychain, 'rubyn_code/auth/strategies/keychain'
+      autoload :CredentialsFile, 'rubyn_code/auth/strategies/credentials_file'
+      autoload :LocalFile, 'rubyn_code/auth/strategies/local_file'
+      autoload :EnvVar, 'rubyn_code/auth/strategies/env_var'
+    end
   end
 
   # LLM

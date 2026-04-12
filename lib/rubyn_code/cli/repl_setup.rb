@@ -116,21 +116,34 @@ module RubynCode
       end
 
       def ensure_auth!
-        provider = Config::Defaults::DEFAULT_PROVIDER
+        provider = config_settings.provider
         tokens = Auth::TokenStore.load_for_provider(provider)
 
         if tokens
-          source = tokens.fetch(:source, :unknown)
-          @renderer.info("Authenticated via #{source}") if source == :keychain
+          announce_auth_source(tokens)
           return true
         end
 
-        @renderer.error('No valid authentication found.')
-        @renderer.info('Options:')
-        @renderer.info('  1. Run Claude Code once to authenticate (Rubyn Code reads the keychain token)')
-        @renderer.info('  2. Set ANTHROPIC_API_KEY environment variable')
-        @renderer.info("  3. Run 'rubyn-code --auth' to enter an API key")
+        print_auth_help(provider)
         exit(1)
+      end
+
+      def announce_auth_source(tokens)
+        source = tokens.fetch(:source, :unknown)
+        display_name = Auth::TokenStore.display_name_for(source)
+        @renderer.info("Authenticated via #{display_name}") if display_name
+      end
+
+      def print_auth_help(provider)
+        @renderer.error("No valid authentication found for provider '#{provider}'.")
+        @renderer.info('Options:')
+        Auth::TokenStore.setup_hints_for(provider).each_with_index do |hint, idx|
+          @renderer.info("  #{idx + 1}. #{hint}")
+        end
+      end
+
+      def config_settings
+        @config_settings ||= Config::Settings.new
       end
 
       def skill_dirs

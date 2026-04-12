@@ -48,11 +48,12 @@ RSpec.describe 'LLM Adapter Integration', :aggregate_failures do # -- integratio
   end
 
   before do
-    allow(RubynCode::Auth::TokenStore).to receive_messages(valid?: true, load: {
-                                                             access_token: 'sk-ant-api01-test-key',
-                                                             expires_at: Time.now + 3600,
-                                                             source: :env
-                                                           })
+    allow(RubynCode::Auth::TokenStore).to receive(:valid_for?).with('anthropic').and_return(true)
+    allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(
+      access_token: 'sk-ant-api01-test-key',
+      expires_at: Time.now + 3600,
+      source: :env
+    )
   end
 
   # ===========================================================================
@@ -194,7 +195,7 @@ RSpec.describe 'LLM Adapter Integration', :aggregate_failures do # -- integratio
 
     describe 'streaming text round-trip' do
       it 'streams text via on_text callback and returns normalized Response' do
-        allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(
+        allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(
           { access_token: 'sk-ant-oat-test-streaming', expires_at: Time.now + 3600, source: :keychain }
         )
 
@@ -219,7 +220,7 @@ RSpec.describe 'LLM Adapter Integration', :aggregate_failures do # -- integratio
 
     describe 'streaming tool_use round-trip' do
       it 'accumulates tool input from stream and returns ToolUseBlock' do
-        allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(
+        allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(
           { access_token: 'sk-ant-oat-test-tool-stream', expires_at: Time.now + 3600, source: :keychain }
         )
 
@@ -620,7 +621,7 @@ RSpec.describe 'LLM Adapter Integration', :aggregate_failures do # -- integratio
       let(:client) { RubynCode::LLM::Client.new(model: 'claude-sonnet-4-20250514') }
 
       it 'passes the block as on_text through to the adapter' do
-        allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(
+        allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return(
           { access_token: 'sk-ant-oat-stream-test', expires_at: Time.now + 3600, source: :keychain }
         )
 

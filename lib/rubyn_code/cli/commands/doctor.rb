@@ -70,12 +70,15 @@ module RubynCode
         end
 
         def check_auth(_ctx)
-          if Auth::TokenStore.valid?
-            tokens = Auth::TokenStore.load
-            source = tokens&.fetch(:source, :unknown)
-            ['Authentication', true, source.to_s]
+          provider = Config::Settings.new.provider
+          tokens = Auth::TokenStore.load_for_provider(provider)
+
+          if tokens
+            source = tokens.fetch(:source, :unknown)
+            display = Auth::TokenStore.display_name_for(source) || source.to_s
+            ['Authentication', true, "#{provider} via #{display}"]
           else
-            ['Authentication', false, 'no valid token found']
+            ['Authentication', false, "no valid token found for provider '#{provider}'"]
           end
         rescue StandardError => e
           ['Authentication', false, e.message]

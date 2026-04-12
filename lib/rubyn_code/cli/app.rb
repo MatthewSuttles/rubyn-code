@@ -167,7 +167,7 @@ module RubynCode
         renderer.info('Starting Claude OAuth authentication...')
 
         begin
-          Auth::OAuth.new.authenticate!
+          Auth::AnthropicOAuth.new.authenticate!
           renderer.success('Authentication successful! Token stored.')
         rescue AuthenticationError => e
           renderer.error("Authentication failed: #{e.message}")

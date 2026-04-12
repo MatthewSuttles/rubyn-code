@@ -8,7 +8,7 @@ require 'json'
 
 module RubynCode
   module Auth
-    class OAuth
+    class AnthropicOAuth
       class StateMismatchError < RubynCode::AuthenticationError
       end
 
@@ -34,7 +34,7 @@ module RubynCode
       end
 
       def refresh!
-        stored = TokenStore.load
+        stored = TokenStore.load_for_provider('anthropic')
         raise RefreshError, 'No stored refresh token available' unless stored&.dig(:refresh_token)
 
         response = post_refresh_request(stored[:refresh_token])

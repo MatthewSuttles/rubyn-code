@@ -28,7 +28,7 @@ RSpec.describe RubynCode::CLI::DaemonRunner do
     allow(renderer).to receive(:error)
 
     # Stub infrastructure
-    allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(true)
+    allow(RubynCode::Auth::TokenStore).to receive(:valid_for?).with('anthropic').and_return(true)
     allow(RubynCode::LLM::Client).to receive(:new).and_return(llm_client)
     allow(RubynCode::DB::Connection).to receive(:instance).and_return(db)
 

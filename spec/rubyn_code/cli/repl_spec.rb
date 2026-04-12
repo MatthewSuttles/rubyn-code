@@ -45,8 +45,8 @@ RSpec.describe RubynCode::CLI::REPL do
     allow(RubynCode::DB::Migrator).to receive(:new).and_return(migrator)
 
     # Auth boundary
-    allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(true)
-    allow(RubynCode::Auth::TokenStore).to receive(:load).and_return({ source: :api_key })
+    allow(RubynCode::Auth::TokenStore).to receive(:valid_for?).with('anthropic').and_return(true)
+    allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with('anthropic').and_return({ source: :api_key })
 
     # LLM boundary
     allow(RubynCode::LLM::Client).to receive(:new).and_return(llm_client)

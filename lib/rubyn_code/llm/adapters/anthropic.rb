@@ -55,14 +55,14 @@ module RubynCode
         end
 
         def ensure_valid_token!
-          return if Auth::TokenStore.valid?
+          return if Auth::TokenStore.valid_for?('anthropic')
 
           raise Client::AuthExpiredError,
                 'No valid authentication. Run `rubyn-code --auth` or set ANTHROPIC_API_KEY.'
         end
 
         def access_token
-          tokens = Auth::TokenStore.load
+          tokens = Auth::TokenStore.load_for_provider('anthropic')
           raise Client::AuthExpiredError, 'No stored access token' unless tokens&.dig(:access_token)
 
           tokens[:access_token]

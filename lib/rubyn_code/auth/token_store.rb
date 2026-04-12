@@ -4,29 +4,58 @@ require 'yaml'
 require 'fileutils'
 require 'json'
 require 'time'
+require_relative 'token_result'
+require_relative 'strategies/base'
+require_relative 'strategies/keychain'
+require_relative 'strategies/credentials_file'
+require_relative 'strategies/local_file'
+require_relative 'strategies/env_var'
 
 module RubynCode
   module Auth
     module TokenStore
       EXPIRY_BUFFER_SECONDS = 300 # 5 minutes
-      KEYCHAIN_SERVICE = 'Claude Code-credentials'
+
+      # Providers with custom strategy chains (e.g., OAuth with refresh tokens).
+      # All other providers fall back to DEFAULT_STRATEGIES.
+      CUSTOM_STRATEGIES = {
+        'anthropic' => [
+          Strategies::Keychain,
+          Strategies::CredentialsFile,
+          Strategies::LocalFile,
+          Strategies::EnvVar
+        ]
+      }.freeze
+
+      # Default strategy chain for providers without custom configuration.
+      DEFAULT_STRATEGIES = [Strategies::EnvVar].freeze
 
       class << self
-        # Load tokens with fallback chain:
-        # 1. macOS Keychain (Claude Code's OAuth token)
-        # 2. Local YAML file (~/.rubyn-code/tokens.yml)
-        # 3. ANTHROPIC_API_KEY environment variable
-        def load
-          load_from_keychain || load_from_file || load_from_env
+        # Load API key for a given provider using its strategy chain.
+        #
+        # Each provider has a strategy chain defined in CUSTOM_STRATEGIES,
+        # or falls back to DEFAULT_STRATEGIES (EnvVar only).
+        #
+        # @param provider [String] provider name (e.g., 'anthropic', 'openai')
+        # @return [Hash, nil] token hash or nil if no token found
+        def load_for_provider(provider)
+          strategies = CUSTOM_STRATEGIES.fetch(provider, DEFAULT_STRATEGIES)
+
+          strategies.each do |strategy_class|
+            result = instantiate_and_call(strategy_class, provider)
+            return result.to_h if result
+          end
+
+          nil
         end
 
-        # Load API key for a given provider. Anthropic uses the full fallback chain.
-        def load_for_provider(provider)
-          return load if provider == 'anthropic'
-
-          env_key = resolve_env_key(provider)
-          api_key = ENV.fetch(env_key, nil)
-          api_key&.empty? == false ? { access_token: api_key, type: :api_key, source: :env } : nil
+        # Get the environment variable key for a given provider.
+        # Reads from Config::Defaults::PROVIDER_ENV_KEYS (single source of truth).
+        #
+        # @param provider [String] provider name
+        # @return [String, nil] env key name or nil if not defined
+        def env_key_for(provider)
+          Config::Defaults::PROVIDER_ENV_KEYS.fetch(provider, nil)
         end
 
         def save(access_token:, refresh_token:, expires_at:)
@@ -48,8 +77,12 @@ module RubynCode
           true
         end
 
-        def valid?
-          tokens = self.load
+        # Check if valid credentials exist for a given provider.
+        #
+        # @param provider [String] provider name
+        # @return [Boolean]
+        def valid_for?(provider)
+          tokens = load_for_provider(provider)
           return false unless tokens&.fetch(:access_token, nil)
           return true if tokens[:type] == :api_key
           return true unless tokens[:expires_at]
@@ -57,70 +90,64 @@ module RubynCode
           tokens[:expires_at] > Time.now + EXPIRY_BUFFER_SECONDS
         end
 
-        def exists? = valid?
-        def access_token = self.load&.fetch(:access_token, nil)
+        # Check if any credentials exist for a given provider (valid or not).
+        #
+        # @param provider [String] provider name
+        # @return [Boolean]
+        def exists_for?(provider) = valid_for?(provider)
+
+        # Get just the access token for a given provider.
+        #
+        # @param provider [String] provider name
+        # @return [String, nil]
+        def access_token_for(provider) = load_for_provider(provider)&.fetch(:access_token, nil)
+
+        # Get the human-readable display name for a token source.
+        #
+        # @param source [Symbol] the source identifier (e.g., :keychain, :env)
+        # @return [String, nil] display name or nil if source not found
+        def display_name_for(source)
+          strategy_class = find_strategy_by_source(source)
+          strategy_class&.display_name
+        end
+
+        # Get setup hints for all strategies in a provider's chain.
+        # Returns only non-nil hints (e.g., platform-specific ones).
+        #
+        # @param provider [String] provider name (e.g., 'anthropic')
+        # @return [Array<String>] list of setup hints
+        def setup_hints_for(provider)
+          strategies = CUSTOM_STRATEGIES.fetch(provider, DEFAULT_STRATEGIES)
+
+          strategies.map do |strategy_class|
+            hint_for_strategy(strategy_class, provider)
+          end.compact
+        end
 
         private
 
-        def resolve_env_key(provider)
-          default = Config::Defaults::PROVIDER_ENV_KEYS.fetch(provider, "#{provider.upcase}_API_KEY")
-          Config::Settings.new.provider_config(provider)&.fetch('env_key', nil) || default
-        rescue StandardError
-          default
-        end
-
-        def load_from_keychain
-          if RUBY_PLATFORM.include?('darwin')
-            output = `security find-generic-password -s "#{KEYCHAIN_SERVICE}" -w 2>/dev/null`.strip
-            return nil if output.empty?
-            oauth = JSON.parse(output)['claudeAiOauth']
+        def hint_for_strategy(strategy_class, provider)
+          if strategy_class == Strategies::EnvVar
+            env_key = env_key_for(provider) || "#{provider.upcase}_API_KEY"
+            "Set #{env_key} environment variable"
           else
-            # Linux: Claude Code stores OAuth tokens in ~/.claude/.credentials.json
-            credentials_path = File.expand_path('~/.claude/.credentials.json')
-            return nil unless File.exist?(credentials_path)
-            oauth = JSON.parse(File.read(credentials_path))['claudeAiOauth']
+            strategy_class.setup_hint
           end
-
-          return nil unless oauth&.dig('accessToken')
-
-          build_keychain_tokens(oauth)
-        rescue StandardError
-          nil
         end
 
-        def build_keychain_tokens(oauth)
-          {
-            access_token: oauth['accessToken'],
-            refresh_token: oauth['refreshToken'],
-            expires_at: oauth['expiresAt'] ? Time.at(oauth['expiresAt'] / 1000.0) : nil,
-            type: :oauth,
-            source: :keychain
-          }
+        def find_strategy_by_source(source)
+          all_strategies = CUSTOM_STRATEGIES.values.flatten + DEFAULT_STRATEGIES
+          all_strategies.uniq.find do |klass|
+            source == klass::SOURCE
+          end
         end
 
-        def load_from_file
-          return nil unless File.exist?(tokens_path)
-
-          data = YAML.safe_load_file(tokens_path, permitted_classes: [Time])
-          return nil unless data.is_a?(Hash)
-          return nil unless data['access_token']
-
-          {
-            access_token: data['access_token'],
-            refresh_token: data['refresh_token'],
-            expires_at: parse_time(data['expires_at']),
-            type: :oauth,
-            source: :file
-          }
-        rescue Psych::SyntaxError, Errno::EACCES
-          nil
-        end
-
-        def load_from_env
-          api_key = ENV.fetch('ANTHROPIC_API_KEY', nil)
-          return nil unless api_key && !api_key.empty?
-
-          { access_token: api_key, refresh_token: nil, expires_at: nil, type: :api_key, source: :env }
+        def instantiate_and_call(strategy_class, provider)
+          if strategy_class == Strategies::EnvVar
+            strategy_class.new(provider).call
+          else
+            strategy_class.new.call
+          end
         end
 
         def tokens_path = Config::Defaults::TOKENS_FILE
@@ -128,16 +155,6 @@ module RubynCode
         def ensure_directory!
           FileUtils.mkdir_p(File.dirname(tokens_path))
           File.chmod(0o700, File.dirname(tokens_path))
-        end
-
-        def parse_time(value)
-          case value
-          when Time then value
-          when String then Time.parse(value)
-          when Integer, Float then Time.at(value)
-          end
-        rescue ArgumentError
-          nil
         end
       end
     end
