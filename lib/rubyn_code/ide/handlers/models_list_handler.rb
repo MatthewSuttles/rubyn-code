@@ -25,10 +25,18 @@ module RubynCode
         def collect_models(providers)
           models = []
           providers.each do |name, cfg|
-            next unless cfg.is_a?(Hash) && cfg['models'].is_a?(Hash)
+            next unless cfg.is_a?(Hash)
 
-            cfg['models'].each do |tier, model_name|
-              models << { 'provider' => name, 'model' => model_name, 'tier' => tier }
+            provider_models = cfg['models']
+            case provider_models
+            when Hash
+              provider_models.each do |tier, model_name|
+                models << { 'provider' => name, 'model' => model_name, 'tier' => tier }
+              end
+            when Array
+              provider_models.each do |model_name|
+                models << { 'provider' => name, 'model' => model_name, 'tier' => '-' }
+              end
             end
           end
           models
