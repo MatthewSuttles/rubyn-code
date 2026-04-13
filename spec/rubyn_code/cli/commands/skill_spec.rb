@@ -16,6 +16,10 @@ RSpec.describe RubynCode::CLI::Commands::Skill do
   let(:catalog) do
     instance_double('Catalog',
                     list: %w[rspec factory-bot],
+                    available: [
+                      { name: 'rspec', description: 'Testing with RSpec' },
+                      { name: 'factory-bot', description: 'Factory Bot patterns' }
+                    ],
                     search: [],
                     by_category: [],
                     categories: %w[rails rspec])

@@ -78,7 +78,7 @@ module RubynCode
         end
       end
 
-      def parse_options(argv) # rubocop:disable Metrics/AbcSize -- option parsing
+      def parse_options(argv)
         options = { command: :repl }
         idx = 0
         while idx < argv.length
