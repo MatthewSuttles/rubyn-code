@@ -81,11 +81,19 @@ module RubynCode
         end
 
         def machine_identity
-          [
-            Etc.getlogin || ENV.fetch('USER', 'unknown'),
-            Socket.gethostname,
-            Dir.home
-          ].join(':')
+          # Use the real UID's login name rather than Etc.getlogin. Etc.getlogin
+          # reads the controlling tty's owner and can return "root" when the tty
+          # is root-owned (common after `sudo`, and in some VSCode integrated
+          # terminal setups) — even though the process itself is running as the
+          # real user. That mismatch derives a different AES key on decrypt vs.
+          # encrypt and the AEAD tag check fails, which surfaces as a misleading
+          # "No <provider> API key configured" error.
+          user = begin
+            Etc.getpwuid(Process.uid).name
+          rescue StandardError
+            ENV['USER'] || Etc.getlogin || 'unknown'
+          end
+          [user, Socket.gethostname, Dir.home].join(':')
         end
 
         def load_or_create_salt

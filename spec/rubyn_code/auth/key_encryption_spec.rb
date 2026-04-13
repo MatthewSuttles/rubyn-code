@@ -68,6 +68,23 @@ RSpec.describe RubynCode::Auth::KeyEncryption do
     end
   end
 
+  describe 'machine identity (regression)' do
+    # Regression: Etc.getlogin reads the controlling tty's owner, not the real
+    # UID. Under sudo or some VSCode terminal setups the tty is root-owned and
+    # Etc.getlogin returns "root" while the process is actually the real user,
+    # which caused decryption to fail with a misleading "no API key" error.
+    # We derive identity from the real UID via Etc.getpwuid instead.
+    it 'derives identity from the real UID, not the controlling tty' do
+      allow(Etc).to receive(:getlogin).and_return('root')
+      allow(Etc).to receive(:getpwuid).with(Process.uid)
+                                      .and_return(instance_double(Etc::Passwd, name: 'realuser'))
+
+      identity = described_class.send(:machine_identity)
+      expect(identity).to start_with('realuser:')
+      expect(identity).not_to start_with('root:')
+    end
+  end
+
   describe 'salt persistence' do
     it 'creates a salt file on first use' do
       described_class.encrypt('test')
