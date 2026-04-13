@@ -2,9 +2,20 @@
 
 require 'spec_helper'
 
-RSpec.describe RubynCode::Auth::AnthropicOAuth do
+RSpec.describe RubynCode::Auth::OAuth::Base do
+  subject(:base_oauth) { described_class.new }
+
+  %i[provider_name client_id redirect_uri authorize_url token_url scopes].each do |method|
+    it "raises NotImplementedError for ##{method}" do
+      expect { base_oauth.public_send(method) }.to raise_error(NotImplementedError, /must implement/)
+    end
+  end
+end
+
+RSpec.describe RubynCode::Auth::OAuth::Anthropic do
   subject(:oauth) { described_class.new }
 
+  let(:oauth_base) { RubynCode::Auth::OAuth::Base }
   let(:token_url) { RubynCode::Config::Defaults::OAUTH_TOKEN_URL }
   let(:authorize_url) { RubynCode::Config::Defaults::OAUTH_AUTHORIZE_URL }
   let(:client_id) { RubynCode::Config::Defaults::OAUTH_CLIENT_ID }
@@ -66,7 +77,7 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
       it 'raises StateMismatchError' do
         expect { oauth.authenticate! }.to raise_error(
-          described_class::StateMismatchError,
+          oauth_base::StateMismatchError,
           /state parameter mismatch/
         )
       end
@@ -84,7 +95,7 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
       it 'raises TokenExchangeError with the error description' do
         expect { oauth.authenticate! }.to raise_error(
-          described_class::TokenExchangeError,
+          oauth_base::TokenExchangeError,
           /Code exchange failed \(400\): Code has expired/
         )
       end
@@ -102,7 +113,7 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
       it 'raises TokenExchangeError about invalid response' do
         expect { oauth.authenticate! }.to raise_error(
-          described_class::TokenExchangeError,
+          oauth_base::TokenExchangeError,
           /Invalid response from token endpoint/
         )
       end
@@ -154,11 +165,11 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
         # Capture the code_verifier from the token exchange request
         stub_request(:post, token_url)
-          .with { |request|
+          .with do |request|
             params = URI.decode_www_form(request.body).to_h
             captured_verifier = params['code_verifier']
             true
-          }
+          end
           .to_return(
             status: 200,
             headers: { 'Content-Type' => 'application/json' },
@@ -176,11 +187,11 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
         captured_challenge = nil
 
         stub_request(:post, token_url)
-          .with { |request|
+          .with do |request|
             params = URI.decode_www_form(request.body).to_h
             captured_verifier = params['code_verifier']
             true
-          }
+          end
           .to_return(
             status: 200,
             headers: { 'Content-Type' => 'application/json' },
@@ -211,7 +222,7 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
       it 'raises StateMismatchError' do
         expect { oauth.authenticate! }.to raise_error(
-          described_class::StateMismatchError
+          oauth_base::StateMismatchError
         )
       end
     end
@@ -228,7 +239,7 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
       it 'raises TokenExchangeError with the raw body as message' do
         expect { oauth.authenticate! }.to raise_error(
-          described_class::TokenExchangeError,
+          oauth_base::TokenExchangeError,
           /Code exchange failed \(500\): Internal Server Error/
         )
       end
@@ -281,12 +292,12 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
         expect(
           a_request(:post, token_url)
-            .with { |req|
+            .with do |req|
               params = URI.decode_www_form(req.body).to_h
               params['grant_type'] == 'refresh_token' &&
                 params['client_id'] == client_id &&
                 params['refresh_token'] == 'old-refresh-token'
-            }
+            end
         ).to have_been_made.once
       end
 
@@ -311,7 +322,7 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
       it 'raises RefreshError' do
         expect { oauth.refresh! }.to raise_error(
-          described_class::RefreshError,
+          oauth_base::RefreshError,
           /No stored refresh token available/
         )
       end
@@ -326,7 +337,7 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
       it 'raises RefreshError' do
         expect { oauth.refresh! }.to raise_error(
-          described_class::RefreshError,
+          oauth_base::RefreshError,
           /No stored refresh token available/
         )
       end
@@ -344,7 +355,7 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
       it 'raises RefreshError with status and error message' do
         expect { oauth.refresh! }.to raise_error(
-          described_class::RefreshError,
+          oauth_base::RefreshError,
           /Token refresh failed \(401\): Refresh token revoked/
         )
       end
@@ -362,7 +373,7 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
       it 'raises RefreshError with the raw body' do
         expect { oauth.refresh! }.to raise_error(
-          described_class::RefreshError,
+          oauth_base::RefreshError,
           /Token refresh failed \(503\): Service Unavailable/
         )
       end
@@ -380,7 +391,7 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
       it 'raises RefreshError about invalid response' do
         expect { oauth.refresh! }.to raise_error(
-          described_class::RefreshError,
+          oauth_base::RefreshError,
           /Invalid response from token endpoint/
         )
       end
@@ -440,7 +451,7 @@ RSpec.describe RubynCode::Auth::AnthropicOAuth do
 
         it 'raises StateMismatchError' do
           expect { oauth.authenticate! }.to raise_error(
-            described_class::StateMismatchError
+            oauth_base::StateMismatchError
           )
         end
       end

@@ -28,7 +28,7 @@ module RubynCode
 
   # Auth
   module Auth
-    autoload :AnthropicOAuth, 'rubyn_code/auth/oauth'
+    autoload :OAuth, 'rubyn_code/auth/oauth'
     autoload :TokenStore, 'rubyn_code/auth/token_store'
     autoload :TokenResult, 'rubyn_code/auth/token_result'
     autoload :Server, 'rubyn_code/auth/server'
