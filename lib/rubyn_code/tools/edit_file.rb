@@ -34,6 +34,20 @@ module RubynCode
         format_diff_result(path, content, old_text, new_text, replace_all)
       end
 
+      # Compute the proposed file content without writing to disk.
+      # Used by IDE mode to preview the edit in a diff view before the user
+      # accepts. Raises if old_text is missing or ambiguous, same as execute.
+      #
+      # @return [Hash] { content: String, type: 'modify' }
+      def preview_content(path:, old_text:, new_text:, replace_all: false)
+        resolved = read_file_safely(path)
+        content = File.read(resolved)
+
+        validate_occurrences!(path, content, old_text, replace_all)
+
+        { content: apply_replacement(content, old_text, new_text, replace_all), type: 'modify' }
+      end
+
       private
 
       def validate_occurrences!(path, content, old_text, replace_all)

@@ -29,6 +29,17 @@ module RubynCode
         format_result(path, bytes, existed, old_content, content)
       end
 
+      # Compute the proposed file content without writing to disk.
+      # Used by IDE mode to preview the write in a diff view (modify) or
+      # preview tab (create) before the user accepts.
+      #
+      # @return [Hash] { content: String, type: 'modify' | 'create' }
+      def preview_content(path:, content:)
+        resolved = safe_path(path)
+        type = File.exist?(resolved) ? 'modify' : 'create'
+        { content: content, type: type }
+      end
+
       private
 
       def format_result(path, bytes, existed, old_content, new_content)

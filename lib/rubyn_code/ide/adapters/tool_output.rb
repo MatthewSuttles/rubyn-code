@@ -1,14 +1,24 @@
 # frozen_string_literal: true
 
+require 'securerandom'
+
 module RubynCode
   module IDE
     module Adapters
-      # Wraps the existing tool execution pipeline for IDE mode.
+      # Wraps every tool invocation in IDE mode. Emits JSON-RPC notifications
+      # that the VS Code extension consumes, precomputes file edits so the
+      # editor can render a diff before any write touches disk, and gates
+      # mutating operations behind acceptance/approval from the IDE client.
       #
-      # Emits JSON-RPC notifications before/after tool execution, gates
-      # destructive operations behind approval from the IDE client, and
-      # intercepts file writes so the editor can show a diff before
-      # committing changes to disk.
+      # Gating policy (when yolo is off):
+      #   - read-only tools  → run immediately, emit tool/use + tool/result
+      #   - file write tools → emit file/edit or file/create with proposed
+      #                        content, wait for acceptEdit, then run
+      #   - other mutating   → emit tool/use with requiresApproval, wait for
+      #                        approveToolUse, then run
+      #
+      # When yolo is on the adapter still emits notifications (so the UI
+      # reflects what's happening) but skips the approval round-trip.
       class ToolOutput
         APPROVAL_TIMEOUT = 60 # seconds
 
@@ -16,6 +26,7 @@ module RubynCode
           read_file glob grep
           git_status git_diff git_log git_commit
           memory_search web_fetch web_search
+          run_specs
         ].freeze
 
         FILE_WRITE_TOOLS = %w[write_file edit_file].freeze
@@ -33,33 +44,32 @@ module RubynCode
         end
 
         # Main entry point. Wraps a tool call, emitting IDE notifications
-        # and gating execution behind approval when required.
+        # and gating execution behind acceptance when required.
         #
         #   adapter.wrap_execution("write_file", { path: "foo.rb", content: "..." }) do
         #     executor.execute("write_file", params)
         #   end
         #
-        def wrap_execution(tool_name, args, &)
+        def wrap_execution(tool_name, args, &block)
           request_id = generate_id
+          args = stringify_keys(args)
 
-          return execute_and_notify(request_id, tool_name, args, &) if read_only?(tool_name)
-
-          return execute_streaming(request_id, tool_name, args, &) if tool_name == 'run_specs'
-
-          return execute_with_edit_gate(request_id, tool_name, args, &) if file_write?(tool_name)
+          return execute_and_notify(request_id, tool_name, args, &block) if read_only?(tool_name)
+          return execute_with_edit_gate(request_id, tool_name, args, &block) if file_write?(tool_name)
 
           # bash and other mutating tools: emit tool/use, optionally wait for approval
-          execute_with_approval(request_id, tool_name, args, &)
+          execute_with_approval(request_id, tool_name, args, &block)
         end
 
         # Called by ApproveToolUseHandler when the IDE client responds.
         def resolve_approval(request_id, approved)
           @mutex.synchronize do
             pending = @pending_approvals[request_id]
-            return unless pending
+            return false unless pending
 
             pending[:approved] = approved
             pending[:cv].signal
+            true
           end
         end
 
@@ -67,16 +77,17 @@ module RubynCode
         def resolve_edit(edit_id, accepted)
           @mutex.synchronize do
             pending = @pending_edits[edit_id]
-            return unless pending
+            return false unless pending
 
             pending[:accepted] = accepted
             pending[:cv].signal
+            true
           end
         end
 
         private
 
-        # ── Read-only tools ──────────────────────────────────────────────
+        # ── Read-only and streaming paths ────────────────────────────────
 
         def execute_and_notify(request_id, tool_name, args)
           emit_tool_use(request_id, tool_name, args, requires_approval: false)
@@ -88,10 +99,49 @@ module RubynCode
           raise
         end
 
-        # ── Streaming tools (run_specs) ──────────────────────────────────
+        # ── File write tools (write_file, edit_file) ─────────────────────
 
-        def execute_streaming(request_id, tool_name, args)
+        def execute_with_edit_gate(request_id, tool_name, args, &)
           emit_tool_use(request_id, tool_name, args, requires_approval: false)
+
+          preview = compute_preview(tool_name, args)
+          return emit_error(request_id, tool_name, preview[:error]) if preview[:error]
+
+          return apply_edit(request_id, tool_name, &) if @yolo
+
+          accepted = notify_and_await_edit(preview, args)
+          return deny_edit(request_id, tool_name, preview[:type]) unless accepted
+
+          apply_edit(request_id, tool_name, &)
+        end
+
+        def compute_preview(tool_name, args)
+          tool = build_tool(tool_name)
+          sym_args = symbolize_keys(args)
+          result = tool.preview_content(**sym_args)
+          { content: result[:content], type: result[:type] }
+        rescue StandardError => e
+          { error: e.message }
+        end
+
+        def build_tool(tool_name)
+          klass = Tools::Registry.get(tool_name)
+          klass.new(project_root: @server.workspace_path || Dir.pwd)
+        end
+
+        def notify_and_await_edit(preview, args)
+          edit_id = generate_id
+          path = args['path']
+          method = preview[:type] == 'create' ? 'file/create' : 'file/edit'
+
+          params = { 'editId' => edit_id, 'path' => path, 'content' => preview[:content] }
+          params['type'] = preview[:type] if method == 'file/edit'
+
+          @server.notify(method, params)
+          wait_for_edit(edit_id)
+        end
+
+        def apply_edit(request_id, tool_name)
           result = yield
           emit_tool_result(request_id, tool_name, result, success: true)
           result
@@ -100,42 +150,16 @@ module RubynCode
           raise
         end
 
-        # ── File write tools (write_file, edit_file) ─────────────────────
+        def deny_edit(request_id, tool_name, type)
+          summary = "Edit denied by IDE user (#{type})"
+          emit_tool_result(request_id, tool_name, summary, success: false)
+          summary
+        end
 
-        def execute_with_edit_gate(request_id, tool_name, args) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength -- approval gate with notification flow
-          emit_tool_use(request_id, tool_name, args, requires_approval: false)
-
-          if @yolo
-            result = yield
-            emit_tool_result(request_id, tool_name, result, success: true)
-            return result
-          end
-
-          # Emit a file/edit or file/create notification and wait for acceptance
-          edit_id = generate_id
-          notification_method = file_exists?(tool_name, args) ? 'file/edit' : 'file/create'
-
-          @server.notify(notification_method, {
-                           'editId' => edit_id,
-                           'toolName' => tool_name,
-                           'path' => args['path'] || args[:path],
-                           'args' => args
-                         })
-
-          accepted = wait_for_edit(edit_id)
-
-          unless accepted
-            summary = "Edit denied by IDE user (#{notification_method})"
-            emit_tool_result(request_id, tool_name, summary, success: false)
-            return summary
-          end
-
-          result = yield
-          emit_tool_result(request_id, tool_name, result, success: true)
-          result
-        rescue StandardError => e
-          emit_tool_result(request_id, tool_name, e.message, success: false)
-          raise
+        def emit_error(request_id, tool_name, message)
+          summary = "Error: #{message}"
+          emit_tool_result(request_id, tool_name, summary, success: false)
+          summary
         end
 
         # ── Approval-gated tools (bash, etc.) ────────────────────────────
@@ -151,7 +175,6 @@ module RubynCode
           end
 
           approved = wait_for_approval(request_id)
-
           unless approved
             summary = 'Tool execution denied by IDE user'
             emit_tool_result(request_id, tool_name, summary, success: false)
@@ -171,7 +194,7 @@ module RubynCode
         def emit_tool_use(request_id, tool_name, args, requires_approval:)
           @server.notify('tool/use', {
                            'requestId' => request_id,
-                           'toolName' => tool_name,
+                           'tool' => tool_name,
                            'args' => args,
                            'requiresApproval' => requires_approval
                          })
@@ -182,7 +205,7 @@ module RubynCode
 
           @server.notify('tool/result', {
                            'requestId' => request_id,
-                           'toolName' => tool_name,
+                           'tool' => tool_name,
                            'success' => success,
                            'summary' => summary
                          })
@@ -192,10 +215,7 @@ module RubynCode
 
         def wait_for_approval(request_id)
           cv = ConditionVariable.new
-
-          @mutex.synchronize do
-            @pending_approvals[request_id] = { cv: cv, approved: nil }
-          end
+          @mutex.synchronize { @pending_approvals[request_id] = { cv: cv, approved: nil } }
 
           @mutex.synchronize do
             deadline = Time.now + APPROVAL_TIMEOUT
@@ -205,19 +225,14 @@ module RubynCode
 
               cv.wait(@mutex, remaining)
             end
-
             approved = @pending_approvals.delete(request_id)[:approved]
-            # Auto-deny on timeout
-            approved.nil? ? false : approved
+            approved.nil? ? false : approved # auto-deny on timeout
           end
         end
 
         def wait_for_edit(edit_id)
           cv = ConditionVariable.new
-
-          @mutex.synchronize do
-            @pending_edits[edit_id] = { cv: cv, accepted: nil }
-          end
+          @mutex.synchronize { @pending_edits[edit_id] = { cv: cv, accepted: nil } }
 
           @mutex.synchronize do
             deadline = Time.now + APPROVAL_TIMEOUT
@@ -227,10 +242,8 @@ module RubynCode
 
               cv.wait(@mutex, remaining)
             end
-
             accepted = @pending_edits.delete(edit_id)[:accepted]
-            # Auto-deny on timeout
-            accepted.nil? ? false : accepted
+            accepted.nil? ? false : accepted # auto-deny on timeout
           end
         end
 
@@ -244,11 +257,14 @@ module RubynCode
           FILE_WRITE_TOOLS.include?(tool_name)
         end
 
-        def file_exists?(tool_name, args)
-          return true if tool_name == 'edit_file'
+        def stringify_keys(hash)
+          return {} unless hash.is_a?(Hash)
 
-          path = args['path'] || args[:path]
-          path && File.exist?(path)
+          hash.each_with_object({}) { |(k, v), memo| memo[k.to_s] = v }
+        end
+
+        def symbolize_keys(hash)
+          hash.each_with_object({}) { |(k, v), memo| memo[k.to_sym] = v }
         end
 
         def generate_id

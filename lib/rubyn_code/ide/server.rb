@@ -16,9 +16,11 @@ module RubynCode
     class Server
       # Attributes set by handlers during the session lifecycle.
       attr_accessor :workspace_path, :extension_version, :client_capabilities,
-                    :session_persistence, :handler_instances
+                    :session_persistence, :handler_instances, :tool_output_adapter
+      attr_reader :yolo
 
-      def initialize
+      def initialize(yolo: false)
+        @yolo = yolo
         @running = false
         @write_mutex = Mutex.new
         @handlers = {}
@@ -27,6 +29,7 @@ module RubynCode
         @extension_version = nil
         @client_capabilities = {}
         @session_persistence = nil
+        @tool_output_adapter = nil
 
         Handlers.register_all(self)
       end
