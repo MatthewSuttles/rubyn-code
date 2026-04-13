@@ -10,7 +10,7 @@ module RubynCode
       class LoadError < StandardError; end
 
       CONFIGURABLE_KEYS = %i[
-        provider model max_iterations max_sub_agent_iterations max_output_chars
+        provider model model_mode max_iterations max_sub_agent_iterations max_output_chars
         context_threshold_tokens micro_compact_keep_recent
         poll_interval idle_timeout
         session_budget_usd daily_budget_usd
@@ -21,6 +21,7 @@ module RubynCode
       DEFAULT_MAP = {
         provider: Defaults::DEFAULT_PROVIDER,
         model: Defaults::DEFAULT_MODEL,
+        model_mode: Defaults::MODEL_MODE,
         max_iterations: Defaults::MAX_ITERATIONS,
         max_sub_agent_iterations: Defaults::MAX_SUB_AGENT_ITERATIONS,
         max_output_chars: Defaults::MAX_OUTPUT_CHARS,

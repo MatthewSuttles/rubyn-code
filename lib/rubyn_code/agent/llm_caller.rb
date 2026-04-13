@@ -43,7 +43,9 @@ module RubynCode
       # Only returns models from the active provider — never crosses
       # provider boundaries (e.g., won't send a GPT model to Anthropic).
       # Falls back to nil (use client's default) if routing fails.
-      def routed_model
+      def routed_model # rubocop:disable Metrics/CyclomaticComplexity -- guard clauses for provider/mode checks
+        return nil if manual_model_mode?
+
         last_user = last_user_message_text
         return nil unless last_user
 
@@ -58,6 +60,12 @@ module RubynCode
         resolved[:model]
       rescue StandardError
         nil
+      end
+
+      def manual_model_mode?
+        Config::Settings.new.get('model_mode', 'auto') == 'manual'
+      rescue StandardError
+        false
       end
 
       def last_user_message_text

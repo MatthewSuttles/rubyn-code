@@ -15,7 +15,7 @@ module RubynCode
           context_threshold_tokens session_budget_usd daily_budget_usd
         ].freeze
 
-        STRING_KEYS = %w[provider model].freeze
+        STRING_KEYS = %w[provider model model_mode].freeze
 
         def initialize(server)
           @server = server

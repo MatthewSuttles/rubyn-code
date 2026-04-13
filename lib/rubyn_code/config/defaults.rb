@@ -12,6 +12,7 @@ module RubynCode
 
       DEFAULT_PROVIDER = 'anthropic'
       DEFAULT_MODEL = 'claude-opus-4-6'
+      MODEL_MODE = 'auto' # 'auto' or 'manual'
       MAX_ITERATIONS = 200
       MAX_SUB_AGENT_ITERATIONS = 200
       MAX_EXPLORE_AGENT_ITERATIONS = 200
