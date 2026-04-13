@@ -7,6 +7,9 @@ require_relative 'handlers/review_handler'
 require_relative 'handlers/approve_tool_use_handler'
 require_relative 'handlers/accept_edit_handler'
 require_relative 'handlers/shutdown_handler'
+require_relative 'handlers/config_get_handler'
+require_relative 'handlers/config_set_handler'
+require_relative 'handlers/models_list_handler'
 
 module RubynCode
   module IDE
@@ -19,7 +22,10 @@ module RubynCode
         'review' => ReviewHandler,
         'approveToolUse' => ApproveToolUseHandler,
         'acceptEdit' => AcceptEditHandler,
-        'shutdown' => ShutdownHandler
+        'shutdown' => ShutdownHandler,
+        'config/get' => ConfigGetHandler,
+        'config/set' => ConfigSetHandler,
+        'models/list' => ModelsListHandler
       }.freeze
 
       # Short name => method name mapping (for handler_instance lookups).
@@ -30,7 +36,10 @@ module RubynCode
         approve_tool_use: 'approveToolUse',
         accept_edit: 'acceptEdit',
         shutdown: 'shutdown',
-        initialize: 'initialize'
+        initialize: 'initialize',
+        config_get: 'config/get',
+        config_set: 'config/set',
+        models_list: 'models/list'
       }.freeze
 
       # Register all handlers on the given server instance.
