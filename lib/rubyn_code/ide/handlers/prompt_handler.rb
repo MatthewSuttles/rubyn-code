@@ -100,48 +100,36 @@ module RubynCode
 
           tool_executor.llm_client = llm_client
 
+          adapter = build_tool_output_adapter
+          tool_wrapper = lambda do |name, input, &blk|
+            adapter.wrap_execution(name, input, &blk)
+          end
+
           Agent::Loop.new(
             llm_client: llm_client,
             tool_executor: tool_executor,
             context_manager: context_manager,
             hook_runner: hook_runner,
             conversation: conversation,
-            permission_tier: :allow_read,
+            # Gating happens in the ToolOutput adapter (per-tool, via JSON-RPC).
+            # The policy tier must not intercept — it has no way to prompt the
+            # user in IDE mode and would otherwise fall back to the TTY prompter
+            # which corrupts the JSON-RPC stream on stdout.
+            permission_tier: :unrestricted,
             deny_list: Permissions::DenyList.new,
             stall_detector: stall_detector,
-            on_tool_call: build_tool_call_callback(session_id),
-            on_tool_result: build_tool_result_callback(session_id),
+            tool_wrapper: tool_wrapper,
             on_text: build_text_callback(session_id),
             project_root: workspace
           )
         end
 
-        def build_tool_call_callback(session_id)
-          lambda { |name, params|
-            @server.notify('agent/status', {
-                             'sessionId' => session_id,
-                             'status' => 'tool_use'
-                           })
-            @server.notify('tool/use', {
-                             'sessionId' => session_id,
-                             'tool' => name,
-                             'params' => params
-                           })
-          }
-        end
-
-        def build_tool_result_callback(session_id)
-          lambda { |name, result, _is_error = false|
-            @server.notify('tool/result', {
-                             'sessionId' => session_id,
-                             'tool' => name,
-                             'result' => result.to_s[0, 4096]
-                           })
-            @server.notify('agent/status', {
-                             'sessionId' => session_id,
-                             'status' => 'thinking'
-                           })
-          }
+        # Install a ToolOutput adapter on the server so AcceptEdit /
+        # ApproveToolUse handlers can route responses back to this session.
+        def build_tool_output_adapter
+          adapter = IDE::Adapters::ToolOutput.new(@server, yolo: @server.yolo)
+          @server.tool_output_adapter = adapter
+          adapter
         end
 
         def build_text_callback(session_id)

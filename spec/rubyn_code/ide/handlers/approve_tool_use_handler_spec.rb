@@ -2,125 +2,58 @@
 
 require "spec_helper"
 require "rubyn_code/ide/server"
+require "rubyn_code/ide/adapters/tool_output"
 
 RSpec.describe RubynCode::IDE::Handlers::ApproveToolUseHandler do
   let(:server)  { RubynCode::IDE::Server.new }
   let(:handler) { described_class.new(server) }
 
-  describe "resolves approval" do
-    it "signals the condition variable and resolves pending approval" do
-      notifications = []
-      allow(server).to receive(:notify) do |method, params|
-        notifications << { "method" => method, "params" => params }
-      end
-
-      approval_result = nil
-      waiter = Thread.new do
-        approval_result = handler.wait_for_approval("req-1", "bash", { "command" => "ls" })
-      end
-      sleep 0.1
-
+  describe "with no active session" do
+    it "returns resolved: false with error when no adapter is installed" do
       result = handler.call({ "requestId" => "req-1", "approved" => true })
-      waiter.join(2)
-
-      expect(result["resolved"]).to eq(true)
-      expect(result["requestId"]).to eq("req-1")
-      expect(approval_result).to eq(true)
-    end
-  end
-
-  describe "approve true" do
-    it "sets approved flag to true" do
-      allow(server).to receive(:notify)
-
-      approved = nil
-      waiter = Thread.new do
-        approved = handler.wait_for_approval("req-2", "write_file", {})
-      end
-      sleep 0.1
-
-      handler.call({ "requestId" => "req-2", "approved" => true })
-      waiter.join(2)
-
-      expect(approved).to eq(true)
-    end
-  end
-
-  describe "approve false" do
-    it "sets approved flag to false (denied)" do
-      allow(server).to receive(:notify)
-
-      approved = nil
-      waiter = Thread.new do
-        approved = handler.wait_for_approval("req-3", "bash", {})
-      end
-      sleep 0.1
-
-      handler.call({ "requestId" => "req-3", "approved" => false })
-      waiter.join(2)
-
-      expect(approved).to eq(false)
-    end
-  end
-
-  describe "unknown requestId" do
-    it "returns resolved: false with error message" do
-      result = handler.call({ "requestId" => "nonexistent", "approved" => true })
       expect(result["resolved"]).to eq(false)
-      expect(result["error"]).to include("No pending request")
+      expect(result["error"]).to include("No active session")
     end
   end
 
   describe "missing requestId" do
-    it "returns resolved: false with error message" do
+    it "returns resolved: false with error" do
       result = handler.call({ "approved" => true })
       expect(result["resolved"]).to eq(false)
       expect(result["error"]).to include("Missing requestId")
     end
   end
 
-  describe "#wait_for_approval" do
-    it "emits tool/approval_required notification" do
-      notifications = []
-      allow(server).to receive(:notify) do |method, params|
-        notifications << { "method" => method, "params" => params }
-      end
+  describe "with an active adapter" do
+    let(:adapter) { instance_double(RubynCode::IDE::Adapters::ToolOutput) }
 
-      waiter = Thread.new do
-        handler.wait_for_approval("req-4", "bash", { "command" => "rm -rf /" })
-      end
-      sleep 0.1
+    before { server.tool_output_adapter = adapter }
 
-      # Approve to unblock the waiter
-      handler.call({ "requestId" => "req-4", "approved" => true })
-      waiter.join(2)
-
-      approval_notif = notifications.find { |n| n["method"] == "tool/approval_required" }
-      expect(approval_notif).not_to be_nil
-      expect(approval_notif["params"]["requestId"]).to eq("req-4")
-      expect(approval_notif["params"]["tool"]).to eq("bash")
-      expect(approval_notif["params"]["params"]["command"]).to eq("rm -rf /")
-    end
-  end
-
-  describe "#pending?" do
-    it "returns false when no approvals are pending" do
-      expect(handler.pending?).to be false
+    it "delegates to adapter.resolve_approval and returns resolved=true on approve" do
+      expect(adapter).to receive(:resolve_approval).with("req-1", true).and_return(true)
+      result = handler.call({ "requestId" => "req-1", "approved" => true })
+      expect(result).to eq({ "resolved" => true, "requestId" => "req-1" })
     end
 
-    it "returns true when an approval is pending" do
-      allow(server).to receive(:notify)
+    it "returns resolved=true with requestId echoed on deny" do
+      expect(adapter).to receive(:resolve_approval).with("req-2", false).and_return(true)
+      result = handler.call({ "requestId" => "req-2", "approved" => false })
+      expect(result).to eq({ "resolved" => true, "requestId" => "req-2" })
+    end
 
-      Thread.new do
-        handler.wait_for_approval("req-5", "bash", {})
-      end
-      sleep 0.1
+    it "returns error when adapter reports no matching pending request" do
+      allow(adapter).to receive(:resolve_approval).and_return(false)
+      result = handler.call({ "requestId" => "unknown", "approved" => true })
+      expect(result["resolved"]).to eq(false)
+      expect(result["error"]).to include("No pending request")
+    end
 
-      expect(handler.pending?).to be true
+    it "coerces truthy/falsy `approved` values to booleans" do
+      expect(adapter).to receive(:resolve_approval).with("req-3", true).and_return(true)
+      handler.call({ "requestId" => "req-3", "approved" => "yes" })
 
-      # Clean up
-      handler.call({ "requestId" => "req-5", "approved" => true })
-      sleep 0.1
+      expect(adapter).to receive(:resolve_approval).with("req-4", false).and_return(true)
+      handler.call({ "requestId" => "req-4", "approved" => nil })
     end
   end
 end

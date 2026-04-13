@@ -94,6 +94,7 @@ module RubynCode
         @stall_detector     = opts.fetch(:stall_detector, LoopDetector.new)
         @skill_loader       = opts[:skill_loader]
         @project_root       = opts[:project_root]
+        @tool_wrapper       = opts[:tool_wrapper]
         @decision_compactor = build_decision_compactor
         @skill_ttl          = Skills::TtlManager.new
         @session_initialized = false

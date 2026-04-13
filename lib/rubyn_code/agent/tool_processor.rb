@@ -116,12 +116,26 @@ module RubynCode
       def execute_tool(tool_name, tool_input)
         discover_tool(tool_name)
         @hook_runner.fire(:pre_tool_use, tool_name: tool_name, tool_input: tool_input)
-        result = @tool_executor.execute(tool_name, symbolize_keys(tool_input))
+        result = dispatch_tool(tool_name, tool_input)
         @hook_runner.fire(:post_tool_use, tool_name: tool_name, tool_input: tool_input, result: result)
         signal_decision_compactor(tool_name, tool_input, result)
         [result.to_s, false]
       rescue StandardError => e
         ["Error executing #{tool_name}: #{e.message}", true]
+      end
+
+      # Run the tool through @tool_wrapper if one is configured (IDE mode),
+      # otherwise call the executor directly. The wrapper receives the raw
+      # tool name/input so it can emit protocol notifications and gate the
+      # call; the block below is what actually performs the work.
+      def dispatch_tool(tool_name, tool_input)
+        if @tool_wrapper
+          @tool_wrapper.call(tool_name, tool_input) do
+            @tool_executor.execute(tool_name, symbolize_keys(tool_input))
+          end
+        else
+          @tool_executor.execute(tool_name, symbolize_keys(tool_input))
+        end
       end
 
       def signal_decision_compactor(tool_name, tool_input, result) # rubocop:disable Metrics/CyclomaticComplexity -- tool dispatch

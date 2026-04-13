@@ -84,42 +84,39 @@ RSpec.describe "IDE Server Integration", :integration do
   end
 
   describe "tool approval lifecycle" do
-    it "prompt triggers tool -> tool/use notification -> approveToolUse -> tool/result" do
-      # Register a custom handler that uses the approve flow
-      approve_handler = server.handler_instance("approveToolUse") ||
-                        server.handler_instances["approveToolUse"]
+    it "tool/use notification -> approveToolUse -> resolves adapter approval" do
+      # Install a ToolOutput adapter on the server — in real IDE mode this is
+      # done by PromptHandler once a session starts. The approveToolUse handler
+      # delegates to it.
+      adapter = RubynCode::IDE::Adapters::ToolOutput.new(server)
+      server.tool_output_adapter = adapter
 
-      notifications = []
-      original_write = server.method(:public_handle_line)
-
-      # Track all output
       allow(server).to receive(:write) do |hash|
-        serialized = RubynCode::IDE::Protocol.serialize(hash)
-        stdout_io.write(serialized)
+        stdout_io.write(RubynCode::IDE::Protocol.serialize(hash))
       end
 
-      # Simulate a tool requiring approval using ApproveToolUseHandler directly
       approval_result = nil
       waiter = Thread.new do
-        approval_result = approve_handler.wait_for_approval("tool-req-1", "bash", { "command" => "ls" })
+        approval_result = adapter.wrap_execution("bash", { "command" => "ls" }) { "ran" }
       end
       sleep 0.2
 
-      # The handler should have emitted a tool/approval_required notification
+      # Adapter should have emitted a tool/use notification carrying the
+      # requestId. That's what the extension uses to respond with approveToolUse.
       messages = collect_responses
-      approval_notif = messages.find { |m| m["method"] == "tool/approval_required" }
-      expect(approval_notif).not_to be_nil
-      expect(approval_notif["params"]["requestId"]).to eq("tool-req-1")
+      tool_use = messages.find { |m| m["method"] == "tool/use" }
+      expect(tool_use).not_to be_nil
+      expect(tool_use["params"]["requiresApproval"]).to eq(true)
+      request_id = tool_use["params"]["requestId"]
 
-      # Send approval
+      # Client approves — handler delegates to adapter.resolve_approval.
       dispatch(json_request("approveToolUse", {
-        "requestId" => "tool-req-1",
+        "requestId" => request_id,
         "approved"  => true
       }, id: 10))
 
       waiter.join(2)
-
-      expect(approval_result).to eq(true)
+      expect(approval_result).to eq("ran")
     end
   end
 

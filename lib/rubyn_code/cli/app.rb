@@ -192,7 +192,7 @@ module RubynCode
       end
 
       def run_ide
-        IDE::Server.new.run
+        IDE::Server.new(yolo: @options[:yolo]).run
       end
 
       def run_daemon
