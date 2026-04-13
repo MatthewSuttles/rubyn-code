@@ -21,6 +21,12 @@ module RubynCode
       RISK_LEVEL = :read
       REQUIRES_CONFIRMATION = false
 
+      def self.summarize(output, args)
+        pattern = args['pattern'] || args[:pattern] || ''
+        count = output.to_s.strip.empty? ? 0 : output.to_s.lines.count
+        "glob #{pattern} (#{count} files)"
+      end
+
       def execute(pattern:, path: nil)
         search_dir = resolve_search_dir(path)
         full_pattern = File.join(search_dir, pattern)

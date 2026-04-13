@@ -92,10 +92,10 @@ module RubynCode
         def execute_and_notify(request_id, tool_name, args)
           emit_tool_use(request_id, tool_name, args, requires_approval: false)
           result = yield
-          emit_tool_result(request_id, tool_name, result, success: true)
+          emit_tool_result(request_id, tool_name, result, success: true, args: args)
           result
         rescue StandardError => e
-          emit_tool_result(request_id, tool_name, e.message, success: false)
+          emit_tool_result(request_id, tool_name, e.message, success: false, args: args)
           raise
         end
 
@@ -114,7 +114,7 @@ module RubynCode
           accepted = notify_and_await_edit(preview, args)
           return deny_edit(request_id, tool_name, preview[:type]) unless accepted
 
-          apply_edit(request_id, tool_name, &)
+          apply_edit(request_id, tool_name, args, &)
         end
 
         def compute_preview(tool_name, args)
@@ -143,19 +143,19 @@ module RubynCode
           wait_for_edit(edit_id)
         end
 
-        def apply_edit(request_id, tool_name)
+        def apply_edit(request_id, tool_name, args)
           result = yield
-          emit_tool_result(request_id, tool_name, result, success: true)
+          emit_tool_result(request_id, tool_name, result, success: true, args: args)
           result
         rescue StandardError => e
-          emit_tool_result(request_id, tool_name, e.message, success: false)
+          emit_tool_result(request_id, tool_name, e.message, success: false, args: args)
           raise
         end
 
         def deny_edit(request_id, tool_name, type)
-          summary = "Edit denied by IDE user (#{type})"
+          summary = "User rejected this #{type}. Do not retry the same content."
           emit_tool_result(request_id, tool_name, summary, success: false)
-          summary
+          raise RubynCode::UserDeniedError, summary
         end
 
         def emit_error(request_id, tool_name, message)
@@ -172,22 +172,22 @@ module RubynCode
 
           if @yolo
             result = yield
-            emit_tool_result(request_id, tool_name, result, success: true)
+            emit_tool_result(request_id, tool_name, result, success: true, args: args)
             return result
           end
 
           approved = wait_for_approval(request_id)
           unless approved
-            summary = 'Tool execution denied by IDE user'
-            emit_tool_result(request_id, tool_name, summary, success: false)
-            return summary
+            summary = 'User refused this tool invocation. Do not retry the same call.'
+            emit_tool_result(request_id, tool_name, summary, success: false, args: args)
+            raise RubynCode::UserDeniedError, summary
           end
 
           result = yield
-          emit_tool_result(request_id, tool_name, result, success: true)
+          emit_tool_result(request_id, tool_name, result, success: true, args: args)
           result
         rescue StandardError => e
-          emit_tool_result(request_id, tool_name, e.message, success: false)
+          emit_tool_result(request_id, tool_name, e.message, success: false, args: args)
           raise
         end
 
@@ -202,24 +202,36 @@ module RubynCode
                          })
         end
 
-        def emit_tool_result(request_id, tool_name, result, success:)
+        def emit_tool_result(request_id, tool_name, result, success:, args: {})
           @server.notify('tool/result', {
                            'requestId' => request_id,
                            'tool' => tool_name,
                            'success' => success,
-                           'summary' => build_summary(result, success)
+                           'summary' => build_summary(tool_name, result, success, args)
                          })
         end
 
-        # Keep successful summaries empty so the chat card renders a clean
-        # "Done" indicator rather than dumping raw tool output (file contents,
-        # diffs) into the UI. The full tool output still lives in the
-        # conversation and is sent to the model — the summary is display only.
-        # On failure we keep the message so the user can see what went wrong.
-        def build_summary(result, success)
-          return '' if success
+        # Ask the tool class for its one-line summary ("Edited foo.rb (1
+        # replacement)", "grep pattern (12 lines)", etc.). Tools that don't
+        # override Base.summarize return "", and the UI renders a clean
+        # "Done". The full tool output always lives in the conversation —
+        # summary is display-only. On failure we include the error so the
+        # user can see what went wrong.
+        def build_summary(tool_name, result, success, args)
+          return result.to_s[0, 500] unless success
 
-          result.to_s[0, 500]
+          klass = tool_class(tool_name)
+          return '' unless klass
+
+          klass.summarize(result.to_s, args || {}).to_s[0, 500]
+        rescue StandardError
+          ''
+        end
+
+        def tool_class(tool_name)
+          Tools::Registry.get(tool_name)
+        rescue ToolNotFoundError
+          nil
         end
 
         # ── Blocking waits ───────────────────────────────────────────────

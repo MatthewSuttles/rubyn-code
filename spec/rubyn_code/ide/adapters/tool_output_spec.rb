@@ -199,15 +199,17 @@ RSpec.describe RubynCode::IDE::Adapters::ToolOutput do
   describe "edit_file denial flow" do
     let(:adapter) { described_class.new(server) }
 
-    it "returns denial message and does not run the block when rejected" do
+    it "raises UserDeniedError and does not run the block when rejected" do
       ran_block = false
-      result_value = nil
+      error = nil
       writer = Thread.new do
         args = { "path" => "/app.rb", "old_text" => "a", "new_text" => "b" }
-        result_value = adapter.wrap_execution("edit_file", args) do
+        adapter.wrap_execution("edit_file", args) do
           ran_block = true
           "should not execute"
         end
+      rescue RubynCode::UserDeniedError => e
+        error = e
       end
       sleep 0.2
 
@@ -216,7 +218,8 @@ RSpec.describe RubynCode::IDE::Adapters::ToolOutput do
       writer.join(2)
 
       expect(ran_block).to eq(false)
-      expect(result_value).to include("denied")
+      expect(error).to be_a(RubynCode::UserDeniedError)
+      expect(error.message).to include("rejected")
 
       tool_result = notifications.select { |n| n["method"] == "tool/result" }.last
       expect(tool_result["params"]["success"]).to eq(false)
@@ -275,28 +278,33 @@ RSpec.describe RubynCode::IDE::Adapters::ToolOutput do
       expect(result).to eq("hi")
     end
 
-    it "returns denial message when bash is denied" do
+    it "raises UserDeniedError when bash is denied" do
+      error = nil
       writer = Thread.new do
         adapter.wrap_execution("bash", { "command" => "rm -rf /" }) { "executed" }
+      rescue RubynCode::UserDeniedError => e
+        error = e
       end
       sleep 0.2
 
       tool_use = notifications.find { |n| n["method"] == "tool/use" }
-      request_id = tool_use["params"]["requestId"]
-      adapter.resolve_approval(request_id, false)
+      adapter.resolve_approval(tool_use["params"]["requestId"], false)
+      writer.join(2)
 
-      expect(writer.value).to include("denied")
+      expect(error).to be_a(RubynCode::UserDeniedError)
+      expect(error.message).to include("refused")
     end
   end
 
   describe "approval timeout" do
-    it "auto-denies after timeout expires" do
+    it "raises UserDeniedError after timeout expires" do
       adapter = described_class.new(server)
       stub_const("RubynCode::IDE::Adapters::ToolOutput::APPROVAL_TIMEOUT", 0.2)
 
-      result = adapter.wrap_execution("bash", { "command" => "slow" }) { "executed" }
+      expect do
+        adapter.wrap_execution("bash", { "command" => "slow" }) { "executed" }
+      end.to raise_error(RubynCode::UserDeniedError)
 
-      expect(result).to include("denied")
       tool_result = notifications.select { |n| n["method"] == "tool/result" }.last
       expect(tool_result["params"]["success"]).to eq(false)
     end
@@ -387,9 +395,42 @@ RSpec.describe RubynCode::IDE::Adapters::ToolOutput do
   describe "result summary" do
     let(:adapter) { described_class.new(server) }
 
-    it "emits an empty summary on success so the UI renders a clean Done indicator" do
-      long_result = "x" * 1000
-      adapter.wrap_execution("read_file", { "path" => "/big.rb" }) { long_result }
+    it "renders an empty summary when the tool class has no summarize override" do
+      # read_file is a read-only tool — no approval/edit gate, runs the block
+      # immediately. We stub the registry to return a class with a trivial
+      # summarize so we can exercise the default empty-summary path.
+      plain = Class.new do
+        def self.summarize(_output, _args) = ""
+      end
+      allow(RubynCode::Tools::Registry).to receive(:get).with("read_file").and_return(plain)
+
+      adapter.wrap_execution("read_file", { "path" => "/big.rb" }) { "x" * 1000 }
+
+      tool_result = notifications.find { |n| n["method"] == "tool/result" }
+      expect(tool_result["params"]["summary"]).to eq("")
+    end
+
+    it "asks the tool class for a summary and truncates to 500 chars" do
+      chatty = Class.new do
+        def self.summarize(_output, args) = "processed #{args['name']}"
+      end
+      allow(RubynCode::Tools::Registry).to receive(:get).with("chatty_tool").and_return(chatty)
+      # chatty isn't a gate-able category → falls through to approval path
+      # which would require a yolo adapter to run without blocking.
+      yolo = described_class.new(server, yolo: true)
+
+      yolo.wrap_execution("chatty_tool", { "name" => "widget" }) { "ignored" }
+
+      tool_result = notifications.find { |n| n["method"] == "tool/result" }
+      expect(tool_result["params"]["summary"]).to eq("processed widget")
+    end
+
+    it "falls back to empty summary if Tools::Registry.get raises" do
+      allow(RubynCode::Tools::Registry).to receive(:get).with("phantom")
+        .and_raise(RubynCode::ToolNotFoundError, "nope")
+      yolo = described_class.new(server, yolo: true)
+
+      yolo.wrap_execution("phantom", {}) { "ignored" }
 
       tool_result = notifications.find { |n| n["method"] == "tool/result" }
       expect(tool_result["params"]["summary"]).to eq("")

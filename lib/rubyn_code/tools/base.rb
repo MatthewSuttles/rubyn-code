@@ -37,6 +37,19 @@ module RubynCode
             input_schema: Schema.build(parameters)
           }
         end
+
+        # One-line summary of a successful invocation, shown in the IDE's
+        # chat card. Default is empty so the UI renders a clean "Done"
+        # indicator. Override in subclasses that have a useful one-liner
+        # (e.g. "Edited app.rb (1 replacement)"). The full output still
+        # goes to the conversation untouched — this only affects the UI.
+        #
+        # @param output [String] what execute(**) returned
+        # @param args   [Hash]   the tool arguments (string-keyed)
+        # @return [String]
+        def summarize(_output, _args)
+          ''
+        end
       end
 
       attr_reader :project_root
