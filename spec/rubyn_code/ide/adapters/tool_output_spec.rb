@@ -141,20 +141,28 @@ RSpec.describe RubynCode::IDE::Adapters::ToolOutput do
   describe "write_file in yolo mode" do
     let(:adapter) { described_class.new(server, yolo: true) }
 
-    it "executes immediately without waiting for approval" do
+    # The adapter always emits file/edit or file/create so the VS Code
+    # extension can surface the change in the diff view. In yolo mode the
+    # extension auto-accepts immediately; here we simulate that by calling
+    # resolve_edit as soon as we see the notification.
+    it "still emits tool/use, file notification, and tool/result" do
       allow(File).to receive(:exist?).and_return(false)
 
-      result = adapter.wrap_execution("write_file", { "path" => "/yolo.rb", "content" => "y = 1" }) do
-        "written in yolo"
+      result_value = nil
+      writer = Thread.new do
+        result_value = adapter.wrap_execution("write_file",
+                                              { "path" => "/yolo.rb", "content" => "y = 1" }) do
+          "written in yolo"
+        end
       end
+      sleep 0.2
 
-      expect(result).to eq("written in yolo")
-    end
+      file_notif = notifications.find { |n| n["method"] == "file/create" }
+      expect(file_notif).not_to be_nil
+      adapter.resolve_edit(file_notif["params"]["editId"], true)
 
-    it "still emits tool/use and tool/result notifications" do
-      allow(File).to receive(:exist?).and_return(false)
-
-      adapter.wrap_execution("write_file", { "path" => "/yolo.rb", "content" => "y = 1" }) { "ok" }
+      writer.join(2)
+      expect(result_value).to eq("written in yolo")
 
       expect(notifications.find { |n| n["method"] == "tool/use" }).not_to be_nil
       tool_result = notifications.find { |n| n["method"] == "tool/result" }

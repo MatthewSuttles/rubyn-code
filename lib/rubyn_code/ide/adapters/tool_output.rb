@@ -107,8 +107,10 @@ module RubynCode
           preview = compute_preview(tool_name, args)
           return emit_error(request_id, tool_name, preview[:error]) if preview[:error]
 
-          return apply_edit(request_id, tool_name, &) if @yolo
-
+          # Always emit the file/edit or file/create notification so the
+          # extension can surface the change — opens a diff editor in normal
+          # mode or flashes "Rubyn auto-applied…" and applies via workspace
+          # edit in yolo mode. Either way the user sees what changed.
           accepted = notify_and_await_edit(preview, args)
           return deny_edit(request_id, tool_name, preview[:type]) unless accepted
 
