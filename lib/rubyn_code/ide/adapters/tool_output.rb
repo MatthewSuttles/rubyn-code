@@ -201,14 +201,23 @@ module RubynCode
         end
 
         def emit_tool_result(request_id, tool_name, result, success:)
-          summary = result.is_a?(String) ? result[0, 500] : result.to_s[0, 500]
-
           @server.notify('tool/result', {
                            'requestId' => request_id,
                            'tool' => tool_name,
                            'success' => success,
-                           'summary' => summary
+                           'summary' => build_summary(result, success)
                          })
+        end
+
+        # Keep successful summaries empty so the chat card renders a clean
+        # "Done" indicator rather than dumping raw tool output (file contents,
+        # diffs) into the UI. The full tool output still lives in the
+        # conversation and is sent to the model — the summary is display only.
+        # On failure we keep the message so the user can see what went wrong.
+        def build_summary(result, success)
+          return '' if success
+
+          result.to_s[0, 500]
         end
 
         # ── Blocking waits ───────────────────────────────────────────────

@@ -376,14 +376,25 @@ RSpec.describe RubynCode::IDE::Adapters::ToolOutput do
     end
   end
 
-  describe "result summary truncation" do
+  describe "result summary" do
     let(:adapter) { described_class.new(server) }
 
-    it "truncates long results to 500 characters in notifications" do
+    it "emits an empty summary on success so the UI renders a clean Done indicator" do
       long_result = "x" * 1000
       adapter.wrap_execution("read_file", { "path" => "/big.rb" }) { long_result }
 
       tool_result = notifications.find { |n| n["method"] == "tool/result" }
+      expect(tool_result["params"]["summary"]).to eq("")
+    end
+
+    it "includes the error message on failure (truncated to 500 chars)" do
+      long_err = "e" * 1000
+      expect do
+        adapter.wrap_execution("read_file", {}) { raise StandardError, long_err }
+      end.to raise_error(StandardError)
+
+      tool_result = notifications.select { |n| n["method"] == "tool/result" }.last
+      expect(tool_result["params"]["success"]).to eq(false)
       expect(tool_result["params"]["summary"].length).to eq(500)
     end
   end
