@@ -18,6 +18,11 @@ module RubynCode
       RISK_LEVEL = :execute
       REQUIRES_CONFIRMATION = true
 
+      def self.summarize(_output, args)
+        cmd = args['command'] || args[:command] || ''
+        "$ #{cmd[0, 180]}"
+      end
+
       def execute(command:, timeout: 120)
         validate_command!(command)
 

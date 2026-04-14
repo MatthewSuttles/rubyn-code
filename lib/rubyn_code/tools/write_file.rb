@@ -18,6 +18,12 @@ module RubynCode
 
       PREVIEW_LINES = 15
 
+      # Take the first line of the tool's output, which is already formatted
+      # as "Updated /path.rb (N bytes)" or "Created /path.rb (N bytes)".
+      def self.summarize(output, _args)
+        output.to_s.lines.first.to_s.chomp[0, 200]
+      end
+
       def execute(path:, content:)
         resolved = safe_path(path)
         existed = File.exist?(resolved)

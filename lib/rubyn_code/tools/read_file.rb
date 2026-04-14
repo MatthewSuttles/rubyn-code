@@ -17,6 +17,12 @@ module RubynCode
       RISK_LEVEL = :read
       REQUIRES_CONFIRMATION = false
 
+      def self.summarize(output, args)
+        path = args['path'] || args[:path] || ''
+        line_count = output.to_s.lines.count
+        "Read #{path} (#{line_count} lines)"
+      end
+
       def execute(path:, offset: nil, limit: nil)
         resolved = read_file_safely(path)
         lines = File.readlines(resolved)

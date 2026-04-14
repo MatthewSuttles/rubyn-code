@@ -22,6 +22,12 @@ module RubynCode
       RISK_LEVEL = :write
       REQUIRES_CONFIRMATION = false
 
+      # Take the first line of the tool's output, which is already formatted
+      # as "Edited /path.rb (N replacements)".
+      def self.summarize(output, _args)
+        output.to_s.lines.first.to_s.chomp[0, 200]
+      end
+
       def execute(path:, old_text:, new_text:, replace_all: false)
         resolved = read_file_safely(path)
         content = File.read(resolved)

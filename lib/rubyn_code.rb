@@ -11,6 +11,10 @@ module RubynCode
   class StallDetectedError < Error; end
   class ToolNotFoundError < Error; end
   class ConfigError < Error; end
+  # Raised when the user refuses a tool invocation in IDE mode. Signals the
+  # agent loop to surface this as is_error: true so the model sees a refusal
+  # rather than a successful tool call returning a string like "denied".
+  class UserDeniedError < Error; end
 
   # Infrastructure
   autoload :Config, 'rubyn_code/config/settings'

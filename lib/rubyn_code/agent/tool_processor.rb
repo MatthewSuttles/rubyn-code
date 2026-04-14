@@ -120,6 +120,10 @@ module RubynCode
         @hook_runner.fire(:post_tool_use, tool_name: tool_name, tool_input: tool_input, result: result)
         signal_decision_compactor(tool_name, tool_input, result)
         [result.to_s, false]
+      rescue RubynCode::UserDeniedError => e
+        # User refused this call via the IDE. Surface as is_error so the model
+        # knows the tool did not run, not that it ran and returned text.
+        [e.message, true]
       rescue StandardError => e
         ["Error executing #{tool_name}: #{e.message}", true]
       end
