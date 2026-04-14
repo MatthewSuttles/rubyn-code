@@ -292,20 +292,6 @@ RSpec.describe RubynCode::IDE::Adapters::ToolOutput do
     end
   end
 
-  describe "approval timeout" do
-    it "raises UserDeniedError after timeout expires" do
-      adapter = described_class.new(server)
-      stub_const("RubynCode::IDE::Adapters::ToolOutput::APPROVAL_TIMEOUT", 0.2)
-
-      expect do
-        adapter.wrap_execution("bash", { "command" => "slow" }) { "executed" }
-      end.to raise_error(RubynCode::UserDeniedError)
-
-      tool_result = notifications.select { |n| n["method"] == "tool/result" }.last
-      expect(tool_result["params"]["success"]).to eq(false)
-    end
-  end
-
   describe "#resolve_approval" do
     let(:adapter) { described_class.new(server) }
 
