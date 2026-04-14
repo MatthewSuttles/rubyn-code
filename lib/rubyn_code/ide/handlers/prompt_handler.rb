@@ -12,7 +12,16 @@ module RubynCode
       class PromptHandler
         def initialize(server)
           @server = server
-          @sessions = {} # sessionId => Thread
+          @sessions = {}       # sessionId => Thread
+          @conversations = {}  # sessionId => Agent::Conversation (persists across prompts)
+        end
+
+        # Called by SessionResetHandler when the user clicks "New Session"
+        # in the chat UI. Drops the cached conversation for this session so
+        # the next prompt starts fresh — parity with the CLI's `/new`.
+        def reset_session(session_id)
+          cancel_session(session_id)
+          @conversations.delete(session_id)
         end
 
         def call(params)
@@ -89,7 +98,12 @@ module RubynCode
 
         def build_agent_loop(session_id, workspace)
           llm_client      = LLM::Client.new
-          conversation    = Agent::Conversation.new
+          # Reuse the conversation across prompts in the same session so the
+          # model has multi-turn memory — same model the CLI REPL uses. A
+          # fresh Agent::Loop is built per prompt (cheap, bundle of refs),
+          # but the conversation (messages array) persists. `session/reset`
+          # drops the cached entry; the next prompt starts a fresh one.
+          conversation    = @conversations[session_id] ||= Agent::Conversation.new
           tool_executor   = Tools::Executor.new(project_root: workspace)
           context_manager = Context::Manager.new(llm_client: llm_client)
           hook_registry   = Hooks::Registry.new
