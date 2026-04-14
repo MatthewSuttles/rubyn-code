@@ -21,7 +21,9 @@ module RubynCode
       # In all modes the adapter emits notifications so the UI reflects
       # what's happening.
       class ToolOutput
-        APPROVAL_TIMEOUT = 60 # seconds
+        # Wake up periodically to check for thread interrupts (cancel).
+        # No auto-deny — waits indefinitely until the user decides.
+        WAIT_POLL_INTERVAL = 5 # seconds
 
         READ_ONLY_TOOLS = %w[
           read_file glob grep
@@ -271,15 +273,13 @@ module RubynCode
           @mutex.synchronize { @pending_approvals[request_id] = { cv: cv, approved: nil } }
 
           @mutex.synchronize do
-            deadline = Time.now + APPROVAL_TIMEOUT
+            # Wait indefinitely — no timeout, no auto-deny. The user decides
+            # when they're ready. Poll periodically so thread interrupts
+            # (cancel) can break us out.
             while @pending_approvals[request_id][:approved].nil?
-              remaining = deadline - Time.now
-              break if remaining <= 0
-
-              cv.wait(@mutex, remaining)
+              cv.wait(@mutex, WAIT_POLL_INTERVAL)
             end
-            approved = @pending_approvals.delete(request_id)[:approved]
-            approved.nil? ? false : approved # auto-deny on timeout
+            @pending_approvals.delete(request_id)[:approved]
           end
         end
 
@@ -288,15 +288,10 @@ module RubynCode
           @mutex.synchronize { @pending_edits[edit_id] = { cv: cv, accepted: nil } }
 
           @mutex.synchronize do
-            deadline = Time.now + APPROVAL_TIMEOUT
             while @pending_edits[edit_id][:accepted].nil?
-              remaining = deadline - Time.now
-              break if remaining <= 0
-
-              cv.wait(@mutex, remaining)
+              cv.wait(@mutex, WAIT_POLL_INTERVAL)
             end
-            accepted = @pending_edits.delete(edit_id)[:accepted]
-            accepted.nil? ? false : accepted # auto-deny on timeout
+            @pending_edits.delete(edit_id)[:accepted]
           end
         end
 
