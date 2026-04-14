@@ -1,0 +1,62 @@
+{
+  "description": "Tool approval lifecycle: tool/use → approveToolUse → tool/result",
+  "steps": [
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "tool/use",
+        "params": {
+          "requestId": "1234-abcd",
+          "tool": "bash",
+          "args": { "command": "ls -la" },
+          "requiresApproval": true
+        }
+      },
+      "validate_params": "tool_use_params"
+    },
+    {
+      "direction": "client_to_server",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "approveToolUse",
+        "params": {
+          "requestId": "1234-abcd",
+          "approved": true
+        }
+      },
+      "validate_params": "approve_tool_use_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "result": {
+          "resolved": true,
+          "requestId": "1234-abcd"
+        }
+      },
+      "validate_result": "approve_tool_use_result"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "tool/result",
+        "params": {
+          "requestId": "1234-abcd",
+          "tool": "bash",
+          "success": true,
+          "summary": "Ran: ls -la"
+        }
+      },
+      "validate_params": "tool_result_params"
+    }
+  ]
+}

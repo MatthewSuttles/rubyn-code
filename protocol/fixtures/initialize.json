@@ -1,0 +1,47 @@
+{
+  "description": "Initialize handshake lifecycle",
+  "steps": [
+    {
+      "direction": "client_to_server",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "workspacePath": "/tmp/test-project",
+          "extensionVersion": "0.1.0",
+          "capabilities": {
+            "inlineDiff": true,
+            "streaming": true
+          }
+        }
+      },
+      "validate_params": "initialize_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "serverVersion": "0.1.0",
+          "protocolVersion": "1",
+          "workspacePath": "/tmp/test-project",
+          "capabilities": {
+            "tools": 25,
+            "skills": 3,
+            "streaming": true,
+            "review": true,
+            "memory": true,
+            "teams": false,
+            "toolApproval": true,
+            "editApproval": true
+          }
+        }
+      },
+      "validate_result": "initialize_result"
+    }
+  ]
+}

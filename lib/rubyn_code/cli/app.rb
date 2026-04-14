@@ -27,6 +27,7 @@ module RubynCode
           rubyn-code --setup            Pin rubyn-code to bypass rbenv/rvm
           rubyn-code --auth             Authenticate with Claude
           rubyn-code --ide              Start IDE server (VS Code extension)
+          rubyn-code --permission-mode MODE  Set permission mode (default, accept_edits, plan_only, auto, dont_ask, bypass)
           rubyn-code --version          Show version
           rubyn-code --help             Show this help
 
@@ -59,6 +60,7 @@ module RubynCode
         '--auth' => :auth, '--setup' => :setup
       }.freeze
       BOOLEAN_FLAGS = { '--yolo' => :yolo, '--debug' => :debug, '--skip-setup' => :skip_setup, '--ide' => :ide }.freeze
+      VALUE_FLAGS = { '--permission-mode' => :permission_mode }.freeze
       DAEMON_INT_FLAGS = { '--max-runs' => :max_runs, '--idle-timeout' => :idle_timeout,
                            '--poll-interval' => :poll_interval }.freeze
       DAEMON_STR_FLAGS = { '--name' => :agent_name, '--role' => :role }.freeze
@@ -96,6 +98,9 @@ module RubynCode
           options[:command] = SIMPLE_FLAGS[arg]
         elsif BOOLEAN_FLAGS.key?(arg)
           options[BOOLEAN_FLAGS[arg]] = true
+        elsif VALUE_FLAGS.key?(arg)
+          options[VALUE_FLAGS[arg]] = argv[idx + 1]
+          idx += 1
         else
           idx = parse_value_option(argv, idx, options)
         end
@@ -192,7 +197,8 @@ module RubynCode
       end
 
       def run_ide
-        IDE::Server.new(yolo: @options[:yolo]).run
+        mode = resolve_permission_mode
+        IDE::Server.new(permission_mode: mode).run
       end
 
       def run_daemon
@@ -213,6 +219,16 @@ module RubynCode
         return if FirstRun.skipped?(skip_flag: @options[:skip_setup])
 
         FirstRun.new.run
+      end
+
+      def resolve_permission_mode
+        if @options[:permission_mode]
+          @options[:permission_mode].to_sym
+        elsif @options[:yolo]
+          :bypass
+        else
+          :default
+        end
       end
 
       def display_help

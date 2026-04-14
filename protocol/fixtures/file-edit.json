@@ -1,0 +1,76 @@
+{
+  "description": "File edit lifecycle: file/edit notification → acceptEdit → tool/result",
+  "steps": [
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "tool/use",
+        "params": {
+          "requestId": "5678-efgh",
+          "tool": "edit_file",
+          "args": { "path": "app/models/user.rb", "old_string": "def name", "new_string": "def full_name" },
+          "requiresApproval": false
+        }
+      },
+      "validate_params": "tool_use_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "file/edit",
+        "params": {
+          "editId": "edit-1234",
+          "path": "app/models/user.rb",
+          "content": "def full_name\n  \"#{first_name} #{last_name}\"\nend",
+          "type": "modify"
+        }
+      },
+      "validate_params": "file_edit_params"
+    },
+    {
+      "direction": "client_to_server",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "acceptEdit",
+        "params": {
+          "editId": "edit-1234",
+          "accepted": true
+        }
+      },
+      "validate_params": "accept_edit_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "result": {
+          "applied": true
+        }
+      },
+      "validate_result": "accept_edit_result"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "tool/result",
+        "params": {
+          "requestId": "5678-efgh",
+          "tool": "edit_file",
+          "success": true,
+          "summary": "Edited app/models/user.rb (1 replacement)"
+        }
+      },
+      "validate_params": "tool_result_params"
+    }
+  ]
+}

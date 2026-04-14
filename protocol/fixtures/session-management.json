@@ -1,0 +1,100 @@
+{
+  "description": "Session management: list, resume, fork",
+  "steps": [
+    {
+      "direction": "client_to_server",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 20,
+        "method": "session/list",
+        "params": {
+          "limit": 10
+        }
+      },
+      "validate_params": "session_list_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 20,
+        "result": {
+          "sessions": [
+            {
+              "id": "session-abc",
+              "title": "Fix user model",
+              "updatedAt": "2026-04-13T10:30:00Z",
+              "messageCount": 12
+            },
+            {
+              "id": "session-def",
+              "title": "Add authentication",
+              "updatedAt": "2026-04-12T14:00:00Z",
+              "messageCount": 8
+            }
+          ]
+        }
+      },
+      "validate_result": "session_list_result"
+    },
+    {
+      "direction": "client_to_server",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 21,
+        "method": "session/resume",
+        "params": {
+          "sessionId": "session-abc"
+        }
+      },
+      "validate_params": "session_resume_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 21,
+        "result": {
+          "resumed": true,
+          "sessionId": "session-abc",
+          "messages": [
+            { "role": "user", "content": "Fix the user model" },
+            { "role": "assistant", "content": "I'll fix the user model..." }
+          ]
+        }
+      },
+      "validate_result": "session_resume_result"
+    },
+    {
+      "direction": "client_to_server",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 22,
+        "method": "session/fork",
+        "params": {
+          "sessionId": "session-abc",
+          "messageIndex": 1
+        }
+      },
+      "validate_params": "session_fork_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 22,
+        "result": {
+          "forked": true,
+          "newSessionId": "session-abc-fork-1"
+        }
+      },
+      "validate_result": "session_fork_result"
+    }
+  ]
+}

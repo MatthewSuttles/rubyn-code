@@ -17,6 +17,10 @@ module RubynCode
         on_stall
         on_error
         on_session_end
+        session_start
+        user_prompt_submit
+        permission_request
+        stop
       ].freeze
 
       Hook = Data.define(:callable, :priority)

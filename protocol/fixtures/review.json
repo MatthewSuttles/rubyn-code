@@ -1,0 +1,75 @@
+{
+  "description": "Review lifecycle: review request → findings → completion",
+  "steps": [
+    {
+      "direction": "client_to_server",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "review",
+        "params": {
+          "baseBranch": "main",
+          "focus": "all",
+          "sessionId": "rev-1"
+        }
+      },
+      "validate_params": "review_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "accepted": true,
+          "sessionId": "rev-1"
+        }
+      },
+      "validate_result": "review_result"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "agent/status",
+        "params": {
+          "sessionId": "rev-1",
+          "status": "reviewing"
+        }
+      },
+      "validate_params": "agent_status_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "review/finding",
+        "params": {
+          "severity": "warning",
+          "message": "N+1 query detected",
+          "file": "app/models/user.rb",
+          "line": 15
+        }
+      },
+      "validate_params": "review_finding_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "agent/status",
+        "params": {
+          "sessionId": "rev-1",
+          "status": "done",
+          "summary": "1 finding(s)"
+        }
+      },
+      "validate_params": "agent_status_params"
+    }
+  ]
+}

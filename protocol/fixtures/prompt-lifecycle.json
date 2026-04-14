@@ -1,0 +1,104 @@
+{
+  "description": "Full prompt lifecycle: request → status notifications → streaming → done",
+  "steps": [
+    {
+      "direction": "client_to_server",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "prompt",
+        "params": {
+          "text": "Hello world",
+          "sessionId": "session-1",
+          "context": {
+            "workspacePath": "/tmp/test-project",
+            "activeFile": "app/models/user.rb",
+            "language": "ruby"
+          }
+        }
+      },
+      "validate_params": "prompt_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "accepted": true,
+          "sessionId": "session-1"
+        }
+      },
+      "validate_result": "prompt_result"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "agent/status",
+        "params": {
+          "sessionId": "session-1",
+          "status": "thinking"
+        }
+      },
+      "validate_params": "agent_status_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "agent/status",
+        "params": {
+          "sessionId": "session-1",
+          "status": "streaming"
+        }
+      },
+      "validate_params": "agent_status_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "stream/text",
+        "params": {
+          "sessionId": "session-1",
+          "text": "Hello! How can I help you?",
+          "final": false
+        }
+      },
+      "validate_params": "stream_text_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "stream/text",
+        "params": {
+          "sessionId": "session-1",
+          "text": "Hello! How can I help you with your Ruby project?",
+          "final": true
+        }
+      },
+      "validate_params": "stream_text_params"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "notification",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "agent/status",
+        "params": {
+          "sessionId": "session-1",
+          "status": "done"
+        }
+      },
+      "validate_params": "agent_status_params"
+    }
+  ]
+}
