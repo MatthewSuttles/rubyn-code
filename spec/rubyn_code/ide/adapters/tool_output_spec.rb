@@ -138,36 +138,32 @@ RSpec.describe RubynCode::IDE::Adapters::ToolOutput do
     end
   end
 
-  describe "write_file in yolo mode" do
-    let(:adapter) { described_class.new(server, yolo: true) }
+  describe "write_file in bypass mode" do
+    let(:adapter) { described_class.new(server, permission_mode: :bypass) }
 
-    # The adapter always emits file/edit or file/create so the VS Code
-    # extension can surface the change in the diff view. In yolo mode the
-    # extension auto-accepts immediately; here we simulate that by calling
-    # resolve_edit as soon as we see the notification.
-    it "still emits tool/use, file notification, and tool/result" do
+    # In bypass mode, file writes are auto-approved — no edit gate.
+    it "auto-approves without waiting for edit acceptance" do
       allow(File).to receive(:exist?).and_return(false)
 
-      result_value = nil
-      writer = Thread.new do
-        result_value = adapter.wrap_execution("write_file",
-                                              { "path" => "/yolo.rb", "content" => "y = 1" }) do
-          "written in yolo"
-        end
+      result = adapter.wrap_execution("write_file",
+                                      { "path" => "/bypass.rb", "content" => "y = 1" }) do
+        "written in bypass"
       end
-      sleep 0.2
 
-      file_notif = notifications.find { |n| n["method"] == "file/create" }
-      expect(file_notif).not_to be_nil
-      adapter.resolve_edit(file_notif["params"]["editId"], true)
-
-      writer.join(2)
-      expect(result_value).to eq("written in yolo")
+      expect(result).to eq("written in bypass")
 
       expect(notifications.find { |n| n["method"] == "tool/use" }).not_to be_nil
       tool_result = notifications.find { |n| n["method"] == "tool/result" }
       expect(tool_result).not_to be_nil
       expect(tool_result["params"]["success"]).to eq(true)
+    end
+  end
+
+  describe "write_file with yolo: true backward compat" do
+    let(:adapter) { described_class.new(server, yolo: true) }
+
+    it "maps yolo: true to bypass mode" do
+      expect(adapter.permission_mode).to eq(:bypass)
     end
   end
 
@@ -272,9 +268,9 @@ RSpec.describe RubynCode::IDE::Adapters::ToolOutput do
       writer.join(2)
     end
 
-    it "skips approval in yolo mode" do
-      yolo_adapter = described_class.new(server, yolo: true)
-      result = yolo_adapter.wrap_execution("bash", { "command" => "echo hi" }) { "hi" }
+    it "skips approval in bypass mode" do
+      bypass_adapter = described_class.new(server, permission_mode: :bypass)
+      result = bypass_adapter.wrap_execution("bash", { "command" => "echo hi" }) { "hi" }
       expect(result).to eq("hi")
     end
 
@@ -416,10 +412,10 @@ RSpec.describe RubynCode::IDE::Adapters::ToolOutput do
       end
       allow(RubynCode::Tools::Registry).to receive(:get).with("chatty_tool").and_return(chatty)
       # chatty isn't a gate-able category → falls through to approval path
-      # which would require a yolo adapter to run without blocking.
-      yolo = described_class.new(server, yolo: true)
+      # which would require a bypass adapter to run without blocking.
+      bypass = described_class.new(server, permission_mode: :bypass)
 
-      yolo.wrap_execution("chatty_tool", { "name" => "widget" }) { "ignored" }
+      bypass.wrap_execution("chatty_tool", { "name" => "widget" }) { "ignored" }
 
       tool_result = notifications.find { |n| n["method"] == "tool/result" }
       expect(tool_result["params"]["summary"]).to eq("processed widget")
@@ -428,9 +424,9 @@ RSpec.describe RubynCode::IDE::Adapters::ToolOutput do
     it "falls back to empty summary if Tools::Registry.get raises" do
       allow(RubynCode::Tools::Registry).to receive(:get).with("phantom")
         .and_raise(RubynCode::ToolNotFoundError, "nope")
-      yolo = described_class.new(server, yolo: true)
+      bypass = described_class.new(server, permission_mode: :bypass)
 
-      yolo.wrap_execution("phantom", {}) { "ignored" }
+      bypass.wrap_execution("phantom", {}) { "ignored" }
 
       tool_result = notifications.find { |n| n["method"] == "tool/result" }
       expect(tool_result["params"]["summary"]).to eq("")

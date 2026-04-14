@@ -11,6 +11,9 @@ require_relative 'handlers/config_get_handler'
 require_relative 'handlers/config_set_handler'
 require_relative 'handlers/models_list_handler'
 require_relative 'handlers/session_reset_handler'
+require_relative 'handlers/session_list_handler'
+require_relative 'handlers/session_resume_handler'
+require_relative 'handlers/session_fork_handler'
 
 module RubynCode
   module IDE
@@ -27,7 +30,10 @@ module RubynCode
         'config/get' => ConfigGetHandler,
         'config/set' => ConfigSetHandler,
         'models/list' => ModelsListHandler,
-        'session/reset' => SessionResetHandler
+        'session/reset' => SessionResetHandler,
+        'session/list' => SessionListHandler,
+        'session/resume' => SessionResumeHandler,
+        'session/fork' => SessionForkHandler
       }.freeze
 
       # Short name => method name mapping (for handler_instance lookups).
@@ -42,7 +48,10 @@ module RubynCode
         config_get: 'config/get',
         config_set: 'config/set',
         models_list: 'models/list',
-        session_reset: 'session/reset'
+        session_reset: 'session/reset',
+        session_list: 'session/list',
+        session_resume: 'session/resume',
+        session_fork: 'session/fork'
       }.freeze
 
       # Register all handlers on the given server instance.

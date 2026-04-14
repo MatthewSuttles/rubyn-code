@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'set'
+
 module RubynCode
   module IDE
     module Handlers
@@ -14,6 +16,14 @@ module RubynCode
           @server = server
           @sessions = {}       # sessionId => Thread
           @conversations = {}  # sessionId => Agent::Conversation (persists across prompts)
+          @started_sessions = Set.new # tracks which sessions have fired session_start
+        end
+
+        # Called by SessionResumeHandler to inject a restored conversation
+        # into the cache so the next prompt continues from the loaded history.
+        def inject_conversation(session_id, conversation)
+          cancel_session(session_id)
+          @conversations[session_id] = conversation
         end
 
         # Called by SessionResetHandler when the user clicks "New Session"
@@ -22,6 +32,7 @@ module RubynCode
         def reset_session(session_id)
           cancel_session(session_id)
           @conversations.delete(session_id)
+          @started_sessions.delete(session_id)
         end
 
         def call(params)
@@ -56,6 +67,14 @@ module RubynCode
                            'sessionId' => session_id,
                            'status' => 'thinking'
                          })
+
+          # Fire IDE hooks for prompt lifecycle
+          ide_hook_runner = build_ide_hook_runner
+          unless @started_sessions.include?(session_id)
+            @started_sessions.add(session_id)
+            ide_hook_runner.fire(:session_start, session_id: session_id)
+          end
+          ide_hook_runner.fire(:user_prompt_submit, session_id: session_id, text: text)
 
           workspace = context['workspacePath'] || @server.workspace_path || Dir.pwd
           agent_loop = build_agent_loop(session_id, workspace)
@@ -104,7 +123,11 @@ module RubynCode
           # but the conversation (messages array) persists. `session/reset`
           # drops the cached entry; the next prompt starts a fresh one.
           conversation    = @conversations[session_id] ||= Agent::Conversation.new
-          tool_executor   = Tools::Executor.new(project_root: workspace)
+
+          # Register IDE-only tools (diagnostics, symbols) when running in IDE mode.
+          Tools::Registry.load_ide_tools! if @server.ide_client
+
+          tool_executor   = Tools::Executor.new(project_root: workspace, ide_client: @server.ide_client)
           context_manager = Context::Manager.new(llm_client: llm_client)
           hook_registry   = Hooks::Registry.new
           hook_runner     = Hooks::Runner.new(registry: hook_registry)
@@ -134,14 +157,15 @@ module RubynCode
             stall_detector: stall_detector,
             tool_wrapper: tool_wrapper,
             on_text: build_text_callback(session_id),
-            project_root: workspace
+            project_root: workspace,
+            ide_client: @server.ide_client
           )
         end
 
         # Install a ToolOutput adapter on the server so AcceptEdit /
         # ApproveToolUse handlers can route responses back to this session.
         def build_tool_output_adapter
-          adapter = IDE::Adapters::ToolOutput.new(@server, yolo: @server.yolo)
+          adapter = IDE::Adapters::ToolOutput.new(@server, permission_mode: @server.permission_mode, hook_runner: build_ide_hook_runner)
           @server.tool_output_adapter = adapter
           adapter
         end
@@ -158,6 +182,12 @@ module RubynCode
                              'final' => false
                            })
           }
+        end
+
+        def build_ide_hook_runner
+          registry = Hooks::Registry.new
+          Hooks::BuiltIn.register_all!(registry)
+          Hooks::Runner.new(registry: registry)
         end
 
         def build_enriched_input(text, context) # rubocop:disable Metrics/AbcSize -- assembles context parts from multiple optional fields

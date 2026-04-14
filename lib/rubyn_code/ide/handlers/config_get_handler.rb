@@ -11,7 +11,7 @@ module RubynCode
       class ConfigGetHandler
         EXPOSED_KEYS = %w[
           provider model model_mode max_iterations max_sub_agent_iterations max_output_chars
-          context_threshold_tokens session_budget_usd daily_budget_usd
+          context_threshold_tokens session_budget_usd daily_budget_usd permission_mode
         ].freeze
 
         def initialize(server)

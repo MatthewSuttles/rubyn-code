@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative '../../config/validator'
+
 module RubynCode
   module IDE
     module Handlers
@@ -17,6 +19,8 @@ module RubynCode
 
         STRING_KEYS = %w[provider model model_mode].freeze
 
+        VALID_PERMISSION_MODES = %w[default accept_edits plan_only auto dont_ask bypass].freeze
+
         def initialize(server)
           @server = server
         end
@@ -27,7 +31,27 @@ module RubynCode
 
           return { 'updated' => false, 'error' => "Unknown config key: #{key}" } unless EXPOSED_KEYS.include?(key)
 
+          # permission_mode is a runtime-only setting on the server, not persisted to config.
+          if key == 'permission_mode'
+            mode = value.to_s
+            unless VALID_PERMISSION_MODES.include?(mode)
+              return { 'updated' => false,
+                       'error' => "Invalid permission mode: #{mode}. " \
+                                  "Valid modes: #{VALID_PERMISSION_MODES.join(', ')}" }
+            end
+
+            @server.permission_mode = mode.to_sym
+            @server.tool_output_adapter&.permission_mode = mode.to_sym
+            @server.notify('config/changed', { 'key' => key, 'value' => mode })
+            return { 'updated' => true, 'key' => key, 'value' => mode }
+          end
+
           value = coerce(key, value)
+
+          result = Config::Validator.new.validate(key, value)
+          unless result[:valid]
+            return { 'updated' => false, 'error' => result[:errors].join('; ') }
+          end
 
           settings = Config::Settings.new
           settings.set(key, value)

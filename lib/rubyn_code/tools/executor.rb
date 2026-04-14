@@ -5,10 +5,11 @@ module RubynCode
     class Executor
       attr_reader :project_root, :output_compressor, :file_cache
       attr_accessor :llm_client, :background_worker, :on_agent_status, :db, :ask_user_callback,
-                    :codebase_index
+                    :codebase_index, :ide_client
 
-      def initialize(project_root:)
+      def initialize(project_root:, ide_client: nil)
         @project_root = File.expand_path(project_root)
+        @ide_client = ide_client
         @injections = {}
         @output_compressor = OutputCompressor.new
         @file_cache = FileCache.new
@@ -54,7 +55,12 @@ module RubynCode
 
       def build_tool(tool_name)
         tool_class = Registry.get(tool_name)
-        tool = tool_class.new(project_root: project_root)
+        # IDE-aware tools accept an ide_client parameter.
+        if @ide_client && tool_class.method(:new).parameters.any? { |_, name| name == :ide_client }
+          tool = tool_class.new(project_root: project_root, ide_client: @ide_client)
+        else
+          tool = tool_class.new(project_root: project_root)
+        end
         inject_dependencies(tool, tool_name)
         tool
       end

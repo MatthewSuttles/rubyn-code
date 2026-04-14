@@ -1,0 +1,722 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rubyn.ai/protocol/schema.json",
+  "title": "Rubyn Code IDE Protocol",
+  "description": "JSON-RPC 2.0 protocol schema for communication between the Rubyn Code CLI and VS Code extension.",
+
+  "$defs": {
+    "jsonrpc_version": {
+      "const": "2.0"
+    },
+
+    "request_base": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": { "$ref": "#/$defs/jsonrpc_version" },
+        "id": { "type": ["number", "string"] },
+        "method": { "type": "string" },
+        "params": { "type": "object" }
+      },
+      "required": ["jsonrpc", "id", "method"]
+    },
+
+    "response_base": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": { "$ref": "#/$defs/jsonrpc_version" },
+        "id": { "type": ["number", "string", "null"] },
+        "result": {},
+        "error": { "$ref": "#/$defs/rpc_error" }
+      },
+      "required": ["jsonrpc", "id"],
+      "oneOf": [
+        { "required": ["result"] },
+        { "required": ["error"] }
+      ]
+    },
+
+    "notification_base": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": { "$ref": "#/$defs/jsonrpc_version" },
+        "method": { "type": "string" },
+        "params": { "type": "object" }
+      },
+      "required": ["jsonrpc", "method"],
+      "not": { "required": ["id"] }
+    },
+
+    "rpc_error": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "integer" },
+        "message": { "type": "string" }
+      },
+      "required": ["code", "message"]
+    },
+
+    "initialize_params": {
+      "type": "object",
+      "properties": {
+        "workspacePath": { "type": "string" },
+        "extensionVersion": { "type": "string" },
+        "capabilities": {
+          "type": "object",
+          "properties": {
+            "inlineDiff": { "type": "boolean" },
+            "streaming": { "type": "boolean" }
+          }
+        }
+      },
+      "required": ["extensionVersion"]
+    },
+
+    "initialize_result": {
+      "type": "object",
+      "properties": {
+        "serverVersion": { "type": "string" },
+        "protocolVersion": { "type": "string" },
+        "workspacePath": { "type": ["string", "null"] },
+        "capabilities": {
+          "type": "object",
+          "properties": {
+            "tools": { "type": "integer" },
+            "skills": { "type": "integer" },
+            "streaming": { "type": "boolean" },
+            "review": { "type": "boolean" },
+            "memory": { "type": "boolean" },
+            "teams": { "type": "boolean" },
+            "toolApproval": { "type": "boolean" },
+            "editApproval": { "type": "boolean" }
+          },
+          "required": ["tools"]
+        }
+      },
+      "required": ["serverVersion", "capabilities"]
+    },
+
+    "prompt_params": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "context": {
+          "type": "object",
+          "properties": {
+            "activeFile": { "type": "string" },
+            "selection": {
+              "type": "object",
+              "properties": {
+                "startLine": { "type": "integer" },
+                "endLine": { "type": "integer" },
+                "text": { "type": "string" }
+              },
+              "required": ["startLine", "endLine", "text"]
+            },
+            "openFiles": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "workspacePath": { "type": "string" },
+            "language": { "type": "string" },
+            "cursorLine": { "type": "integer" }
+          }
+        },
+        "sessionId": { "type": "string" }
+      },
+      "required": ["text", "sessionId"]
+    },
+
+    "prompt_result": {
+      "type": "object",
+      "properties": {
+        "accepted": { "type": "boolean" },
+        "sessionId": { "type": "string" }
+      },
+      "required": ["accepted", "sessionId"]
+    },
+
+    "cancel_params": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" }
+      },
+      "required": ["sessionId"]
+    },
+
+    "cancel_result": {
+      "type": "object",
+      "properties": {
+        "cancelled": { "type": "boolean" },
+        "sessionId": { "type": "string" }
+      },
+      "required": ["cancelled"]
+    },
+
+    "review_params": {
+      "type": "object",
+      "properties": {
+        "baseBranch": { "type": "string" },
+        "focus": { "type": "string" },
+        "sessionId": { "type": "string" }
+      },
+      "required": ["baseBranch"]
+    },
+
+    "review_result": {
+      "type": "object",
+      "properties": {
+        "accepted": { "type": "boolean" },
+        "sessionId": { "type": "string" }
+      },
+      "required": ["accepted"]
+    },
+
+    "approve_tool_use_params": {
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string" },
+        "approved": { "type": "boolean" }
+      },
+      "required": ["requestId", "approved"]
+    },
+
+    "approve_tool_use_result": {
+      "type": "object",
+      "properties": {
+        "resolved": { "type": "boolean" },
+        "requestId": { "type": "string" }
+      },
+      "required": ["resolved"]
+    },
+
+    "accept_edit_params": {
+      "type": "object",
+      "properties": {
+        "editId": { "type": "string" },
+        "accepted": { "type": "boolean" }
+      },
+      "required": ["editId", "accepted"]
+    },
+
+    "accept_edit_result": {
+      "type": "object",
+      "properties": {
+        "applied": { "type": "boolean" }
+      },
+      "required": ["applied"]
+    },
+
+    "shutdown_result": {
+      "type": "object",
+      "properties": {
+        "shutdown": { "type": "boolean" }
+      },
+      "required": ["shutdown"]
+    },
+
+    "config_get_params": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" }
+      }
+    },
+
+    "config_get_result": {
+      "type": "object",
+      "properties": {
+        "settings": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "value": {},
+              "default": {}
+            }
+          }
+        },
+        "providers": { "type": "object" }
+      }
+    },
+
+    "config_set_params": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": {}
+      },
+      "required": ["key", "value"]
+    },
+
+    "config_set_result": {
+      "type": "object",
+      "properties": {
+        "updated": { "type": "boolean" },
+        "key": { "type": "string" },
+        "value": {},
+        "error": { "type": "string" }
+      },
+      "required": ["updated"]
+    },
+
+    "models_list_result": {
+      "type": "object",
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "provider": { "type": "string" },
+              "model": { "type": "string" },
+              "tier": { "type": "string" }
+            },
+            "required": ["provider", "model"]
+          }
+        },
+        "activeProvider": { "type": "string" },
+        "activeModel": { "type": "string" },
+        "modelMode": { "type": "string" }
+      },
+      "required": ["models"]
+    },
+
+    "session_reset_params": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" }
+      },
+      "required": ["sessionId"]
+    },
+
+    "session_reset_result": {
+      "type": "object",
+      "properties": {
+        "reset": { "type": "boolean" },
+        "sessionId": { "type": "string" }
+      },
+      "required": ["reset"]
+    },
+
+    "session_list_params": {
+      "type": "object",
+      "properties": {
+        "projectPath": { "type": "string" },
+        "limit": { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "session_list_result": {
+      "type": "object",
+      "properties": {
+        "sessions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "updatedAt": { "type": "string" },
+              "messageCount": { "type": "integer" }
+            },
+            "required": ["id", "updatedAt"]
+          }
+        }
+      },
+      "required": ["sessions"]
+    },
+
+    "session_resume_params": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" }
+      },
+      "required": ["sessionId"]
+    },
+
+    "session_resume_result": {
+      "type": "object",
+      "properties": {
+        "resumed": { "type": "boolean" },
+        "sessionId": { "type": "string" },
+        "messages": { "type": "array" }
+      },
+      "required": ["resumed", "sessionId"]
+    },
+
+    "session_fork_params": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "messageIndex": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["sessionId", "messageIndex"]
+    },
+
+    "session_fork_result": {
+      "type": "object",
+      "properties": {
+        "forked": { "type": "boolean" },
+        "newSessionId": { "type": "string" }
+      },
+      "required": ["forked", "newSessionId"]
+    },
+
+    "stream_text_params": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "text": { "type": "string" },
+        "delta": { "type": "string" },
+        "final": { "type": "boolean" },
+        "done": { "type": "boolean" }
+      },
+      "required": ["sessionId"]
+    },
+
+    "agent_status_params": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["idle", "thinking", "streaming", "tool_use", "reviewing", "learning", "done", "error", "cancelled"]
+        },
+        "detail": { "type": "string" },
+        "error": { "type": "string" },
+        "summary": { "type": "string" },
+        "toolCalls": { "type": "integer" },
+        "tokensUsed": { "type": "integer" },
+        "cost": { "type": "number" }
+      },
+      "required": ["sessionId", "status"]
+    },
+
+    "tool_use_params": {
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string" },
+        "tool": { "type": "string" },
+        "args": { "type": "object" },
+        "requiresApproval": { "type": "boolean" }
+      },
+      "required": ["requestId", "tool", "args", "requiresApproval"]
+    },
+
+    "tool_result_params": {
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string" },
+        "tool": { "type": "string" },
+        "success": { "type": "boolean" },
+        "summary": { "type": "string" }
+      },
+      "required": ["requestId", "tool", "success"]
+    },
+
+    "file_edit_params": {
+      "type": "object",
+      "properties": {
+        "editId": { "type": "string" },
+        "path": { "type": "string" },
+        "content": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["modify", "create", "delete"]
+        },
+        "hunks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "startLine": { "type": "integer" },
+              "endLine": { "type": "integer" },
+              "originalContent": { "type": "string" },
+              "newContent": { "type": "string" }
+            },
+            "required": ["startLine", "endLine", "originalContent", "newContent"]
+          }
+        }
+      },
+      "required": ["editId", "path"]
+    },
+
+    "file_create_params": {
+      "type": "object",
+      "properties": {
+        "editId": { "type": "string" },
+        "path": { "type": "string" },
+        "content": { "type": "string" }
+      },
+      "required": ["editId", "path", "content"]
+    },
+
+    "review_finding_params": {
+      "type": "object",
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "warning", "suggestion", "nitpick", "error", "info"]
+        },
+        "message": { "type": "string" },
+        "file": { "type": "string" },
+        "line": { "type": "integer" }
+      },
+      "required": ["severity", "message"]
+    },
+
+    "session_cost_params": {
+      "type": "object",
+      "properties": {
+        "inputTokens": { "type": "integer" },
+        "outputTokens": { "type": "integer" },
+        "cacheHits": { "type": "integer" },
+        "totalCost": { "type": "number" },
+        "sessionBudget": { "type": "number" },
+        "budgetRemaining": { "type": "number" }
+      },
+      "required": ["totalCost"]
+    },
+
+    "config_changed_params": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": {}
+      },
+      "required": ["key", "value"]
+    },
+
+    "ide_open_diff_params": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "proposedContent": { "type": "string" },
+        "title": { "type": "string" }
+      },
+      "required": ["path", "proposedContent"]
+    },
+
+    "ide_open_diff_result": {
+      "type": "object",
+      "properties": {
+        "accepted": { "type": "boolean" }
+      },
+      "required": ["accepted"]
+    },
+
+    "ide_read_selection_result": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "file": { "type": "string" },
+        "startLine": { "type": "integer" },
+        "endLine": { "type": "integer" },
+        "language": { "type": "string" }
+      },
+      "required": ["text"]
+    },
+
+    "ide_read_active_file_result": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "content": { "type": "string" },
+        "language": { "type": "string" }
+      },
+      "required": ["path", "content"]
+    },
+
+    "ide_save_file_params": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" }
+      },
+      "required": ["path"]
+    },
+
+    "ide_save_file_result": {
+      "type": "object",
+      "properties": {
+        "saved": { "type": "boolean" }
+      },
+      "required": ["saved"]
+    },
+
+    "ide_navigate_to_params": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "line": { "type": "integer" },
+        "column": { "type": "integer" }
+      },
+      "required": ["path"]
+    },
+
+    "ide_get_open_tabs_result": {
+      "type": "object",
+      "properties": {
+        "tabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": { "type": "string" },
+              "language": { "type": "string" },
+              "isDirty": { "type": "boolean" }
+            },
+            "required": ["path"]
+          }
+        }
+      },
+      "required": ["tabs"]
+    },
+
+    "ide_get_diagnostics_params": {
+      "type": "object",
+      "properties": {
+        "file": { "type": "string" }
+      }
+    },
+
+    "ide_get_diagnostics_result": {
+      "type": "object",
+      "properties": {
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file": { "type": "string" },
+              "line": { "type": "integer" },
+              "column": { "type": "integer" },
+              "severity": { "type": "string", "enum": ["error", "warning", "info", "hint"] },
+              "message": { "type": "string" },
+              "source": { "type": "string" }
+            },
+            "required": ["file", "line", "severity", "message"]
+          }
+        }
+      },
+      "required": ["diagnostics"]
+    },
+
+    "ide_get_workspace_symbols_params": {
+      "type": "object",
+      "properties": {
+        "query": { "type": "string" }
+      },
+      "required": ["query"]
+    },
+
+    "ide_get_workspace_symbols_result": {
+      "type": "object",
+      "properties": {
+        "symbols": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "kind": { "type": "string" },
+              "file": { "type": "string" },
+              "line": { "type": "integer" },
+              "containerName": { "type": "string" }
+            },
+            "required": ["name", "kind", "file"]
+          }
+        }
+      },
+      "required": ["symbols"]
+    },
+
+    "method_registry": {
+      "description": "Maps method names to their param/result schema refs.",
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "object",
+          "description": "Client → Server requests",
+          "properties": {
+            "initialize":      { "$ref": "#/$defs/_method_meta_initialize" },
+            "prompt":          { "$ref": "#/$defs/_method_meta_prompt" },
+            "cancel":          { "$ref": "#/$defs/_method_meta_cancel" },
+            "review":          { "$ref": "#/$defs/_method_meta_review" },
+            "approveToolUse":  { "$ref": "#/$defs/_method_meta_approve_tool_use" },
+            "acceptEdit":      { "$ref": "#/$defs/_method_meta_accept_edit" },
+            "shutdown":        { "$ref": "#/$defs/_method_meta_shutdown" },
+            "config/get":      { "$ref": "#/$defs/_method_meta_config_get" },
+            "config/set":      { "$ref": "#/$defs/_method_meta_config_set" },
+            "models/list":     { "$ref": "#/$defs/_method_meta_models_list" },
+            "session/reset":   { "$ref": "#/$defs/_method_meta_session_reset" },
+            "session/list":    { "$ref": "#/$defs/_method_meta_session_list" },
+            "session/resume":  { "$ref": "#/$defs/_method_meta_session_resume" },
+            "session/fork":    { "$ref": "#/$defs/_method_meta_session_fork" }
+          }
+        },
+        "server_requests": {
+          "type": "object",
+          "description": "Server → Client requests (bidirectional RPC)",
+          "properties": {
+            "ide/openDiff":              { "$ref": "#/$defs/_method_meta_ide_open_diff" },
+            "ide/readSelection":         { "$ref": "#/$defs/_method_meta_ide_read_selection" },
+            "ide/readActiveFile":        { "$ref": "#/$defs/_method_meta_ide_read_active_file" },
+            "ide/saveFile":              { "$ref": "#/$defs/_method_meta_ide_save_file" },
+            "ide/navigateTo":            { "$ref": "#/$defs/_method_meta_ide_navigate_to" },
+            "ide/getOpenTabs":           { "$ref": "#/$defs/_method_meta_ide_get_open_tabs" },
+            "ide/getDiagnostics":        { "$ref": "#/$defs/_method_meta_ide_get_diagnostics" },
+            "ide/getWorkspaceSymbols":   { "$ref": "#/$defs/_method_meta_ide_get_workspace_symbols" }
+          }
+        },
+        "notifications": {
+          "type": "object",
+          "description": "Server → Client notifications",
+          "properties": {
+            "stream/text":      { "$ref": "#/$defs/_notif_meta_stream_text" },
+            "agent/status":     { "$ref": "#/$defs/_notif_meta_agent_status" },
+            "tool/use":         { "$ref": "#/$defs/_notif_meta_tool_use" },
+            "tool/result":      { "$ref": "#/$defs/_notif_meta_tool_result" },
+            "file/edit":        { "$ref": "#/$defs/_notif_meta_file_edit" },
+            "file/create":      { "$ref": "#/$defs/_notif_meta_file_create" },
+            "review/finding":   { "$ref": "#/$defs/_notif_meta_review_finding" },
+            "session/cost":     { "$ref": "#/$defs/_notif_meta_session_cost" },
+            "config/changed":   { "$ref": "#/$defs/_notif_meta_config_changed" }
+          }
+        }
+      }
+    },
+
+    "_method_meta_initialize":        { "type": "object", "properties": { "params": { "$ref": "#/$defs/initialize_params" },        "result": { "$ref": "#/$defs/initialize_result" } } },
+    "_method_meta_prompt":            { "type": "object", "properties": { "params": { "$ref": "#/$defs/prompt_params" },            "result": { "$ref": "#/$defs/prompt_result" } } },
+    "_method_meta_cancel":            { "type": "object", "properties": { "params": { "$ref": "#/$defs/cancel_params" },            "result": { "$ref": "#/$defs/cancel_result" } } },
+    "_method_meta_review":            { "type": "object", "properties": { "params": { "$ref": "#/$defs/review_params" },            "result": { "$ref": "#/$defs/review_result" } } },
+    "_method_meta_approve_tool_use":  { "type": "object", "properties": { "params": { "$ref": "#/$defs/approve_tool_use_params" },  "result": { "$ref": "#/$defs/approve_tool_use_result" } } },
+    "_method_meta_accept_edit":       { "type": "object", "properties": { "params": { "$ref": "#/$defs/accept_edit_params" },       "result": { "$ref": "#/$defs/accept_edit_result" } } },
+    "_method_meta_shutdown":          { "type": "object", "properties": { "result": { "$ref": "#/$defs/shutdown_result" } } },
+    "_method_meta_config_get":        { "type": "object", "properties": { "params": { "$ref": "#/$defs/config_get_params" },        "result": { "$ref": "#/$defs/config_get_result" } } },
+    "_method_meta_config_set":        { "type": "object", "properties": { "params": { "$ref": "#/$defs/config_set_params" },        "result": { "$ref": "#/$defs/config_set_result" } } },
+    "_method_meta_models_list":       { "type": "object", "properties": { "result": { "$ref": "#/$defs/models_list_result" } } },
+    "_method_meta_session_reset":     { "type": "object", "properties": { "params": { "$ref": "#/$defs/session_reset_params" },     "result": { "$ref": "#/$defs/session_reset_result" } } },
+    "_method_meta_session_list":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/session_list_params" },      "result": { "$ref": "#/$defs/session_list_result" } } },
+    "_method_meta_session_resume":    { "type": "object", "properties": { "params": { "$ref": "#/$defs/session_resume_params" },    "result": { "$ref": "#/$defs/session_resume_result" } } },
+    "_method_meta_session_fork":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/session_fork_params" },      "result": { "$ref": "#/$defs/session_fork_result" } } },
+
+    "_method_meta_ide_open_diff":            { "type": "object", "properties": { "params": { "$ref": "#/$defs/ide_open_diff_params" },            "result": { "$ref": "#/$defs/ide_open_diff_result" } } },
+    "_method_meta_ide_read_selection":        { "type": "object", "properties": { "result": { "$ref": "#/$defs/ide_read_selection_result" } } },
+    "_method_meta_ide_read_active_file":      { "type": "object", "properties": { "result": { "$ref": "#/$defs/ide_read_active_file_result" } } },
+    "_method_meta_ide_save_file":            { "type": "object", "properties": { "params": { "$ref": "#/$defs/ide_save_file_params" },            "result": { "$ref": "#/$defs/ide_save_file_result" } } },
+    "_method_meta_ide_navigate_to":          { "type": "object", "properties": { "params": { "$ref": "#/$defs/ide_navigate_to_params" } } },
+    "_method_meta_ide_get_open_tabs":        { "type": "object", "properties": { "result": { "$ref": "#/$defs/ide_get_open_tabs_result" } } },
+    "_method_meta_ide_get_diagnostics":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/ide_get_diagnostics_params" },      "result": { "$ref": "#/$defs/ide_get_diagnostics_result" } } },
+    "_method_meta_ide_get_workspace_symbols": { "type": "object", "properties": { "params": { "$ref": "#/$defs/ide_get_workspace_symbols_params" }, "result": { "$ref": "#/$defs/ide_get_workspace_symbols_result" } } },
+
+    "_notif_meta_stream_text":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/stream_text_params" } } },
+    "_notif_meta_agent_status":     { "type": "object", "properties": { "params": { "$ref": "#/$defs/agent_status_params" } } },
+    "_notif_meta_tool_use":         { "type": "object", "properties": { "params": { "$ref": "#/$defs/tool_use_params" } } },
+    "_notif_meta_tool_result":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/tool_result_params" } } },
+    "_notif_meta_file_edit":        { "type": "object", "properties": { "params": { "$ref": "#/$defs/file_edit_params" } } },
+    "_notif_meta_file_create":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/file_create_params" } } },
+    "_notif_meta_review_finding":   { "type": "object", "properties": { "params": { "$ref": "#/$defs/review_finding_params" } } },
+    "_notif_meta_session_cost":     { "type": "object", "properties": { "params": { "$ref": "#/$defs/session_cost_params" } } },
+    "_notif_meta_config_changed":   { "type": "object", "properties": { "params": { "$ref": "#/$defs/config_changed_params" } } }
+  }
+}

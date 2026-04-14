@@ -2,6 +2,7 @@
 
 require 'json'
 require_relative 'protocol'
+require_relative 'client'
 require_relative 'handlers'
 
 module RubynCode
@@ -16,11 +17,12 @@ module RubynCode
     class Server
       # Attributes set by handlers during the session lifecycle.
       attr_accessor :workspace_path, :extension_version, :client_capabilities,
-                    :session_persistence, :handler_instances, :tool_output_adapter
-      attr_reader :yolo
+                    :session_persistence, :handler_instances, :tool_output_adapter,
+                    :permission_mode
+      attr_reader :ide_client
 
-      def initialize(yolo: false)
-        @yolo = yolo
+      def initialize(permission_mode: :default, yolo: false)
+        @permission_mode = yolo ? :bypass : permission_mode.to_sym
         @running = false
         @write_mutex = Mutex.new
         @handlers = {}
@@ -30,8 +32,14 @@ module RubynCode
         @client_capabilities = {}
         @session_persistence = nil
         @tool_output_adapter = nil
+        @ide_client = Client.new(self)
 
         Handlers.register_all(self)
+      end
+
+      # Backward-compatible reader: true when permission_mode is :bypass.
+      def yolo
+        @permission_mode == :bypass
       end
 
       def run
@@ -110,6 +118,17 @@ module RubynCode
       # ── Dispatch ────────────────────────────────────────────────────
 
       def dispatch(msg)
+        # Response messages from the extension (for our outbound requests via ide_client).
+        # These have id + (result or error) but no method.
+        if !msg.key?('method') && msg.key?('id') && (msg.key?('result') || msg.key?('error'))
+          @ide_client.resolve(
+            msg['id'],
+            result: msg['result'],
+            error: msg['error']
+          )
+          return
+        end
+
         method = msg['method']
         params = msg['params'] || {}
         id     = msg['id']

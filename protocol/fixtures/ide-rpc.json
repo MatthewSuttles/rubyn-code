@@ -1,0 +1,90 @@
+{
+  "description": "Bidirectional IDE RPC: server sends request to client, client responds",
+  "steps": [
+    {
+      "direction": "server_to_client",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1001,
+        "method": "ide/readSelection",
+        "params": {}
+      }
+    },
+    {
+      "direction": "client_to_server",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1001,
+        "result": {
+          "text": "def hello\n  puts 'world'\nend",
+          "file": "app/models/user.rb",
+          "startLine": 10,
+          "endLine": 12,
+          "language": "ruby"
+        }
+      },
+      "validate_result": "ide_read_selection_result"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1002,
+        "method": "ide/getDiagnostics",
+        "params": {
+          "file": "app/models/user.rb"
+        }
+      },
+      "validate_params": "ide_get_diagnostics_params"
+    },
+    {
+      "direction": "client_to_server",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1002,
+        "result": {
+          "diagnostics": [
+            {
+              "file": "app/models/user.rb",
+              "line": 5,
+              "column": 10,
+              "severity": "error",
+              "message": "undefined method 'foo'",
+              "source": "ruby-lsp"
+            }
+          ]
+        }
+      },
+      "validate_result": "ide_get_diagnostics_result"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1003,
+        "method": "ide/getOpenTabs",
+        "params": {}
+      }
+    },
+    {
+      "direction": "client_to_server",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1003,
+        "result": {
+          "tabs": [
+            { "path": "app/models/user.rb", "language": "ruby", "isDirty": false },
+            { "path": "spec/models/user_spec.rb", "language": "ruby", "isDirty": true }
+          ]
+        }
+      },
+      "validate_result": "ide_get_open_tabs_result"
+    }
+  ]
+}

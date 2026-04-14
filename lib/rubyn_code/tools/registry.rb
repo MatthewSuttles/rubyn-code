@@ -33,13 +33,24 @@ module RubynCode
           @tools = {}
         end
 
+        # IDE-only tools that require an ide_client to function.
+        IDE_ONLY_TOOLS = %w[ide_diagnostics ide_symbols].freeze
+
         def load_all!
           tool_files = Dir[File.join(__dir__, '*.rb')]
           tool_files.each do |file|
             basename = File.basename(file, '.rb')
             next if %w[base registry schema executor].include?(basename)
+            next if IDE_ONLY_TOOLS.include?(basename)
 
             require_relative basename
+          end
+        end
+
+        # Register IDE-only tools when an ide_client is available.
+        def load_ide_tools!
+          IDE_ONLY_TOOLS.each do |name|
+            require_relative name
           end
         end
       end

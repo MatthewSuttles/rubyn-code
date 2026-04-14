@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_mode": {
+      "type": "string",
+      "enum": ["auto", "manual"]
+    },
+    "max_iterations": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "max_sub_agent_iterations": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500
+    },
+    "max_output_chars": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 1000000
+    },
+    "context_threshold_tokens": {
+      "type": "integer",
+      "minimum": 10000,
+      "maximum": 200000
+    },
+    "session_budget_usd": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 100
+    },
+    "daily_budget_usd": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 500
+    }
+  },
+  "additionalProperties": true
+}

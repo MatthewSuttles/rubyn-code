@@ -10,6 +10,7 @@ group :development, :test do
   gem 'rubocop', '~> 1.21'
   gem 'simplecov', '~> 0.22'
   gem 'webmock', '~> 3.0'
+  gem 'json_schemer', '~> 2.0'
 end
 
 gem 'base64', '~> 0.3.0'

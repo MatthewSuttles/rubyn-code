@@ -10,15 +10,16 @@ module RubynCode
       # editor can render a diff before any write touches disk, and gates
       # mutating operations behind acceptance/approval from the IDE client.
       #
-      # Gating policy (when yolo is off):
-      #   - read-only tools  → run immediately, emit tool/use + tool/result
-      #   - file write tools → emit file/edit or file/create with proposed
-      #                        content, wait for acceptEdit, then run
-      #   - other mutating   → emit tool/use with requiresApproval, wait for
-      #                        approveToolUse, then run
+      # Gating policy depends on the permission mode:
+      #   :default      → approve every mutating tool + every file edit
+      #   :accept_edits → auto-approve file edits, prompt for bash/other
+      #   :plan_only    → read-only, block all writes
+      #   :auto         → auto-approve everything except deny-listed
+      #   :dont_ask     → auto-deny all non-read-only tools
+      #   :bypass       → no checks (legacy yolo)
       #
-      # When yolo is on the adapter still emits notifications (so the UI
-      # reflects what's happening) but skips the approval round-trip.
+      # In all modes the adapter emits notifications so the UI reflects
+      # what's happening.
       class ToolOutput
         APPROVAL_TIMEOUT = 60 # seconds
 
@@ -31,10 +32,15 @@ module RubynCode
 
         FILE_WRITE_TOOLS = %w[write_file edit_file].freeze
 
-        def initialize(server, yolo: false)
-          @server = server
-          @yolo   = yolo
-          @mutex  = Mutex.new
+        VALID_PERMISSION_MODES = %i[default accept_edits plan_only auto dont_ask bypass].freeze
+
+        attr_accessor :permission_mode
+
+        def initialize(server, permission_mode: :default, yolo: false, hook_runner: nil)
+          @server          = server
+          @permission_mode = yolo ? :bypass : permission_mode.to_sym
+          @hook_runner     = hook_runner
+          @mutex           = Mutex.new
 
           # { request_id => { cv: ConditionVariable, approved: nil|true|false } }
           @pending_approvals = {}
@@ -55,10 +61,35 @@ module RubynCode
           args = stringify_keys(args)
 
           return execute_and_notify(request_id, tool_name, args, &block) if read_only?(tool_name)
-          return execute_with_edit_gate(request_id, tool_name, args, &block) if file_write?(tool_name)
 
-          # bash and other mutating tools: emit tool/use, optionally wait for approval
-          execute_with_approval(request_id, tool_name, args, &block)
+          # Non-read-only tools: gating depends on permission mode
+          case @permission_mode
+          when :bypass, :auto
+            # Auto-approve everything — run without waiting
+            execute_and_notify(request_id, tool_name, args, &block)
+          when :plan_only
+            emit_tool_use(request_id, tool_name, args, requires_approval: false)
+            msg = 'Plan mode: write operations blocked'
+            emit_tool_result(request_id, tool_name, msg, success: false, args: args)
+            raise RubynCode::UserDeniedError, msg
+          when :dont_ask
+            emit_tool_use(request_id, tool_name, args, requires_approval: false)
+            msg = 'Auto-denied: permission mode is dont_ask'
+            emit_tool_result(request_id, tool_name, msg, success: false, args: args)
+            raise RubynCode::UserDeniedError, msg
+          when :accept_edits
+            if file_write?(tool_name)
+              execute_with_edit_gate(request_id, tool_name, args, &block)
+            else
+              execute_with_approval(request_id, tool_name, args, &block)
+            end
+          else # :default
+            if file_write?(tool_name)
+              execute_with_edit_gate(request_id, tool_name, args, &block)
+            else
+              execute_with_approval(request_id, tool_name, args, &block)
+            end
+          end
         end
 
         # Called by ApproveToolUseHandler when the IDE client responds.
@@ -111,7 +142,7 @@ module RubynCode
           # extension can surface the change — opens a diff editor in normal
           # mode or flashes "Rubyn auto-applied…" and applies via workspace
           # edit in yolo mode. Either way the user sees what changed.
-          accepted = notify_and_await_edit(preview, args)
+          accepted = notify_and_await_edit(tool_name, preview, args)
           return deny_edit(request_id, tool_name, preview[:type]) unless accepted
 
           apply_edit(request_id, tool_name, args, &)
@@ -131,7 +162,7 @@ module RubynCode
           klass.new(project_root: @server.workspace_path || Dir.pwd)
         end
 
-        def notify_and_await_edit(preview, args)
+        def notify_and_await_edit(tool_name, preview, args)
           edit_id = generate_id
           path = args['path']
           method = preview[:type] == 'create' ? 'file/create' : 'file/edit'
@@ -140,6 +171,11 @@ module RubynCode
           params['type'] = preview[:type] if method == 'file/edit'
 
           @server.notify(method, params)
+
+          # In accept_edits mode, auto-approve file writes without waiting
+          return true if @permission_mode == :accept_edits
+
+          fire_permission_request(tool_name, edit_id)
           wait_for_edit(edit_id)
         end
 
@@ -167,15 +203,9 @@ module RubynCode
         # ── Approval-gated tools (bash, etc.) ────────────────────────────
 
         def execute_with_approval(request_id, tool_name, args)
-          requires_approval = !@yolo
-          emit_tool_use(request_id, tool_name, args, requires_approval: requires_approval)
+          emit_tool_use(request_id, tool_name, args, requires_approval: true)
 
-          if @yolo
-            result = yield
-            emit_tool_result(request_id, tool_name, result, success: true, args: args)
-            return result
-          end
-
+          fire_permission_request(tool_name, request_id)
           approved = wait_for_approval(request_id)
           unless approved
             summary = 'User refused this tool invocation. Do not retry the same call.'
@@ -268,6 +298,12 @@ module RubynCode
             accepted = @pending_edits.delete(edit_id)[:accepted]
             accepted.nil? ? false : accepted # auto-deny on timeout
           end
+        end
+
+        # ── Hook helpers ───────────────────────────────────────────────
+
+        def fire_permission_request(tool_name, request_id)
+          @hook_runner&.fire(:permission_request, tool_name: tool_name, request_id: request_id)
         end
 
         # ── Helpers ──────────────────────────────────────────────────────

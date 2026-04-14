@@ -21,7 +21,19 @@ module RubynCode
           prompt_handler = @server.handler_instance(:prompt)
           prompt_handler&.cancel_session(session_id)
 
+          # Fire the stop hook so extensions can react to session cancellation
+          fire_stop_hook(session_id)
+
           { 'cancelled' => true, 'sessionId' => session_id }
+        end
+
+        private
+
+        def fire_stop_hook(session_id)
+          hook_registry = Hooks::Registry.new
+          hook_runner = Hooks::Runner.new(registry: hook_registry)
+          Hooks::BuiltIn.register_all!(hook_registry)
+          hook_runner.fire(:stop, session_id: session_id)
         end
       end
     end
