@@ -87,7 +87,11 @@ module RubynCode
         normalized_old = normalize_trailing_ws(old_text)
 
         if normalized_content.include?(normalized_old)
-          replace_all ? normalized_content.gsub(normalized_old, new_text) : normalized_content.sub(normalized_old, new_text)
+          if replace_all
+            normalized_content.gsub(normalized_old, new_text)
+          else
+            normalized_content.sub(normalized_old, new_text)
+          end
         else
           content.sub(old_text, new_text)
         end
