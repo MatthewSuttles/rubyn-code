@@ -59,7 +59,15 @@ module RubynCode
       def validate_occurrences!(path, content, old_text, replace_all)
         count = content.scan(old_text).length
 
-        raise Error, "old_text not found in #{path}. No changes made." if count.zero?
+        # If exact match fails, try with normalized trailing whitespace on
+        # each line. Models sometimes strip or add trailing spaces/tabs.
+        if count.zero?
+          normalized_content = normalize_trailing_ws(content)
+          normalized_old = normalize_trailing_ws(old_text)
+          count = normalized_content.scan(normalized_old).length
+
+          raise Error, "old_text not found in #{path}. No changes made." if count.zero?
+        end
 
         return if replace_all || count == 1
 
@@ -69,7 +77,28 @@ module RubynCode
       end
 
       def apply_replacement(content, old_text, new_text, replace_all)
-        replace_all ? content.gsub(old_text, new_text) : content.sub(old_text, new_text)
+        # Try exact match first
+        if content.include?(old_text)
+          return replace_all ? content.gsub(old_text, new_text) : content.sub(old_text, new_text)
+        end
+
+        # Fall back to normalized trailing-whitespace match
+        normalized_content = normalize_trailing_ws(content)
+        normalized_old = normalize_trailing_ws(old_text)
+
+        if normalized_content.include?(normalized_old)
+          if replace_all
+            normalized_content.gsub(normalized_old, new_text)
+          else
+            normalized_content.sub(normalized_old, new_text)
+          end
+        else
+          content.sub(old_text, new_text)
+        end
+      end
+
+      def normalize_trailing_ws(str)
+        str.gsub(/[^\S\n]+$/, '')
       end
 
       CONTEXT_LINES = 3 # rubocop:disable Lint/UselessConstantScoping
@@ -96,7 +125,7 @@ module RubynCode
       end
 
       def context_before(content, text)
-        idx = content.index(text)
+        idx = find_index(content, text)
         return [] unless idx
 
         before = content[0...idx].lines.last(CONTEXT_LINES)
@@ -104,7 +133,7 @@ module RubynCode
       end
 
       def context_after(content, text)
-        idx = content.index(text)
+        idx = find_index(content, text)
         return [] unless idx
 
         after_start = idx + text.length
@@ -113,10 +142,18 @@ module RubynCode
       end
 
       def find_line_number(content, text)
-        idx = content.index(text)
+        idx = find_index(content, text)
         return nil unless idx
 
         content[0...idx].count("\n") + 1
+      end
+
+      # Find the index of text in content, falling back to normalized match.
+      def find_index(content, text)
+        idx = content.index(text)
+        return idx if idx
+
+        normalize_trailing_ws(content).index(normalize_trailing_ws(text))
       end
     end
 
