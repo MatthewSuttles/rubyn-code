@@ -22,12 +22,49 @@ Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code f
 
 > **Rubyn is going open source.** The original [Rubyn gem](https://github.com/Rubyn-AI/rubyn) provided AI-assisted refactoring, spec generation, and code review through the Rubyn API. **Rubyn Code** is the next evolution — a complete agentic coding assistant that runs locally, thinks for itself, and learns from every session. No API keys. No separate billing. Just `gem install rubyn-code` and go.
 
+---
+
+## Table of Contents
+
+- [Why Rubyn?](#why-rubyn)
+- [Install](#install)
+- [Quick Start](#quick-start)
+- [What Can Rubyn Do?](#what-can-rubyn-do)
+- [VS Code Extension](#vs-code-extension)
+- [29 Built-in Tools](#29-built-in-tools)
+- [MCP — External Tool Servers](#mcp--external-tool-servers)
+- [Codebase Indexing](#codebase-indexing)
+- [112 Best Practice Skills](#112-best-practice-skills)
+- [Context Architecture](#context-architecture)
+- [RUBYN.md — Project Instructions](#rubynmd--project-instructions)
+- [PR Review](#pr-review)
+- [Sub-Agents & Teams](#sub-agents--teams)
+- [GOLEM — Autonomous Daemon](#golem--autonomous-daemon)
+- [Continuous Learning](#continuous-learning)
+- [Streaming Output](#streaming-output)
+- [Search Providers](#search-providers)
+- [User Hooks](#user-hooks)
+- [CLI Reference](#cli-reference)
+- [Authentication](#authentication)
+- [Architecture](#architecture)
+- [Configuration](#configuration)
+- [Security](#security)
+- [Diagnostics](#diagnostics)
+- [Development](#development)
+- [From Rubyn to Rubyn Code](#from-rubyn-to-rubyn-code)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
 ## Why Rubyn?
 
 - **Rails-native** — understands service object extraction, RSpec conventions, ActiveRecord patterns, and Hotwire
 - **Context-aware** — automatically incorporates schema, routes, specs, factories, and models
 - **Best practices built in** — ships with 112 curated Ruby and Rails guidelines that load on demand
 - **Agentic** — doesn't just answer questions. Reads files, writes code, runs specs, commits, reviews PRs, spawns sub-agents, and remembers what it learns
+- **IDE-ready** — works in the terminal and inside VS Code with full bidirectional communication
+- **Extensible** — connect external tool servers via MCP, add custom skills, or wire up your own providers
 
 ## Install
 
@@ -93,6 +130,9 @@ rubyn-code --yolo
 
 # Single prompt
 rubyn-code -p "Refactor app/controllers/orders_controller.rb into service objects"
+
+# VS Code IDE mode (used by the extension)
+rubyn-code --ide
 ```
 
 ## What Can Rubyn Do?
@@ -118,7 +158,7 @@ rubyn > Write specs for the new service objects
   > write_file: path=spec/services/orders/create_service_spec.rb
   > run_specs: path=spec/services/orders/
 
-4 examples, 0 failures. All green. ✓
+4 examples, 0 failures. All green.
 ```
 
 ### Review code
@@ -142,6 +182,29 @@ Agent finished (23 tool calls).
 This is a Rails 7.1 e-commerce app with...
 ```
 
+## VS Code Extension
+
+Rubyn Code includes a VS Code extension that provides a full IDE experience with bidirectional JSON-RPC communication. The extension runs Rubyn as a subprocess and connects over stdin/stdout.
+
+**Capabilities:**
+
+- Chat panel with streaming responses and syntax-highlighted code blocks
+- Inline diffs — review and accept generated code changes directly in the editor
+- Tool approval prompts in the IDE (or skip them in YOLO mode)
+- Full session management — resume, list, fork, and reset conversations
+- Structured code review feedback with severity ratings
+- IDE config get/set for persistent settings
+- All 29 tools available, including MCP tools
+
+**Permission modes:**
+
+| Mode | Behavior |
+|------|----------|
+| `default` | Per-tool approval required |
+| `bypass` | YOLO — skip all approval prompts |
+
+The extension communicates over 14 RPC methods: `initialize`, `prompt`, `cancel`, `review`, `approveToolUse`, `acceptEdit`, `session/*`, `config/*`, `models/list`, and `shutdown`.
+
 ## 29 Built-in Tools
 
 | Category | Tools |
@@ -159,6 +222,58 @@ This is a Rails 7.1 e-commerce app with...
 | **Teams** | `send_message`, `read_inbox` |
 | **Interactive** | `ask_user` (ask clarifying questions mid-task) |
 
+## MCP — External Tool Servers
+
+Connect external tool servers via the [Model Context Protocol](https://modelcontextprotocol.io). MCP tools are dynamically discovered and registered as native Rubyn tools, available in the REPL, IDE, and daemon.
+
+### Configuration
+
+Create `.rubyn-code/mcp.json` in your project or `~/.rubyn-code/mcp.json` globally:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
+    },
+    "my-api": {
+      "url": "http://localhost:3001/mcp",
+      "timeout": 30
+    }
+  }
+}
+```
+
+- **Stdio transport** — specify `command` and `args` to run a subprocess
+- **SSE transport** — specify `url` for HTTP-based servers
+- Environment variables are interpolated with `${VAR}` syntax
+
+MCP tools appear in the tool palette prefixed with `mcp_` and require confirmation before execution. Run `/doctor` to verify server connectivity.
+
+Rubyn ships with three example MCP servers: **database explorer**, **RubyGems lookup**, and **Rails routes**. See `/mcp` for documentation.
+
+## Codebase Indexing
+
+Rubyn builds a structural index of your codebase on first session and incrementally updates it as files change. The index powers smarter context injection, skill suggestions, and impact analysis.
+
+**What it tracks:**
+
+- Classes, modules, methods, callbacks, scopes, validations, associations
+- Relationships between files (associations, test coverage, caller/callee)
+- Rails patterns: `has_many`, `belongs_to`, `before_action`, `validates`, etc.
+- File classification: model, controller, service, concern, spec
+
+**How it's used:**
+
+- Injects a compact structural summary into the system prompt
+- Feeds the dynamic tool schema for smarter tool selection
+- Powers `impact_analysis(file)` to find affected tests and dependents
+- Suggests relevant skills based on the code you're working with
+
+Stored at `.rubyn-code/codebase_index.json`. The `/doctor` command flags stale indexes (>24 hours).
+
 ## 112 Best Practice Skills
 
 Rubyn ships with curated best practice documents that load on demand. Only skill names are in memory — full content loads when Rubyn needs it.
@@ -175,6 +290,17 @@ Rubyn ships with curated best practice documents that load on demand. Only skill
 | **Code Quality** | Naming, YAGNI, value objects, null object, technical debt |
 | **Gems** | Sidekiq, Devise, FactoryBot, Pundit, Faraday, Stripe, RuboCop, dry-rb |
 | **Sinatra** | Application structure, middleware, testing |
+
+### Skill search & filter
+
+```
+rubyn > /skill search factory      # search by name, description, or tags
+rubyn > /skill list rails          # filter by category
+rubyn > /skill list                # show all categories
+rubyn > /skill load rspec_matchers # inject a skill into context
+```
+
+Results are relevance-ranked: name matches score highest, then description, then tags.
 
 ### Custom skills
 
@@ -198,6 +324,8 @@ Rubyn automatically loads relevant context based on what you're working on:
 - **Models** → includes schema, associations, specs, factories
 - **Service objects** → includes referenced models and their specs
 - **Any file** → checks for `RUBYN.md`, `CLAUDE.md`, or `AGENT.md` instructions
+
+The [codebase index](#codebase-indexing) enhances this with structural awareness — Rubyn knows which files depend on each other before it reads them.
 
 ## RUBYN.md — Project Instructions
 
@@ -259,6 +387,32 @@ rubyn > Send alice a message to write specs for the User model
 
 Teammates run in background threads with their own agent loop and mailbox.
 
+## GOLEM — Autonomous Daemon
+
+GOLEM is an always-on autonomous agent that claims tasks from a queue and works through them independently. It runs a full agent loop per task with access to all tools, MCP servers, and memory.
+
+```bash
+rubyn-code daemon \
+  --name golem-1 \
+  --role "Backend Engineer" \
+  --max-runs 100 \
+  --max-cost 10.0 \
+  --poll-interval 5 \
+  --idle-timeout 60
+```
+
+**Lifecycle:** `spawned → working ⇄ idle → shutting_down → stopped`
+
+**Safety limits:**
+
+| Guard | Description |
+|-------|-------------|
+| `--max-runs` | Auto-shutdown after N completed tasks |
+| `--max-cost` | Stop when cumulative USD spend exceeds limit |
+| **Retry backoff** | 3 retries per task before marking failed |
+| **Audit trail** | Full conversation saved per task via session persistence |
+| **Cost tracking** | Accurate per-task spend via the observability layer |
+
 ## Continuous Learning
 
 Rubyn gets smarter with every session:
@@ -310,12 +464,14 @@ post_tool_use:
 rubyn-code                    # Interactive REPL
 rubyn-code --yolo             # Auto-approve all tools
 rubyn-code -p "prompt"        # Single prompt, exit when done
+rubyn-code --ide              # IDE server mode (JSON-RPC over stdin/stdout)
 rubyn-code --resume [ID]      # Resume previous session
 rubyn-code --setup            # Pin to this Ruby (run once after install)
 rubyn-code --debug            # Enable debug output
 rubyn-code --auth             # Authenticate with Claude
 rubyn-code --version          # Show version
 rubyn-code --help             # Show help
+rubyn-code daemon [OPTIONS]   # Run GOLEM autonomous daemon
 ```
 
 ### Slash Commands
@@ -331,10 +487,12 @@ rubyn-code --help             # Show help
 | `/cost` | Show token usage and costs |
 | `/tasks` | List all tasks |
 | `/budget [amt]` | Show or set session budget |
-| `/skill [name]` | Load or list available skills |
+| `/skill [name]` | Load, search, or list available skills |
 | `/resume [id]` | Resume or list sessions |
 | `/provider` | Add or list providers |
 | `/model` | Show/switch model and provider |
+| `/doctor` | Run environment health checks |
+| `/mcp` | MCP server documentation and status |
 
 ## Authentication
 
@@ -527,6 +685,26 @@ This means:
 | `~/.rubyn-code/.encryption_salt` | `0600` | PBKDF2 salt (not secret alone, but protected) |
 | `~/.rubyn-code/config.yml` | `0600` | Provider config (no secrets) |
 
+## Diagnostics
+
+Run `/doctor` to check your environment:
+
+```
+rubyn > /doctor
+
+✓ Ruby version         4.0.2
+✓ Bundler              installed
+✓ Database             12 migrations applied
+✓ Authentication       valid (keychain)
+✓ Skills               112 available
+✓ Project detected     Rails 7.1
+✓ MCP servers          2 connected
+✓ Codebase index       fresh (2 hours ago)
+✓ Skill catalog        112 skills, 0 malformed
+```
+
+Checks Ruby version, bundler, database state, authentication, skills, project type, MCP server connectivity, codebase index freshness, and skill catalog integrity.
+
 ## Development
 
 Requires Ruby 4.0+.
@@ -536,6 +714,12 @@ git clone https://github.com/MatthewSuttles/rubyn-code.git
 cd rubyn-code
 bundle install
 bundle exec rspec
+```
+
+Quick rebuild from source:
+
+```bash
+bin/dev-install
 ```
 
 ## From Rubyn to Rubyn Code
