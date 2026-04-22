@@ -26,6 +26,7 @@ module RubynCode
           rubyn-code --resume [ID]      Resume a previous session
           rubyn-code --setup            Pin rubyn-code to bypass rbenv/rvm
           rubyn-code --auth             Authenticate with Claude
+          rubyn-code --install-skills NAME  Install a skill pack from the registry
           rubyn-code --ide              Start IDE server (VS Code extension)
           rubyn-code --permission-mode MODE  Set permission mode (default, accept_edits, plan_only, auto, dont_ask, bypass)
           rubyn-code --version          Show version
@@ -47,6 +48,9 @@ module RubynCode
           /cost          Show usage costs
           /tasks         List tasks
           /skill [name]  Load or list skills
+          /skills        List installed and community skill packs
+          /install-skills Install skill packs from rubyn.ai
+          /remove-skills  Remove an installed skill pack
 
         Environment:
           Config:  ~/.rubyn-code/config.yml
@@ -69,14 +73,15 @@ module RubynCode
 
       def dispatch_command(command) # rubocop:disable Metrics/CyclomaticComplexity -- unavoidable dispatch switch
         case command
-        when :version then puts "rubyn-code #{RubynCode::VERSION}"
-        when :auth    then run_auth
-        when :setup   then run_setup
-        when :help    then display_help
-        when :run     then run_single_prompt(@options[:prompt])
-        when :ide     then run_ide
-        when :daemon  then run_daemon
-        when :repl    then run_repl
+        when :version        then puts "rubyn-code #{RubynCode::VERSION}"
+        when :auth           then run_auth
+        when :setup          then run_setup
+        when :help           then display_help
+        when :run            then run_single_prompt(@options[:prompt])
+        when :ide            then run_ide
+        when :daemon         then run_daemon
+        when :install_skills then run_install_skills(@options[:install_skills_names])
+        when :repl           then run_repl
         end
       end
 
@@ -116,6 +121,10 @@ module RubynCode
           options[:command] = :run
           options[:prompt] = argv[idx + 1]
           idx + 1
+        when '--install-skills'
+          options[:command] = :install_skills
+          options[:install_skills_names] = collect_pack_names(argv, idx + 1)
+          argv.length - 1
         when 'daemon'
           options[:command] = :daemon
           parse_daemon_options!(argv, idx + 1, options)
@@ -203,6 +212,69 @@ module RubynCode
 
       def run_daemon
         DaemonRunner.new(@options).run
+      end
+
+      def run_install_skills(names)
+        renderer = Renderer.new
+        client = Skills::RegistryClient.new
+        installer = Skills::PackInstaller.new(
+          registry_client: client,
+          project_root: Dir.pwd,
+          global: @options[:install_skills_global]
+        )
+
+        if names.empty? || names.include?('--update')
+          renderer.info('Checking for updates on all installed packs...')
+          results = installer.update_all do |event, data|
+            report_install_progress(renderer, event, data)
+          end
+          updated = results.select { |r| r[:status] == :installed }
+          if updated.empty?
+            renderer.info('All packs are up to date.')
+          else
+            renderer.info("Updated #{updated.size} pack(s).")
+          end
+        else
+          installer.install(names) do |event, data|
+            report_install_progress(renderer, event, data)
+          end
+        end
+      rescue Skills::RegistryError => e
+        renderer.error("Registry error: #{e.message}")
+        exit(1)
+      rescue StandardError => e
+        renderer.error("Install failed: #{e.message}")
+        exit(1)
+      end
+
+      def report_install_progress(renderer, event, data)
+        case event
+        when :fetching   then renderer.info("Fetching #{data[:name]} from rubyn.ai...")
+        when :downloading then renderer.info("  Downloading #{data[:total]} skill files...")
+        when :installed
+          data[:files].each { |f| puts "  → #{data[:name]}/#{f}" }
+          renderer.info("Installed #{data[:files].size} skills to .rubyn-code/skills/#{data[:name]}/")
+        when :up_to_date then renderer.info("#{data[:name]} is already up to date (v#{data[:version]}).")
+        when :error      then renderer.error("Failed: #{data[:name]}: #{data[:message]}")
+        end
+      end
+
+      def collect_pack_names(argv, start)
+        names = []
+        idx = start
+        while idx < argv.length
+          arg = argv[idx]
+          break if arg.start_with?('-') && arg != '--update' && arg != '--global'
+
+          if arg == '--global'
+            @options ||= {}
+            @options[:install_skills_global] = true
+          else
+            names << arg
+          end
+          idx += 1
+        end
+        names
       end
 
       def run_repl

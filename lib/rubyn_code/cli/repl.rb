@@ -34,6 +34,7 @@ module RubynCode
 
         @renderer.welcome
         @version_check.notify
+        check_skill_suggestions!
 
         at_exit { shutdown! }
 
@@ -43,6 +44,14 @@ module RubynCode
       end
 
       private
+
+      def check_skill_suggestions!
+        suggest = Skills::AutoSuggest.new(project_root: @project_root)
+        message = suggest.check
+        @renderer.info(message) if message
+      rescue StandardError
+        # Never block session start on suggestion failure
+      end
 
       def run_input_loop
         while @running
