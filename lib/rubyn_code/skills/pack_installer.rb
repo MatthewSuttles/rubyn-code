@@ -42,7 +42,7 @@ module RubynCode
         installed = installed_packs
         return [] if installed.empty?
 
-        installed.map { |name| install_single(name, update: true, &block) }
+        installed.map { |manifest| install_single(manifest['name'], update: true, &block) }
       end
 
       # Remove an installed pack.
