@@ -243,6 +243,40 @@ RSpec.describe RubynCode::Rules::Security::Sec002PunditScopeMissing do
       expect(rule.validate(finding, diff_data)).to be false
     end
 
+    it "ignores commented-out def index above an unscoped action" do
+      content = <<~RUBY
+        class PostsController < ApplicationController
+          # def index
+          #   @posts = Post.all
+          # end
+
+          def show
+            @post = Post.find(params[:id])
+          end
+        end
+      RUBY
+
+      diff_data = { files: [{ path: "app/controllers/posts_controller.rb", content: content }] }
+      finding = { file: "app/controllers/posts_controller.rb" }
+
+      expect(rule.validate(finding, diff_data)).to be false
+    end
+
+    it "passes when index uses policy_scope without parentheses" do
+      content = <<~RUBY
+        class PostsController < ApplicationController
+          def index
+            @posts = policy_scope Post
+          end
+        end
+      RUBY
+
+      diff_data = { files: [{ path: "app/controllers/posts_controller.rb", content: content }] }
+      finding = { file: "app/controllers/posts_controller.rb" }
+
+      expect(rule.validate(finding, diff_data)).to be false
+    end
+
     it "returns false when finding references a non-controller file" do
       diff_data = { files: [{ path: "app/models/post.rb", content: "class Post; end" }] }
       finding = { file: "app/models/post.rb" }

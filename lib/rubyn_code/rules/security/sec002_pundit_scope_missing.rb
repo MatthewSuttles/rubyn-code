@@ -32,11 +32,13 @@ module RubynCode
              from|reorder|rewhere|none|unscoped)\b
         /x.freeze
 
-        # Pattern matching a `policy_scope(...)` call.
-        POLICY_SCOPE_PATTERN = /policy_scope\s*\(/
+        # Pattern matching a `policy_scope(...)` or `policy_scope Model` call.
+        # Accepts either parentheses or whitespace after `policy_scope`.
+        POLICY_SCOPE_PATTERN = /policy_scope[\s(]/
 
         # Pattern to detect `index` action definitions.
-        INDEX_ACTION_PATTERN = /def\s+index\b/
+        # Anchored to reject commented-out definitions (e.g. `# def index`).
+        INDEX_ACTION_PATTERN = /\A\s*def\s+index\b/
 
         class << self
           # Applies when the diff touches a controller file in a project that
