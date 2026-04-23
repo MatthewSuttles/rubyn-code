@@ -92,7 +92,22 @@ RSpec.describe RubynCode::Context::Manager do
     context 'compaction deduplication' do
       let(:manager) { described_class.new(threshold: 10) }
 
-      it 'skips compaction on duplicate calls within the same turn' do
+      it 'skips compaction on duplicate calls within the same turn when compaction succeeded' do
+        conversation.add_user_message('x' * 200)
+        collapsed = [{ role: 'user', content: 'collapsed' }]
+
+        allow(RubynCode::Context::MicroCompact).to receive(:call).and_return(0)
+        allow(RubynCode::Context::ContextCollapse).to receive(:call).and_return(collapsed)
+
+        manager.advance_turn!
+        manager.check_compaction!(conversation)
+
+        # Second call in the same turn should be skipped because compaction succeeded
+        manager.check_compaction!(conversation)
+        expect(RubynCode::Context::MicroCompact).to have_received(:call).once
+      end
+
+      it 'retries compaction within the same turn when prior attempt did not reduce context' do
         conversation.add_user_message('x' * 200)
 
         allow(RubynCode::Context::MicroCompact).to receive(:call).and_return(0)
@@ -101,12 +116,9 @@ RSpec.describe RubynCode::Context::Manager do
         manager.advance_turn!
         manager.check_compaction!(conversation)
 
-        # Second call in the same turn should be skipped
-        expect(RubynCode::Context::MicroCompact).to have_received(:call).once
-
-        # Calling again without advance_turn! should not trigger
+        # Second call should retry since compaction didn't actually succeed
         manager.check_compaction!(conversation)
-        expect(RubynCode::Context::MicroCompact).to have_received(:call).once
+        expect(RubynCode::Context::MicroCompact).to have_received(:call).twice
       end
 
       it 'allows compaction again after advancing the turn' do
