@@ -17,10 +17,10 @@ module RubynCode
       # expose admin flags, role assignments, or other privileged fields
       # to user-controlled input.
       class Sec001StrongParamsLeak < Base
-        ID = "SEC001"
+        ID = 'SEC001'
         CATEGORY = :security
         SEVERITY = :high
-        RAILS_VERSIONS = [">= 4.0"].freeze
+        RAILS_VERSIONS = ['>= 4.0'].freeze
         CONFIDENCE_FLOOR = 0.85
 
         # Matches params.permit! anywhere in the line
@@ -30,18 +30,18 @@ module RubynCode
         #   permit(:name, user_attributes: {})
         #   permit(:name, user_attributes: [:id, :admin])
         #   permit(:name, profile_attributes: %i[bio avatar])
-        NESTED_ATTRIBUTES_PATTERN = /\.permit\(.*\w+_attributes:\s*[\[{%]/
+        NESTED_ATTRIBUTES_PATTERN = /\.permit\(.*\w+_attributes:\s*[\[{%]/m
 
         # Matches permit calls that include _ids arrays, which can
         # manipulate has_many :through associations:
         #   permit(:name, role_ids: [])
         #   permit(:name, tag_ids: [])
-        ASSOCIATION_IDS_PATTERN = /\.permit\(.*\w+_ids:\s*\[/
+        ASSOCIATION_IDS_PATTERN = /\.permit\(.*\w+_ids:\s*\[/m
 
         # Matches permit calls with deeply nested hash permissions:
         #   permit(user: [:name, { address: [:street] }])
         #   permit(user: {})
-        DEEP_NESTED_PATTERN = /\.permit\(.*\w+:\s*\{/
+        DEEP_NESTED_PATTERN = /\.permit\(.*\w+:\s*\{/m
 
         PATTERNS = [
           PERMIT_BANG_PATTERN,
@@ -53,13 +53,13 @@ module RubynCode
         class << self
           # Applies to changed controller files only.
           #
-          # @param diff_data [Hash] parsed diff information with :files key
+          # @param diff_data [Hash] :files => Array<Hash{ path: }>
           # @return [Boolean]
           def applies_to?(diff_data)
             return false unless diff_data.is_a?(Hash)
 
-            files = diff_data[:files] || diff_data["files"] || []
-            files.any? { |f| controller_file?(f) }
+            files = diff_data.fetch(:files, [])
+            files.any? { |f| controller_file?(f[:path]) }
           end
 
           # Returns the prompt module text for LLM evaluation.
@@ -114,51 +114,63 @@ module RubynCode
           # Validates a finding against the diff data to reduce false positives.
           #
           # @param finding  [Hash] the LLM-generated finding
-          # @param diff_data [Hash] parsed diff information
+          # @param diff_data [Hash] :files => Array<Hash{ path: }>
           # @return [Boolean]
           def validate(finding, diff_data)
             return false unless finding.is_a?(Hash) && diff_data.is_a?(Hash)
 
-            file = finding[:file] || finding["file"]
-            return false if file.nil? || file.empty?
+            file_path = extract_file_path(finding)
+            return false unless file_path
+            return false unless controller_file?(file_path)
+            return false unless file_in_diff?(file_path, diff_data)
 
-            # Must be a controller file
-            return false unless controller_file?(file)
-
-            # Check that the file is in the diff
-            files = diff_data[:files] || diff_data["files"] || []
-            return false unless files.any? { |f| normalize_path(f) == normalize_path(file) }
-
-            # Check that the snippet contains one of our patterns
-            snippet = finding[:snippet] || finding["snippet"] || ""
-            PATTERNS.any? { |pattern| snippet.match?(pattern) }
+            snippet_matches_pattern?(finding)
           end
 
           private
 
-          # Determines if a file path looks like a Rails controller.
+          # Extracts the file path string from a finding hash.
           #
-          # @param file [String, Hash] file path string or hash with :path key
-          # @return [Boolean]
-          def controller_file?(file)
-            path = normalize_path(file)
-            return false if path.nil?
+          # @param finding [Hash] :file or "file" key
+          # @return [String, nil]
+          def extract_file_path(finding)
+            path = finding[:file] || finding['file']
+            return nil if path.nil? || path.empty?
 
-            path.match?(%r{app/controllers/.*_controller\.rb\z}) ||
-              path.match?(%r{controllers/.*_controller\.rb\z})
+            path
           end
 
-          # Extracts a path string from either a String or a Hash.
+          # Checks whether the given file path appears in the diff file list.
           #
-          # @param file [String, Hash]
-          # @return [String, nil]
-          def normalize_path(file)
-            case file
-            when String
-              file
-            when Hash
-              file[:path] || file["path"]
-            end
+          # @param file_path [String]
+          # @param diff_data [Hash] :files => Array<Hash{ path: }>
+          # @return [Boolean]
+          def file_in_diff?(file_path, diff_data)
+            files = diff_data.fetch(:files, [])
+            files.any? { |f| f[:path] == file_path }
+          end
+
+          # Checks whether the finding's snippet matches any known pattern.
+          # Joins multiline snippets before matching to handle cases where
+          # permit calls span multiple lines.
+          #
+          # @param finding [Hash] :snippet or "snippet" key
+          # @return [Boolean]
+          def snippet_matches_pattern?(finding)
+            snippet = finding[:snippet] || finding['snippet'] || ''
+            collapsed = snippet.gsub(/\s*\n\s*/, ' ')
+
+            PATTERNS.any? { |pattern| snippet.match?(pattern) || collapsed.match?(pattern) }
+          end
+
+          # Checks whether a file path looks like a Rails controller.
+          #
+          # @param path [String]
+          # @return [Boolean]
+          def controller_file?(path)
+            return false unless path
+
+            path.match?(%r{app/controllers/.*_controller\.rb\z})
           end
         end
       end

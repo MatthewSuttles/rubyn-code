@@ -34,34 +34,34 @@ RSpec.describe RubynCode::Rules::Security::Sec001StrongParamsLeak do
   describe ".applies_to?" do
     context "with controller files in diff" do
       it "returns true for a standard controller path" do
-        diff_data = { files: ["app/controllers/users_controller.rb"] }
+        diff_data = { files: [{ path: "app/controllers/users_controller.rb" }] }
         expect(rule.applies_to?(diff_data)).to be true
       end
 
       it "returns true for a namespaced controller path" do
-        diff_data = { files: ["app/controllers/admin/users_controller.rb"] }
+        diff_data = { files: [{ path: "app/controllers/admin/users_controller.rb" }] }
         expect(rule.applies_to?(diff_data)).to be true
       end
 
-      it "returns true when files are hashes with :path key" do
-        diff_data = { files: [{ path: "app/controllers/orders_controller.rb" }] }
-        expect(rule.applies_to?(diff_data)).to be true
-      end
-
-      it "returns true when files use string keys" do
-        diff_data = { "files" => ["app/controllers/posts_controller.rb"] }
+      it "returns true when diff includes mixed file types" do
+        diff_data = {
+          files: [
+            { path: "app/models/user.rb" },
+            { path: "app/controllers/orders_controller.rb" }
+          ]
+        }
         expect(rule.applies_to?(diff_data)).to be true
       end
     end
 
     context "without controller files in diff" do
       it "returns false for model files only" do
-        diff_data = { files: ["app/models/user.rb"] }
+        diff_data = { files: [{ path: "app/models/user.rb" }] }
         expect(rule.applies_to?(diff_data)).to be false
       end
 
       it "returns false for service files only" do
-        diff_data = { files: ["app/services/registration_service.rb"] }
+        diff_data = { files: [{ path: "app/services/registration_service.rb" }] }
         expect(rule.applies_to?(diff_data)).to be false
       end
 
@@ -100,7 +100,7 @@ RSpec.describe RubynCode::Rules::Security::Sec001StrongParamsLeak do
   end
 
   describe ".validate" do
-    let(:diff_data) { { files: ["app/controllers/users_controller.rb"] } }
+    let(:diff_data) { { files: [{ path: "app/controllers/users_controller.rb" }] } }
 
     context "with valid findings" do
       it "accepts a permit! finding in a controller file" do
@@ -139,6 +139,14 @@ RSpec.describe RubynCode::Rules::Security::Sec001StrongParamsLeak do
         finding = {
           "file" => "app/controllers/users_controller.rb",
           "snippet" => "params.permit!"
+        }
+        expect(rule.validate(finding, diff_data)).to be true
+      end
+
+      it "accepts multiline permit snippets" do
+        finding = {
+          file: "app/controllers/users_controller.rb",
+          snippet: "params.require(:user).permit(\n  :name,\n  :email,\n  address_attributes: [:street, :city]\n)"
         }
         expect(rule.validate(finding, diff_data)).to be true
       end
