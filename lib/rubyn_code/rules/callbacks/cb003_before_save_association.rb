@@ -33,32 +33,28 @@ module RubynCode
         CONFIDENCE_FLOOR = 0.75
 
         # Patterns that indicate association mutation inside a callback body.
+        # Note: \b (word boundary) matches before `!`, so `/\.create\b/`
+        # already catches `.create!` — no separate bang-variant patterns needed.
         ASSOCIATION_MUTATION_PATTERNS = [
           # Building associations
           /\.build\b/,
           /\.build_\w+/,
           /build_\w+\(/,
           /\.create\b/,
-          /\.create!\b/,
 
           # Assigning new unsaved records
           /\.\w+\s*=\s*\w+\.new\b/,
-          /self\.\w+\s*=\s*\w+\.new\b/,
 
           # Collection mutation via << or push
           /\w+\s*<<\s*\w+\.new\b/,
           /\.push\(\s*\w+\.new\b/,
 
-          # Updating/saving associated records (word.update, word.update!)
+          # Updating/saving associated records
           /\w+\.update\b/,
-          /\w+\.update!/,
           /\w+\.save\b/,
-          /\w+\.save!/,
 
           # Destroying associations
-          /\w+\.destroy\b/,
-          /\w+\.destroy!/,
-          /\w+\.delete\b/
+          /\w+\.destroy\b/
         ].freeze
 
         # Method name fragments that imply association mutation when used
@@ -220,6 +216,13 @@ module RubynCode
 
           # Scans the file body for the method definition and checks its
           # contents for association-mutation patterns.
+          #
+          # Limitation: The method boundary regex terminates at the first
+          # `end` keyword at any indentation level, which may be an inner
+          # block's `end` (e.g., `if`/`do`/`begin`) rather than the method's
+          # closing `end`. This means the captured body may be truncated for
+          # methods with nested blocks. Acceptable for a first-pass heuristic
+          # — the LLM prompt module handles deeper analysis.
           #
           # @param body [String]
           # @param method_name [String]
