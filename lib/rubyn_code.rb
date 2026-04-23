@@ -226,6 +226,17 @@ module RubynCode
     autoload :Shortcut, 'rubyn_code/learning/shortcut'
   end
 
+  # Rules (PR review rule engine)
+  module Rules
+    autoload :Base, 'rubyn_code/rules/base'
+    autoload :Registry, 'rubyn_code/rules/registry'
+
+    # Convenience: RubynCode::Rules.all delegates to the registry.
+    def self.all
+      Registry.all
+    end
+  end
+
   # IDE (VS Code extension server)
   module IDE
     autoload :Protocol, 'rubyn_code/ide/protocol'
