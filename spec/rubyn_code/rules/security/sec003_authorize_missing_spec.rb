@@ -26,6 +26,10 @@ RSpec.describe RubynCode::Rules::Security::Sec003AuthorizeMissing do
     it "has a confidence floor of 0.85" do
       expect(described_class.confidence_floor).to eq(0.85)
     end
+
+    it "does not define ACTION_DEF_PATTERN" do
+      expect(described_class.constants).not_to include(:ACTION_DEF_PATTERN)
+    end
   end
 
   describe ".applies_to?" do
@@ -242,6 +246,26 @@ RSpec.describe RubynCode::Rules::Security::Sec003AuthorizeMissing do
       end
     end
 
+    context "negative: show action with authorize without parens (authorize @post)" do
+      let(:controller_content) do
+        <<~RUBY
+          class PostsController < ApplicationController
+            def show
+              @post = Post.find(params[:id])
+              authorize @post
+              render :show
+            end
+          end
+        RUBY
+      end
+
+      it "returns false" do
+        diff_data = { files: [{ path: "app/controllers/posts_controller.rb", content: controller_content }] }
+        finding = { file: "app/controllers/posts_controller.rb", action: "show", line: 2 }
+        expect(described_class.validate(finding, diff_data)).to be false
+      end
+    end
+
     context "negative: action without a finder call (no record loaded)" do
       let(:controller_content) do
         <<~RUBY
@@ -279,6 +303,36 @@ RSpec.describe RubynCode::Rules::Security::Sec003AuthorizeMissing do
       it "returns false when action is nil" do
         diff_data = { files: [] }
         finding = { file: "app/controllers/posts_controller.rb", action: nil, line: 2 }
+        expect(described_class.validate(finding, diff_data)).to be false
+      end
+    end
+
+    context "negative: finding with out-of-scope action name" do
+      let(:controller_content) do
+        <<~RUBY
+          class PostsController < ApplicationController
+            def index
+              @posts = Post.where(published: true)
+              render :index
+            end
+
+            def create
+              @post = Post.find(params[:template_id])
+              render :new
+            end
+          end
+        RUBY
+      end
+
+      it "returns false for index action" do
+        diff_data = { files: [{ path: "app/controllers/posts_controller.rb", content: controller_content }] }
+        finding = { file: "app/controllers/posts_controller.rb", action: "index", line: 2 }
+        expect(described_class.validate(finding, diff_data)).to be false
+      end
+
+      it "returns false for create action" do
+        diff_data = { files: [{ path: "app/controllers/posts_controller.rb", content: controller_content }] }
+        finding = { file: "app/controllers/posts_controller.rb", action: "create", line: 7 }
         expect(described_class.validate(finding, diff_data)).to be false
       end
     end
@@ -321,6 +375,25 @@ RSpec.describe RubynCode::Rules::Security::Sec003AuthorizeMissing do
       it "returns false" do
         diff_data = { files: [{ path: "app/controllers/tasks_controller.rb", content: controller_content }] }
         finding = { "file" => "app/controllers/tasks_controller.rb", "action" => "update", "line" => 2 }
+        expect(described_class.validate(finding, diff_data)).to be false
+      end
+    end
+
+    context "negative: edit action with authorize without parens (authorize @article)" do
+      let(:controller_content) do
+        <<~RUBY
+          class ArticlesController < ApplicationController
+            def edit
+              @article = Article.find(params[:id])
+              authorize @article
+            end
+          end
+        RUBY
+      end
+
+      it "returns false" do
+        diff_data = { files: [{ path: "app/controllers/articles_controller.rb", content: controller_content }] }
+        finding = { file: "app/controllers/articles_controller.rb", action: "edit", line: 2 }
         expect(described_class.validate(finding, diff_data)).to be false
       end
     end

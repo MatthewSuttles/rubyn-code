@@ -22,17 +22,13 @@ module RubynCode
           \.(find|find_by!?|find_sole_by|where)\b
         /x
 
-        # Authorize call pattern: authorize(@var) or authorize(var)
+        # Authorize call pattern: authorize(@var), authorize(var), or authorize @var
         AUTHORIZE_PATTERN = /
-          \bauthorize\s*\(
+          \bauthorize\s*[\(@]
         /x
 
         # Actions that typically require authorization on a loaded record.
         GUARDED_ACTIONS = %w[show edit update destroy].freeze
-
-        ACTION_DEF_PATTERN = /
-          \bdef\s+(#{GUARDED_ACTIONS.join('|')})\b
-        /x
 
         class << self
           # Applies when the diff includes controller files and the project
@@ -92,6 +88,7 @@ module RubynCode
             file_path = finding[:file] || finding["file"]
             action    = finding[:action] || finding["action"]
             return false unless file_path && action
+            return false unless GUARDED_ACTIONS.include?(action)
 
             file_entry = diff_data.fetch(:files, []).find { |f| f[:path] == file_path }
             return false unless file_entry
