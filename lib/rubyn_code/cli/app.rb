@@ -2,7 +2,7 @@
 
 module RubynCode
   module CLI
-    class App
+    class App # rubocop:disable Metrics/ClassLength -- CLI dispatch requires many small methods
       def self.start(argv)
         new(argv).run
       end

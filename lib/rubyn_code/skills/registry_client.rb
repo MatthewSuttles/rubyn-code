@@ -7,11 +7,11 @@ module RubynCode
   module Skills
     # HTTP client for the rubyn.ai skill packs API.
     #
-    # All requests include the required `User-Accept: Rubyn Code` header.
+    # All requests include the required `Accept: application/vnd.rubyn-code` header.
     # The API returns 403 without it.
     class RegistryClient
       BASE_URL = 'https://rubyn.ai/api/v1/skills'
-      USER_ACCEPT_HEADER = 'Rubyn Code'
+      ACCEPT_HEADER = 'application/vnd.rubyn-code'
       DEFAULT_TIMEOUT = 10
 
       # @param base_url [String] override for testing
@@ -98,8 +98,7 @@ module RubynCode
 
       def connection
         @connection ||= Faraday.new(url: @base_url) do |f|
-          f.headers['User-Accept'] = USER_ACCEPT_HEADER
-          f.headers['Accept'] = 'application/json'
+          f.headers['Accept'] = ACCEPT_HEADER
           f.options.timeout = @timeout
           f.options.open_timeout = @timeout
           f.adapter Faraday.default_adapter

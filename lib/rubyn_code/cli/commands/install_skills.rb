@@ -11,14 +11,14 @@ module RubynCode
           global = args.delete('--global')
           update = args.delete('--update')
 
-          installer = build_installer(ctx, global: !!global)
+          installer = build_installer(ctx, global: !global.nil?)
 
           if update && args.empty?
             update_all(installer, ctx)
           elsif args.empty?
             show_usage(ctx)
           else
-            install_packs(installer, args, update: !!update, ctx: ctx)
+            install_packs(installer, args, update: !update.nil?, ctx: ctx)
           end
         rescue Skills::RegistryError => e
           ctx.renderer.error("Registry error: #{e.message}")

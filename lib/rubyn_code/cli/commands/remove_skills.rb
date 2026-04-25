@@ -30,7 +30,7 @@ module RubynCode
           $stdout.flush
 
           answer = $stdin.gets&.strip&.downcase
-          unless answer == 'y' || answer == 'yes'
+          unless %w[y yes].include?(answer)
             ctx.renderer.info('Cancelled.')
             return
           end
