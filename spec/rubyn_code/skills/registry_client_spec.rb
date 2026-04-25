@@ -1,111 +1,113 @@
 # frozen_string_literal: true
 
-require 'webmock/rspec' unless defined?(WebMock)
-
 RSpec.describe RubynCode::Skills::RegistryClient do
-  let(:base_url) { 'https://rubyn.ai' }
+  subject(:client) { described_class.new(base_url: 'https://test.rubyn.ai') }
 
-  subject(:client) { described_class.new(base_url: base_url) }
+  let(:connection) { instance_double(Faraday::Connection) }
 
   before do
-    WebMock.enable! if defined?(WebMock)
+    allow(Faraday).to receive(:new).and_return(connection)
   end
 
-  after do
-    WebMock.disable! if defined?(WebMock)
+  describe '#initialize' do
+    it 'uses default base URL' do
+      default_client = described_class.new
+      expect(default_client.base_url).to eq('https://rubyn.ai')
+    end
+
+    it 'accepts custom base URL' do
+      expect(client.base_url).to eq('https://test.rubyn.ai')
+    end
+
+    it 'reads RUBYN_REGISTRY_URL from environment' do
+      allow(ENV).to receive(:fetch).with('RUBYN_REGISTRY_URL', anything).and_return('https://custom.rubyn.ai')
+      env_client = described_class.new
+      expect(env_client.base_url).to eq('https://custom.rubyn.ai')
+    end
   end
 
   describe '#list_packs' do
-    it 'returns an array of pack metadata' do
-      stub_request(:get, "#{base_url}/api/skills")
-        .to_return(
-          status: 200,
-          body: [{ name: 'rails-testing', description: 'Testing patterns', version: '1.0.0' }].to_json,
-          headers: { 'Content-Type' => 'application/json' }
-        )
+    let(:response_body) do
+      [
+        { name: 'rails-testing', description: 'Rails testing', version: '1.0.0' },
+        { name: 'factory-bot', description: 'Factory Bot patterns', version: '1.0.0' }
+      ].to_json
+    end
 
-      result = client.list_packs
-      expect(result).to be_an(Array)
-      expect(result.first[:name]).to eq('rails-testing')
+    it 'fetches and returns pack list' do
+      response = instance_double(Faraday::Response, body: response_body)
+      allow(connection).to receive(:get).with('/api/skills').and_return(response)
+
+      packs = client.list_packs
+      expect(packs).to be_an(Array)
+      expect(packs.size).to eq(2)
+      expect(packs.first[:name]).to eq('rails-testing')
     end
 
     it 'raises RegistryError on network failure' do
-      stub_request(:get, "#{base_url}/api/skills").to_timeout
+      allow(connection).to receive(:get).and_raise(Faraday::ConnectionFailed, 'refused')
 
-      expect { client.list_packs }.to raise_error(RubynCode::Skills::RegistryError, /Failed to fetch/)
-    end
-
-    it 'raises RegistryError on invalid JSON' do
-      stub_request(:get, "#{base_url}/api/skills")
-        .to_return(status: 200, body: 'not json')
-
-      expect { client.list_packs }.to raise_error(RubynCode::Skills::RegistryError, /Invalid response/)
+      expect { client.list_packs }.to raise_error(
+        RubynCode::Skills::RegistryError, /Failed to fetch skill packs/
+      )
     end
   end
 
   describe '#search_packs' do
-    it 'passes query parameter' do
-      stub_request(:get, "#{base_url}/api/skills")
-        .with(query: { q: 'rails' })
-        .to_return(
-          status: 200,
-          body: [{ name: 'rails-testing' }].to_json,
-          headers: { 'Content-Type' => 'application/json' }
-        )
+    let(:response_body) do
+      [{ name: 'rails-testing', description: 'Rails testing' }].to_json
+    end
 
-      result = client.search_packs('rails')
-      expect(result.first[:name]).to eq('rails-testing')
+    it 'passes query parameter' do
+      response = instance_double(Faraday::Response, body: response_body)
+      allow(connection).to receive(:get).with('/api/skills', { q: 'rails' }).and_return(response)
+
+      results = client.search_packs('rails')
+      expect(results.first[:name]).to eq('rails-testing')
     end
 
     it 'raises RegistryError on failure' do
-      stub_request(:get, "#{base_url}/api/skills")
-        .with(query: { q: 'broken' })
-        .to_return(status: 500)
+      allow(connection).to receive(:get).and_raise(Faraday::TimeoutError, 'timeout')
 
-      expect { client.search_packs('broken') }.to raise_error(RubynCode::Skills::RegistryError)
+      expect { client.search_packs('rails') }.to raise_error(
+        RubynCode::Skills::RegistryError, /Failed to search/
+      )
     end
   end
 
   describe '#fetch_pack' do
-    it 'returns pack data with files' do
-      pack_data = {
+    let(:response_body) do
+      {
         name: 'rails-testing',
-        description: 'Testing patterns',
         version: '1.0.0',
-        files: [{ filename: 'factory_bot.md', content: '# Factory Bot' }]
-      }
-
-      stub_request(:get, "#{base_url}/api/skills/rails-testing")
-        .to_return(
-          status: 200,
-          body: pack_data.to_json,
-          headers: { 'Content-Type' => 'application/json' }
-        )
-
-      result = client.fetch_pack('rails-testing')
-      expect(result[:name]).to eq('rails-testing')
-      expect(result[:files]).to be_an(Array)
-      expect(result[:files].first[:filename]).to eq('factory_bot.md')
+        files: [{ filename: 'rspec.md', content: '# RSpec' }]
+      }.to_json
     end
 
-    it 'raises RegistryError on 404' do
-      stub_request(:get, "#{base_url}/api/skills/nonexistent")
-        .to_return(status: 404)
+    it 'fetches pack content by name' do
+      response = instance_double(Faraday::Response, body: response_body)
+      allow(connection).to receive(:get).with('/api/skills/rails-testing').and_return(response)
 
-      expect { client.fetch_pack('nonexistent') }.to raise_error(RubynCode::Skills::RegistryError)
-    end
-  end
-
-  describe '#base_url' do
-    it 'uses RUBYN_REGISTRY_URL env var when set' do
-      allow(ENV).to receive(:fetch).with('RUBYN_REGISTRY_URL', 'https://rubyn.ai').and_return('https://custom.registry.dev')
-      custom_client = described_class.new
-      expect(custom_client.base_url).to eq('https://custom.registry.dev')
+      pack = client.fetch_pack('rails-testing')
+      expect(pack[:name]).to eq('rails-testing')
+      expect(pack[:files]).to be_an(Array)
     end
 
-    it 'defaults to https://rubyn.ai' do
-      default_client = described_class.new
-      expect(default_client.base_url).to start_with('https://rubyn.')
+    it 'raises RegistryError on failure' do
+      allow(connection).to receive(:get).and_raise(Faraday::ResourceNotFound, '404')
+
+      expect { client.fetch_pack('nonexistent') }.to raise_error(
+        RubynCode::Skills::RegistryError, /Failed to fetch pack/
+      )
+    end
+
+    it 'raises RegistryError on invalid JSON' do
+      response = instance_double(Faraday::Response, body: 'not json')
+      allow(connection).to receive(:get).and_return(response)
+
+      expect { client.fetch_pack('bad') }.to raise_error(
+        RubynCode::Skills::RegistryError, /Invalid response/
+      )
     end
   end
 end

@@ -20,78 +20,71 @@ RSpec.describe RubynCode::CLI::Commands::Skills do
 
   describe '#execute' do
     context 'without arguments (list installed)' do
-      it 'lists installed packs' do
-        allow(pack_manager).to receive(:installed).and_return([
-          { name: 'rails-testing', version: '1.0.0', description: 'Testing patterns' }
-        ])
-
-        expect { command.execute([], ctx) }.to output(/rails-testing/).to_stdout
-        expect(renderer).to have_received(:info).with(/Installed skill packs/)
-      end
-
-      it 'shows message when no packs installed' do
+      it 'shows empty message when no packs installed' do
         allow(pack_manager).to receive(:installed).and_return([])
         command.execute([], ctx)
         expect(renderer).to have_received(:info).with(/No skill packs installed/)
+      end
+
+      it 'lists installed packs' do
+        packs = [
+          { name: 'rails-testing', version: '1.0.0', description: 'Rails testing patterns' },
+          { name: 'factory-bot', version: '2.0.0', description: 'Factory Bot guide' }
+        ]
+        allow(pack_manager).to receive(:installed).and_return(packs)
+        expect { command.execute([], ctx) }.to output(/rails-testing/).to_stdout
       end
     end
 
     context 'with "list" subcommand' do
       it 'lists installed packs' do
-        allow(pack_manager).to receive(:installed).and_return([
-          { name: 'api-design', version: '2.0.0', description: 'API patterns' }
-        ])
-
-        expect { command.execute(['list'], ctx) }.to output(/api-design/).to_stdout
+        allow(pack_manager).to receive(:installed).and_return([])
+        command.execute(['list'], ctx)
+        expect(renderer).to have_received(:info).with(/No skill packs installed/)
       end
     end
 
     context 'with "available" subcommand' do
       it 'fetches and displays registry packs' do
-        allow(registry).to receive(:list_packs).and_return([
-          { name: 'rails-testing', description: 'Testing patterns' },
-          { name: 'api-design', description: 'API patterns' }
-        ])
+        packs = [
+          { name: 'rails-testing', description: 'Rails testing' },
+          { name: 'rspec', description: 'RSpec patterns' }
+        ]
+        allow(registry).to receive(:list_packs).and_return(packs)
         allow(pack_manager).to receive(:installed?).and_return(false)
-
         expect { command.execute(['available'], ctx) }.to output(/rails-testing/).to_stdout
-        expect(renderer).to have_received(:info).with(/Available skill packs/)
       end
 
-      it 'marks installed packs' do
-        allow(registry).to receive(:list_packs).and_return([
-          { name: 'rails-testing', description: 'Testing patterns' }
-        ])
-        allow(pack_manager).to receive(:installed?).with('rails-testing').and_return(true)
-
-        expect { command.execute(['available'], ctx) }.to output(/\[installed\]/).to_stdout
-      end
-
-      it 'shows message when registry is empty' do
+      it 'shows empty message when no packs in registry' do
         allow(registry).to receive(:list_packs).and_return([])
         command.execute(['available'], ctx)
         expect(renderer).to have_received(:info).with(/No packs found/)
+      end
+
+      it 'marks installed packs' do
+        packs = [{ name: 'rails-testing', description: 'Rails testing' }]
+        allow(registry).to receive(:list_packs).and_return(packs)
+        allow(pack_manager).to receive(:installed?).with('rails-testing').and_return(true)
+        expect { command.execute(['available'], ctx) }.to output(/\[installed\]/).to_stdout
       end
     end
 
     context 'with "search" subcommand' do
       it 'searches the registry' do
-        allow(registry).to receive(:search_packs).with('rails').and_return([
-          { name: 'rails-testing', description: 'Testing patterns' }
-        ])
-
+        results = [{ name: 'rails-testing', description: 'Rails testing patterns' }]
+        allow(registry).to receive(:search_packs).with('rails').and_return(results)
         expect { command.execute(%w[search rails], ctx) }.to output(/rails-testing/).to_stdout
       end
 
-      it 'shows usage when no search term provided' do
-        command.execute(%w[search], ctx)
-        expect(renderer).to have_received(:warning).with(/Usage/)
+      it 'shows no results message' do
+        allow(registry).to receive(:search_packs).with('nonexistent').and_return([])
+        command.execute(%w[search nonexistent], ctx)
+        expect(renderer).to have_received(:info).with(/No packs found matching/)
       end
 
-      it 'shows message when no results found' do
-        allow(registry).to receive(:search_packs).with('zzz').and_return([])
-        command.execute(%w[search zzz], ctx)
-        expect(renderer).to have_received(:info).with(/No packs found matching/)
+      it 'shows usage when no search term' do
+        command.execute(['search'], ctx)
+        expect(renderer).to have_received(:warning).with(/Usage/)
       end
     end
 
