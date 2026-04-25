@@ -25,7 +25,7 @@ module RubynCode
       #   Each file: { filename: "name.md", content: "..." }
       # @return [Hash] installed pack metadata
       def install(pack_data)
-        name = pack_data[:name] || pack_data['name']
+        name = fetch_key(pack_data, :name)
         raise ArgumentError, 'Pack data must include a name' if name.nil? || name.empty?
 
         pack_dir = File.join(@packs_dir, name)
@@ -41,7 +41,7 @@ module RubynCode
       #
       # @param name [String] pack name
       # @return [Boolean] true if removed, false if not found
-      def remove(name)
+      def remove(name) # rubocop:disable Naming/PredicateMethod
         pack_dir = File.join(@packs_dir, name.to_s)
         return false unless File.directory?(pack_dir)
 
@@ -92,6 +92,15 @@ module RubynCode
 
       private
 
+      # Fetch a value from a hash supporting both symbol and string keys.
+      #
+      # @param hash [Hash]
+      # @param key [Symbol]
+      # @return [Object, nil]
+      def fetch_key(hash, key)
+        hash[key] || hash[key.to_s]
+      end
+
       def manifest(name)
         path = File.join(@packs_dir, name.to_s, MANIFEST_FILE)
         return nil unless File.exist?(path)
@@ -102,31 +111,37 @@ module RubynCode
       end
 
       def write_files(pack_dir, pack_data)
-        files = pack_data[:files] || pack_data['files'] || []
-        files.each do |file|
-          filename = file[:filename] || file['filename']
-          content  = file[:content]  || file['content']
-          next if filename.nil? || content.nil?
+        files = fetch_key(pack_data, :files) || []
+        files.each { |file| write_single_file(pack_dir, file) }
+      end
 
-          # Prevent path traversal
-          safe_name = File.basename(filename)
-          File.write(File.join(pack_dir, safe_name), content)
-        end
+      def write_single_file(pack_dir, file)
+        filename = fetch_key(file, :filename)
+        content  = fetch_key(file, :content)
+        return if filename.nil? || content.nil?
+
+        # Prevent path traversal
+        safe_name = File.basename(filename)
+        File.write(File.join(pack_dir, safe_name), content)
       end
 
       def write_manifest(pack_dir, pack_data)
-        manifest = {
-          name: pack_data[:name] || pack_data['name'],
-          description: pack_data[:description] || pack_data['description'] || '',
-          version: pack_data[:version] || pack_data['version'] || '1.0.0',
-          installed_at: Time.now.iso8601,
-          file_count: (pack_data[:files] || pack_data['files'] || []).size
-        }
+        manifest_data = build_manifest_hash(pack_data)
 
         File.write(
           File.join(pack_dir, MANIFEST_FILE),
-          JSON.pretty_generate(manifest)
+          JSON.pretty_generate(manifest_data)
         )
+      end
+
+      def build_manifest_hash(pack_data)
+        {
+          name: fetch_key(pack_data, :name),
+          description: fetch_key(pack_data, :description) || '',
+          version: fetch_key(pack_data, :version) || '1.0.0',
+          installed_at: Time.now.iso8601,
+          file_count: (fetch_key(pack_data, :files) || []).size
+        }
       end
     end
   end
