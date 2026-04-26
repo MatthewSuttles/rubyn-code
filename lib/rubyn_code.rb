@@ -138,6 +138,9 @@ module RubynCode
     autoload :Catalog, 'rubyn_code/skills/catalog'
     autoload :Document, 'rubyn_code/skills/document'
     autoload :TtlManager, 'rubyn_code/skills/ttl_manager'
+    autoload :RegistryClient, 'rubyn_code/skills/registry_client'
+    autoload :PackManager, 'rubyn_code/skills/pack_manager'
+    autoload :RegistryError, 'rubyn_code/skills/registry_client'
   end
 
   # Layer 6: Sub-Agents
@@ -284,6 +287,9 @@ module RubynCode
       autoload :Model, 'rubyn_code/cli/commands/model'
       autoload :NewSession, 'rubyn_code/cli/commands/new_session'
       autoload :Provider, 'rubyn_code/cli/commands/provider'
+      autoload :InstallSkills, 'rubyn_code/cli/commands/install_skills'
+      autoload :RemoveSkills, 'rubyn_code/cli/commands/remove_skills'
+      autoload :Skills, 'rubyn_code/cli/commands/skills'
     end
   end
 
