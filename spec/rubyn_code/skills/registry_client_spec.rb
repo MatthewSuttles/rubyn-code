@@ -28,15 +28,17 @@ RSpec.describe RubynCode::Skills::RegistryClient do
 
   describe '#list_packs' do
     let(:response_body) do
-      [
-        { name: 'rails-testing', description: 'Rails testing', version: '1.0.0' },
-        { name: 'factory-bot', description: 'Factory Bot patterns', version: '1.0.0' }
-      ].to_json
+      {
+        packs: [
+          { name: 'rails-testing', description: 'Rails testing', version: '1.0.0' },
+          { name: 'factory-bot', description: 'Factory Bot patterns', version: '1.0.0' }
+        ]
+      }.to_json
     end
 
     it 'fetches and returns pack list' do
-      response = instance_double(Faraday::Response, body: response_body)
-      allow(connection).to receive(:get).with('/api/skills').and_return(response)
+      response = instance_double(Faraday::Response, body: response_body, status: 200, headers: { 'etag' => '"abc"' })
+      allow(connection).to receive(:get).with('/api/v1/skills/packs').and_return(response)
 
       packs = client.list_packs
       expect(packs).to be_an(Array)
@@ -48,29 +50,44 @@ RSpec.describe RubynCode::Skills::RegistryClient do
       allow(connection).to receive(:get).and_raise(Faraday::ConnectionFailed, 'refused')
 
       expect { client.list_packs }.to raise_error(
-        RubynCode::Skills::RegistryError, /Failed to fetch skill packs/
+        RubynCode::Skills::RegistryError, /Failed to fetch skill catalog/
       )
     end
   end
 
   describe '#search_packs' do
     let(:response_body) do
-      [{ name: 'rails-testing', description: 'Rails testing' }].to_json
+      {
+        packs: [
+          { name: 'rails-testing', description: 'Rails testing', tags: ['testing'] },
+          { name: 'factory-bot', description: 'Factory Bot patterns', tags: ['factories'] }
+        ]
+      }.to_json
     end
 
-    it 'passes query parameter' do
-      response = instance_double(Faraday::Response, body: response_body)
-      allow(connection).to receive(:get).with('/api/skills', { q: 'rails' }).and_return(response)
+    it 'filters packs by query locally' do
+      response = instance_double(Faraday::Response, body: response_body, status: 200, headers: { 'etag' => '"abc"' })
+      allow(connection).to receive(:get).with('/api/v1/skills/packs').and_return(response)
 
       results = client.search_packs('rails')
-      expect(results.first[:name]).to eq('rails-testing')
+      expect(results[:data].size).to eq(1)
+      expect(results[:data].first[:name]).to eq('rails-testing')
+    end
+
+    it 'searches in description' do
+      response = instance_double(Faraday::Response, body: response_body, status: 200, headers: { 'etag' => '"abc"' })
+      allow(connection).to receive(:get).with('/api/v1/skills/packs').and_return(response)
+
+      results = client.search_packs('patterns')
+      expect(results[:data].size).to eq(1)
+      expect(results[:data].first[:name]).to eq('factory-bot')
     end
 
     it 'raises RegistryError on failure' do
       allow(connection).to receive(:get).and_raise(Faraday::TimeoutError, 'timeout')
 
       expect { client.search_packs('rails') }.to raise_error(
-        RubynCode::Skills::RegistryError, /Failed to search/
+        RubynCode::Skills::RegistryError, /Failed to fetch skill catalog/
       )
     end
   end
@@ -80,17 +97,50 @@ RSpec.describe RubynCode::Skills::RegistryClient do
       {
         name: 'rails-testing',
         version: '1.0.0',
-        files: [{ filename: 'rspec.md', content: '# RSpec' }]
+        files: [
+          { path: 'rspec.md', title: 'RSpec', size: 1234 }
+        ]
       }.to_json
     end
 
-    it 'fetches pack content by name' do
-      response = instance_double(Faraday::Response, body: response_body)
-      allow(connection).to receive(:get).with('/api/skills/rails-testing').and_return(response)
+    let(:file_response_body) { '# RSpec Content' }
 
-      pack = client.fetch_pack('rails-testing')
-      expect(pack[:name]).to eq('rails-testing')
-      expect(pack[:files]).to be_an(Array)
+    it 'fetches pack content and file contents by name' do
+      pack_response = instance_double(
+        Faraday::Response,
+        body: response_body, status: 200, headers: { 'etag' => '"abc"' }
+      )
+      file_response = instance_double(
+        Faraday::Response,
+        body: file_response_body, status: 200, headers: {}, success?: true
+      )
+
+      allow(connection).to receive(:get)
+        .with('/api/v1/skills/packs/rails-testing').and_return(pack_response)
+      allow(connection).to receive(:get)
+        .with('/api/v1/skills/packs/rails-testing/files/rspec.md')
+        .and_return(file_response)
+
+      result = client.fetch_pack('rails-testing')
+      expect(result[:data][:name]).to eq('rails-testing')
+      expect(result[:data][:files]).to be_an(Array)
+      expect(result[:data][:files].first[:filename]).to eq('rspec.md')
+      expect(result[:data][:files].first[:content]).to eq('# RSpec Content')
+      expect(result[:etag]).to eq('"abc"')
+    end
+
+    it 'handles pack with no files' do
+      pack_response = instance_double(
+        Faraday::Response,
+        body: { name: 'empty-pack', version: '1.0.0', files: [] }.to_json,
+        status: 200, headers: { 'etag' => '"def"' }
+      )
+      allow(connection).to receive(:get)
+        .with('/api/v1/skills/packs/empty-pack').and_return(pack_response)
+
+      result = client.fetch_pack('empty-pack')
+      expect(result[:data][:name]).to eq('empty-pack')
+      expect(result[:data][:files]).to eq([])
     end
 
     it 'raises RegistryError on failure' do
@@ -102,8 +152,8 @@ RSpec.describe RubynCode::Skills::RegistryClient do
     end
 
     it 'raises RegistryError on invalid JSON' do
-      response = instance_double(Faraday::Response, body: 'not json')
-      allow(connection).to receive(:get).and_return(response)
+      response = instance_double(Faraday::Response, body: 'not json', status: 200, headers: {})
+      allow(connection).to receive(:get).with('/api/v1/skills/packs/bad').and_return(response)
 
       expect { client.fetch_pack('bad') }.to raise_error(
         RubynCode::Skills::RegistryError, /Invalid response/

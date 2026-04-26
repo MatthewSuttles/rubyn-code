@@ -6,7 +6,9 @@ module RubynCode
     # Only available when running in IDE mode.
     class IdeSymbols < Base
       TOOL_NAME = 'ide_symbols'
-      DESCRIPTION = 'Search workspace symbols (classes, methods, modules) via VS Code language server. Only available in IDE mode.'
+      DESCRIPTION =
+        'Search workspace symbols (classes, methods, modules) via VS Code language server. ' \
+        'Only available in IDE mode.'
       PARAMETERS = {
         query: {
           type: 'string',

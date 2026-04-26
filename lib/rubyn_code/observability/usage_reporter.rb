@@ -80,7 +80,8 @@ module RubynCode
         }
       end
 
-      def build_session_summary_lines(session_id, turns, totals) # rubocop:disable Metrics/AbcSize -- assembles multi-field summary
+      # -- assembles multi-field summary
+      def build_session_summary_lines(session_id, turns, totals)
         avg_cost = turns.positive? ? totals[:cost] / turns : 0.0
         [
           header('Session Summary'),
@@ -104,7 +105,8 @@ module RubynCode
         ).to_a
       end
 
-      def build_daily_summary_lines(today, rows) # rubocop:disable Metrics/AbcSize -- assembles multi-field daily summary
+      # -- assembles multi-field daily summary
+      def build_daily_summary_lines(today, rows)
         total_input  = rows.sum { |r| fetch_int(r, 'input_tokens') }
         total_output = rows.sum { |r| fetch_int(r, 'output_tokens') }
         total_cost   = rows.sum { |r| fetch_float(r, 'cost_usd') }

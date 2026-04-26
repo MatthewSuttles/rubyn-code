@@ -43,7 +43,8 @@ module RubynCode
       # Only returns models from the active provider — never crosses
       # provider boundaries (e.g., won't send a GPT model to Anthropic).
       # Falls back to nil (use client's default) if routing fails.
-      def routed_model # rubocop:disable Metrics/CyclomaticComplexity -- guard clauses for provider/mode checks
+      # -- guard clauses for provider/mode checks
+      def routed_model
         return nil if manual_model_mode?
 
         last_user = last_user_message_text
@@ -76,7 +77,8 @@ module RubynCode
         content.is_a?(String) ? content : nil
       end
 
-      def log_llm_call(opts) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- safe accessor checks
+      # -- safe accessor checks
+      def log_llm_call(opts)
         default_model = @llm_client.respond_to?(:model) ? @llm_client.model : 'default'
         routed = opts[:model]
         effective = routed || default_model

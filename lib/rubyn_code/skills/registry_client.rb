@@ -6,22 +6,27 @@ require 'json'
 module RubynCode
   module Skills
     # HTTP client for the rubyn.ai skill packs registry API.
-    #
-    # All requests send Accept: application/vnd.rubyn-code to identify
-    # rubyn-code clients. Supports ETag-based conditional requests for
-    # efficient cache validation and offline resilience.
-    #
-    # GET /api/skills          -> catalog of available packs
-    # GET /api/skills/:name    -> single pack metadata + files
+    # Supports ETag-based conditional requests for efficient cache
+    # validation and offline resilience.
     class RegistryClient
+      LEADING_SLASHES_REGEX = %r{\A/+}
       DEFAULT_BASE_URL = 'https://rubyn.ai'
       TIMEOUT_SECONDS  = 10
-      ACCEPT_HEADER    = 'application/vnd.rubyn-code'
+      USER_ACCEPT_HEADER = 'Rubyn Code'
 
       attr_reader :base_url
 
       def initialize(base_url: nil)
         @base_url = base_url || ENV.fetch('RUBYN_REGISTRY_URL', DEFAULT_BASE_URL)
+      end
+
+      # List all available packs (returns flat array for CLI commands).
+      #
+      # @param etag [String, nil] cached ETag for conditional request
+      # @return [Array<Hash>] array of pack metadata
+      # @raise [RegistryError] on network or parse failure
+      def list_packs(etag: nil)
+        fetch_catalog(etag: etag)[:data] || []
       end
 
       # Fetch the full catalog of available skill packs.
@@ -30,7 +35,7 @@ module RubynCode
       # @return [Hash] { data: Array<Hash>, etag: String|nil, not_modified: Boolean }
       # @raise [RegistryError] on network or parse failure
       def fetch_catalog(etag: nil)
-        response = conditional_get('/api/skills', etag: etag)
+        response = conditional_get('/api/v1/skills/packs', etag: etag)
         return not_modified_result if response.status == 304
 
         data = validate_and_parse(response)
@@ -41,23 +46,43 @@ module RubynCode
       end
 
       # Search packs by keyword.
+      # Note: The registry API does not support server-side search.
+      # This method fetches the catalog and filters locally.
       #
       # @param query [String]
       # @param etag [String, nil] cached ETag for conditional request
       # @return [Hash] { data: Array<Hash>, etag: String|nil, not_modified: Boolean }
       # @raise [RegistryError] on network or parse failure
       def search_packs(query, etag: nil)
-        response = conditional_get('/api/skills', params: { q: query }, etag: etag)
-        return not_modified_result if response.status == 304
+        catalog = fetch_catalog(etag: etag)
+        return catalog if catalog[:not_modified]
+
+        q = query.to_s.downcase
+        filtered = catalog[:data].select { |pack| matches_query?(pack, q) }
+        { data: filtered, etag: catalog[:etag], not_modified: false }
+      end
+
+      # Fetch pack suggestions based on detected gems.
+      #
+      # @param gems [Array<String>] list of gem names detected in the project
+      # @return [Array<Hash>] array of { name: String, reason: String }
+      # @raise [RegistryError] on network or parse failure
+      def fetch_suggestions(gems)
+        return [] if gems.empty?
+
+        gems_param = gems.join(',')
+        response = connection.get('/api/v1/skills/packs/suggest', { gems: gems_param })
+        return [] if response.status == 404
 
         data = validate_and_parse(response)
-        packs = normalize_packs(data)
-        { data: packs, etag: response.headers['etag'], not_modified: false }
+        suggestions = data[:suggestions] || data['suggestions'] || []
+        suggestions.is_a?(Array) ? suggestions : []
       rescue Faraday::Error => e
-        raise RegistryError, "Failed to search skill packs: #{e.message}"
+        raise RegistryError, "Failed to fetch suggestions: #{e.message}"
       end
 
       # Fetch a single pack's full content for installation.
+      # Fetches pack metadata and all skill file contents.
       #
       # @param name [String] pack name (validated for safe characters)
       # @param etag [String, nil] cached ETag for conditional request
@@ -65,14 +90,43 @@ module RubynCode
       # @raise [RegistryError] on not found, validation, or network failure
       def fetch_pack(name, etag: nil)
         validate_pack_name!(name)
-        response = conditional_get("/api/skills/#{encode_name(name)}", etag: etag)
+        response = conditional_get("/api/v1/skills/packs/#{encode_name(name)}", etag: etag)
         return not_modified_result if response.status == 304
 
         data = validate_and_parse(response)
         validate_pack_response!(data, name)
+
+        # Fetch individual file contents
+        files = fetch_key(data, :files) || []
+        data[:files] = fetch_files_with_content(name, files)
+
         { data: data, etag: response.headers['etag'], not_modified: false }
       rescue Faraday::Error => e
         raise RegistryError, "Failed to fetch pack '#{name}': #{e.message}"
+      end
+
+      # Fetch a single skill file's markdown content.
+      #
+      # @param pack_name [String]
+      # @param file_path [String]
+      # @param etag [String, nil] cached ETag for conditional request
+      # @return [Hash] { content: String, etag: String|nil, not_modified: Boolean }
+      # @raise [RegistryError] on not found or network failure
+      def fetch_file(pack_name, file_path, etag: nil)
+        validate_pack_name!(pack_name)
+        safe_path = file_path.to_s.gsub('..', '').gsub(LEADING_SLASHES_REGEX, '')
+        response = connection.get(
+          "/api/v1/skills/packs/#{encode_name(pack_name)}/files/#{ERB::Util.url_encode(safe_path)}"
+        ) do |req|
+          req.headers['If-None-Match'] = etag if etag
+        end
+
+        return { content: nil, etag: nil, not_modified: true } if response.status == 304
+        return { content: response.body, etag: response.headers['etag'], not_modified: false } if response.success?
+
+        raise RegistryError, "Failed to fetch file '#{file_path}' from pack '#{pack_name}'"
+      rescue Faraday::Error => e
+        raise RegistryError, "Failed to fetch file '#{file_path}': #{e.message}"
       end
 
       private
@@ -83,7 +137,7 @@ module RubynCode
           f.response :raise_error
           f.options.timeout = TIMEOUT_SECONDS
           f.options.open_timeout = TIMEOUT_SECONDS
-          f.headers['Accept'] = ACCEPT_HEADER
+          f.headers['User-Accept'] = USER_ACCEPT_HEADER
           f.headers['User-Agent'] = "rubyn-code/#{RubynCode::VERSION}"
         end
       end
@@ -132,6 +186,39 @@ module RubynCode
 
       def encode_name(name)
         ERB::Util.url_encode(name.to_s)
+      end
+
+      def fetch_key(hash, key)
+        hash[key] || hash[key.to_s]
+      end
+
+      def matches_query?(pack, query)
+        pack_name = pack[:name].to_s.downcase
+        pack_display = pack[:displayName].to_s.downcase
+        pack_desc = pack[:description].to_s.downcase
+        pack_tags = pack[:tags] || []
+
+        pack_name.include?(query) ||
+          pack_display.include?(query) ||
+          pack_desc.include?(query) ||
+          pack_tags.any? { |t| t.to_s.downcase.include?(query) }
+      end
+
+      # Fetch markdown content for each file in the pack and transform
+      # into the format expected by PackManager: { filename, content }
+      def fetch_files_with_content(pack_name, files)
+        return files if files.empty?
+
+        files_with_content = files.map do |file|
+          path = fetch_key(file, :path)
+          result = fetch_file(pack_name, path)
+          { filename: path, content: result[:content] }
+        rescue RegistryError
+          # Skip files that fail to load
+          nil
+        end.compact
+
+        files_with_content
       end
 
       def not_modified_result

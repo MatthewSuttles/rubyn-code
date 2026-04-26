@@ -84,7 +84,8 @@ module RubynCode
         # @param task_type [Symbol]
         # @param client [LLM::Client, nil] active client (for provider checks)
         # @return [Hash] { provider:, model: }
-        def resolve(task_type, client: nil) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- multi-source fallback chain
+        # -- multi-source fallback chain
+        def resolve(task_type, client: nil)
           tier = tier_for(task_type)
           active = active_provider
 

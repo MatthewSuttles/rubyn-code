@@ -103,7 +103,7 @@ module RubynCode
         failures
       end
 
-      # rubocop:disable Metrics/AbcSize -- head/tail splitting requires coordinated arithmetic
+      # -- head/tail splitting requires coordinated arithmetic
       def head_tail(output, max_chars)
         lines = output.lines
         return output if lines.size <= 10
@@ -120,9 +120,8 @@ module RubynCode
         parts << tail_lines.join
         parts.join
       end
-      # rubocop:enable Metrics/AbcSize
 
-      # rubocop:disable Metrics/AbcSize -- diff hunk iteration with header extraction
+      # -- diff hunk iteration with header extraction
       def compress_diff(output, max_chars)
         hunks = output.split(/^(?=diff --git)/)
         return head_tail(output, max_chars) if hunks.size <= 1
@@ -140,7 +139,6 @@ module RubynCode
 
         result
       end
-      # rubocop:enable Metrics/AbcSize
 
       def top_matches(output, max_chars)
         lines = output.lines
@@ -152,7 +150,7 @@ module RubynCode
         result
       end
 
-      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity -- multi-step tree collapse
+      # -- multi-step tree collapse
       def collapse_tree(output, max_chars)
         paths = output.lines.map(&:strip).reject(&:empty?)
         return output if output.length <= max_chars
@@ -164,7 +162,6 @@ module RubynCode
 
         head_tail(result, max_chars)
       end
-      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
       def take_lines_up_to(lines, max_chars)
         taken = []

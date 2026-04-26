@@ -260,7 +260,8 @@ module RubynCode
         end
       end
 
-      def classify_node(file, type) # rubocop:disable Metrics/CyclomaticComplexity -- Rails directory mapping
+      # -- Rails directory mapping
+      def classify_node(file, type)
         return 'model' if file.include?('app/models/')
         return 'controller' if file.include?('app/controllers/')
         return 'service' if file.include?('app/services/')

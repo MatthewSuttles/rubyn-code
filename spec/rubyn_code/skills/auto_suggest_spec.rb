@@ -47,9 +47,9 @@ RSpec.describe RubynCode::Skills::AutoSuggest do
         allow(registry_client).to receive(:fetch_suggestions)
           .with(array_including('stripe', 'sidekiq'))
           .and_return([
-            { 'name' => 'stripe', 'reason' => 'stripe gem detected in Gemfile' },
-            { 'name' => 'sidekiq', 'reason' => 'sidekiq gem detected in Gemfile' }
-          ])
+                        { 'name' => 'stripe', 'reason' => 'stripe gem detected in Gemfile' },
+                        { 'name' => 'sidekiq', 'reason' => 'sidekiq gem detected in Gemfile' }
+                      ])
       end
 
       it 'returns a suggestion message' do
@@ -68,7 +68,7 @@ RSpec.describe RubynCode::Skills::AutoSuggest do
       end
 
       it 'does not repeat suggestions already shown' do
-        write_state({ 'shown' => ['stripe', 'sidekiq'] })
+        write_state({ 'shown' => %w[stripe sidekiq] })
 
         message = suggest.check
 
@@ -257,17 +257,17 @@ RSpec.describe RubynCode::Skills::AutoSuggest do
 
     it 'filters out shown, installed, and dismissed packs' do
       write_state({
-        'shown' => ['stripe'],
-        'installed' => ['sidekiq'],
-        'dismissed' => []
-      })
+                    'shown' => ['stripe'],
+                    'installed' => ['sidekiq'],
+                    'dismissed' => []
+                  })
 
       allow(registry_client).to receive(:fetch_suggestions)
         .and_return([
-          { 'name' => 'stripe', 'reason' => 'stripe gem detected' },
-          { 'name' => 'sidekiq', 'reason' => 'sidekiq gem detected' },
-          { 'name' => 'devise', 'reason' => 'devise gem detected' }
-        ])
+                      { 'name' => 'stripe', 'reason' => 'stripe gem detected' },
+                      { 'name' => 'sidekiq', 'reason' => 'sidekiq gem detected' },
+                      { 'name' => 'devise', 'reason' => 'devise gem detected' }
+                    ])
 
       message = suggest.check
 

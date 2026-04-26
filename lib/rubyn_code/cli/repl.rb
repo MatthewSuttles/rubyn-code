@@ -107,7 +107,8 @@ module RubynCode
         @stream_formatter&.feed(text)
       end
 
-      def handle_message(input) # rubocop:disable Metrics/AbcSize -- sequential steps with interrupt rescue
+      # -- sequential steps with interrupt rescue
+      def handle_message(input)
         @spinner.start
         @streaming_first_chunk = true
 
