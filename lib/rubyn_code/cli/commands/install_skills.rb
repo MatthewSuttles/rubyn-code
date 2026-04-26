@@ -13,11 +13,11 @@ module RubynCode
             return
           end
 
-          pack_manager = Skills::PackManager.new
-          registry = Skills::RegistryClient.new
+          pack_manager = RubynCode::Skills::PackManager.new
+          registry = RubynCode::Skills::RegistryClient.new
 
           args.each { |name| install_pack(name, registry, pack_manager, ctx) }
-        rescue Skills::RegistryError => e
+        rescue RubynCode::Skills::RegistryError => e
           ctx.renderer.error(e.message)
         end
 
@@ -33,7 +33,7 @@ module RubynCode
           pack_data = registry.fetch_pack(name)
           pack_manager.install(pack_data)
           ctx.renderer.info("Installed skill pack '#{name}' successfully.")
-        rescue Skills::RegistryError => e
+        rescue RubynCode::Skills::RegistryError => e
           ctx.renderer.error("Failed to install '#{name}': #{e.message}")
         rescue ArgumentError => e
           ctx.renderer.error("Invalid pack data for '#{name}': #{e.message}")

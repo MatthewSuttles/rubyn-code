@@ -13,7 +13,7 @@ module RubynCode
             return
           end
 
-          pack_manager = Skills::PackManager.new
+          pack_manager = RubynCode::Skills::PackManager.new
 
           args.each { |name| remove_pack(name, pack_manager, ctx) }
         end
