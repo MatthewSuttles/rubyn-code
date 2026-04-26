@@ -33,7 +33,8 @@ module RubynCode
           skills.each { |skill| puts "  /#{skill[:name]}: #{skill[:description]}" }
         end
 
-        def search_skills(term, ctx) # rubocop:disable Metrics/AbcSize -- readable sequential display logic
+        # -- readable sequential display logic
+        def search_skills(term, ctx)
           if term.nil? || term.strip.empty?
             ctx.renderer.warning('Usage: /skill search <term>')
             return
@@ -49,7 +50,8 @@ module RubynCode
           display_entries(results)
         end
 
-        def list_by_category(category, ctx) # rubocop:disable Metrics/AbcSize -- readable sequential display logic
+        # -- readable sequential display logic
+        def list_by_category(category, ctx)
           catalog = ctx.skill_loader.catalog
           return list_categories(catalog, ctx) if category.nil? || category.strip.empty?
 

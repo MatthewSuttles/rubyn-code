@@ -64,7 +64,8 @@ module RubynCode
         # @param message [String]
         # @param codebase_index [RubynCode::Index::CodebaseIndex, nil] optional index for deeper detection
         # @return [Symbol, nil]
-        def detect_context(message, codebase_index: nil) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- context detection dispatch
+        # -- context detection dispatch
+        def detect_context(message, codebase_index: nil)
           msg = message.to_s.downcase
           return :testing if msg.match?(/\b(test|spec|rspec)\b/)
           return :git     if msg.match?(/\b(commit|push|diff|branch|merge|git)\b/)

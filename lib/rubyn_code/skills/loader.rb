@@ -42,7 +42,7 @@ module RubynCode
       # @param codebase_index [RubynCode::Index::CodebaseIndex, nil]
       # @param project_profile [Object, nil] reserved for future profile-based hints
       # @return [Array<String>] suggested skill names (not loaded automatically)
-      def suggest_skills(codebase_index: nil, project_profile: nil) # rubocop:disable Lint/UnusedMethodArgument, Metrics/CyclomaticComplexity -- project_profile reserved for future use
+      def suggest_skills(codebase_index: nil, project_profile: nil) # rubocop:disable Lint/UnusedMethodArgument
         return [] unless codebase_index
 
         suggestions = []

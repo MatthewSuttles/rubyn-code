@@ -31,7 +31,7 @@ module RubynCode
 
         private
 
-        def run_review(session_id, base_branch, focus) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength -- review lifecycle with finding notifications
+        def run_review(session_id, base_branch, focus) # rubocop:disable Metrics/MethodLength -- review lifecycle with finding notifications
           @server.notify('agent/status', {
                            'sessionId' => session_id,
                            'status' => 'reviewing'

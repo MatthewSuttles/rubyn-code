@@ -6,18 +6,13 @@ require 'json'
 module RubynCode
   module Skills
     # HTTP client for the rubyn.ai skill packs registry API.
-    #
-    # All requests send User-Accept: Rubyn Code to identify
-    # rubyn-code clients. Supports ETag-based conditional requests for
-    # efficient cache validation and offline resilience.
-    #
-    # GET /api/v1/skills/packs           -> catalog of available packs
-    # GET /api/v1/skills/packs/:name     -> single pack metadata + files
+    # Supports ETag-based conditional requests for efficient cache
+    # validation and offline resilience.
     class RegistryClient
+      LEADING_SLASHES_REGEX = %r{\A/+}
       DEFAULT_BASE_URL = 'https://rubyn.ai'
       TIMEOUT_SECONDS  = 10
       USER_ACCEPT_HEADER = 'Rubyn Code'
-      LEADING_SLASHES_REGEX = %r{\A/+}
 
       attr_reader :base_url
 
@@ -86,18 +81,6 @@ module RubynCode
         raise RegistryError, "Failed to fetch suggestions: #{e.message}"
       end
 
-      def matches_query?(pack, query)
-        pack_name = pack[:name].to_s.downcase
-        pack_display = pack[:displayName].to_s.downcase
-        pack_desc = pack[:description].to_s.downcase
-        pack_tags = pack[:tags] || []
-
-        pack_name.include?(query) ||
-          pack_display.include?(query) ||
-          pack_desc.include?(query) ||
-          pack_tags.any? { |t| t.to_s.downcase.include?(query) }
-      end
-
       # Fetch a single pack's full content for installation.
       # Fetches pack metadata and all skill file contents.
       #
@@ -115,11 +98,35 @@ module RubynCode
 
         # Fetch individual file contents
         files = fetch_key(data, :files) || []
-        data_with_content = fetch_file_contents(name, data, files)
+        data[:files] = fetch_files_with_content(name, files)
 
-        { data: data_with_content, etag: response.headers['etag'], not_modified: false }
+        { data: data, etag: response.headers['etag'], not_modified: false }
       rescue Faraday::Error => e
         raise RegistryError, "Failed to fetch pack '#{name}': #{e.message}"
+      end
+
+      # Fetch a single skill file's markdown content.
+      #
+      # @param pack_name [String]
+      # @param file_path [String]
+      # @param etag [String, nil] cached ETag for conditional request
+      # @return [Hash] { content: String, etag: String|nil, not_modified: Boolean }
+      # @raise [RegistryError] on not found or network failure
+      def fetch_file(pack_name, file_path, etag: nil)
+        validate_pack_name!(pack_name)
+        safe_path = file_path.to_s.gsub('..', '').gsub(LEADING_SLASHES_REGEX, '')
+        response = connection.get(
+          "/api/v1/skills/packs/#{encode_name(pack_name)}/files/#{ERB::Util.url_encode(safe_path)}"
+        ) do |req|
+          req.headers['If-None-Match'] = etag if etag
+        end
+
+        return { content: nil, etag: nil, not_modified: true } if response.status == 304
+        return { content: response.body, etag: response.headers['etag'], not_modified: false } if response.success?
+
+        raise RegistryError, "Failed to fetch file '#{file_path}' from pack '#{pack_name}'"
+      rescue Faraday::Error => e
+        raise RegistryError, "Failed to fetch file '#{file_path}': #{e.message}"
       end
 
       private
@@ -185,38 +192,33 @@ module RubynCode
         hash[key] || hash[key.to_s]
       end
 
+      def matches_query?(pack, query)
+        pack_name = pack[:name].to_s.downcase
+        pack_display = pack[:displayName].to_s.downcase
+        pack_desc = pack[:description].to_s.downcase
+        pack_tags = pack[:tags] || []
+
+        pack_name.include?(query) ||
+          pack_display.include?(query) ||
+          pack_desc.include?(query) ||
+          pack_tags.any? { |t| t.to_s.downcase.include?(query) }
+      end
+
       # Fetch markdown content for each file in the pack and transform
       # into the format expected by PackManager: { filename, content }
-      def fetch_file_contents(pack_name, pack_data, files)
-        return pack_data if files.empty?
+      def fetch_files_with_content(pack_name, files)
+        return files if files.empty?
 
         files_with_content = files.map do |file|
           path = fetch_key(file, :path)
-          content = fetch_file(pack_name, path)
-          { filename: path, content: content }
+          result = fetch_file(pack_name, path)
+          { filename: path, content: result[:content] }
         rescue RegistryError
           # Skip files that fail to load
           nil
         end.compact
 
-        pack_data.merge(files: files_with_content)
-      end
-
-      # Fetch a single skill file's markdown content.
-      #
-      # @param pack_name [String]
-      # @param file_path [String]
-      # @return [String] file content
-      # @raise [RegistryError] on not found or network failure
-      def fetch_file(pack_name, file_path)
-        validate_pack_name!(pack_name)
-        safe_path = file_path.to_s.gsub('..', '').gsub(LEADING_SLASHES_REGEX, '')
-        response = connection.get("/api/v1/skills/packs/#{encode_name(pack_name)}/files/#{ERB::Util.url_encode(safe_path)}")
-        return response.body if response.success?
-
-        raise RegistryError, "Failed to fetch file '#{file_path}' from pack '#{pack_name}'"
-      rescue Faraday::Error => e
-        raise RegistryError, "Failed to fetch file '#{file_path}': #{e.message}"
+        files_with_content
       end
 
       def not_modified_result
