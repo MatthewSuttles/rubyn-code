@@ -74,10 +74,8 @@ module RubynCode
       MICRO_COMPACT_RATIO_UNCACHED = 0.5
 
       def check_compaction!(conversation)
-        # Guard: skip if compaction already ran this turn
+        # Guard: skip if compaction already succeeded this turn
         return if @last_compaction_turn == @current_turn
-
-        @last_compaction_turn = @current_turn
 
         messages = conversation.messages
 
@@ -93,6 +91,7 @@ module RubynCode
         collapsed = ContextCollapse.call(messages, threshold: @threshold)
         if collapsed
           apply_compacted_messages(conversation, collapsed)
+          @last_compaction_turn = @current_turn
           return
         end
 
@@ -102,6 +101,7 @@ module RubynCode
         compactor = Compactor.new(llm_client: @llm_client, threshold: @threshold)
         new_messages = compactor.auto_compact!(messages)
         apply_compacted_messages(conversation, new_messages)
+        @last_compaction_turn = @current_turn
       end
 
       # Resets cumulative token counters to zero.
