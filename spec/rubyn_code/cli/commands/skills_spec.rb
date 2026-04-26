@@ -50,20 +50,20 @@ RSpec.describe RubynCode::CLI::Commands::Skills do
           { name: 'rails-testing', description: 'Rails testing' },
           { name: 'rspec', description: 'RSpec patterns' }
         ]
-        allow(registry).to receive(:list_packs).and_return(packs)
+        allow(registry).to receive(:fetch_catalog).and_return({ data: packs })
         allow(pack_manager).to receive(:installed?).and_return(false)
         expect { command.execute(['available'], ctx) }.to output(/rails-testing/).to_stdout
       end
 
       it 'shows empty message when no packs in registry' do
-        allow(registry).to receive(:list_packs).and_return([])
+        allow(registry).to receive(:fetch_catalog).and_return({ data: [] })
         command.execute(['available'], ctx)
         expect(renderer).to have_received(:info).with(/No packs found/)
       end
 
       it 'marks installed packs' do
         packs = [{ name: 'rails-testing', description: 'Rails testing' }]
-        allow(registry).to receive(:list_packs).and_return(packs)
+        allow(registry).to receive(:fetch_catalog).and_return({ data: packs })
         allow(pack_manager).to receive(:installed?).with('rails-testing').and_return(true)
         expect { command.execute(['available'], ctx) }.to output(/\[installed\]/).to_stdout
       end
@@ -72,12 +72,12 @@ RSpec.describe RubynCode::CLI::Commands::Skills do
     context 'with "search" subcommand' do
       it 'searches the registry' do
         results = [{ name: 'rails-testing', description: 'Rails testing patterns' }]
-        allow(registry).to receive(:search_packs).with('rails').and_return(results)
+        allow(registry).to receive(:search_packs).with('rails').and_return({ data: results })
         expect { command.execute(%w[search rails], ctx) }.to output(/rails-testing/).to_stdout
       end
 
       it 'shows no results message' do
-        allow(registry).to receive(:search_packs).with('nonexistent').and_return([])
+        allow(registry).to receive(:search_packs).with('nonexistent').and_return({ data: [] })
         command.execute(%w[search nonexistent], ctx)
         expect(renderer).to have_received(:info).with(/No packs found matching/)
       end
@@ -97,7 +97,7 @@ RSpec.describe RubynCode::CLI::Commands::Skills do
 
     context 'when registry raises error' do
       it 'shows error message' do
-        allow(registry).to receive(:list_packs).and_raise(
+        allow(registry).to receive(:fetch_catalog).and_raise(
           RubynCode::Skills::RegistryError, 'connection refused'
         )
         command.execute(['available'], ctx)

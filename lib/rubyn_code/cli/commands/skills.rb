@@ -17,14 +17,14 @@ module RubynCode
               "Unknown subcommand '#{args.first}'. Try: /skills, /skills available, /skills search <term>"
             )
           end
-        rescue Skills::RegistryError => e
+        rescue RubynCode::Skills::RegistryError => e
           ctx.renderer.error(e.message)
         end
 
         private
 
         def list_installed(ctx)
-          packs = Skills::PackManager.new.installed
+          packs = RubynCode::Skills::PackManager.new.installed
 
           if packs.empty?
             ctx.renderer.info(
@@ -39,10 +39,11 @@ module RubynCode
 
         def list_available(ctx)
           ctx.renderer.info('Fetching available packs from registry...')
-          packs = Skills::RegistryClient.new.list_packs
+          result = RubynCode::Skills::RegistryClient.new.fetch_catalog
+          packs = result[:data]
           return ctx.renderer.info('No packs found in the registry.') unless valid_results?(packs)
 
-          pack_manager = Skills::PackManager.new
+          pack_manager = RubynCode::Skills::PackManager.new
           ctx.renderer.info("Available skill packs (#{packs.size}):")
           packs.each { |pack| puts "  #{format_available_pack(pack, pack_manager)}" }
         end
@@ -55,15 +56,16 @@ module RubynCode
 
           query = term.strip
           ctx.renderer.info("Searching registry for '#{query}'...")
-          results = Skills::RegistryClient.new.search_packs(query)
+          result = RubynCode::Skills::RegistryClient.new.search_packs(query)
+          packs = result[:data]
 
-          unless valid_results?(results)
+          unless valid_results?(packs)
             ctx.renderer.info("No packs found matching '#{query}'.")
             return
           end
 
-          ctx.renderer.info("Packs matching '#{query}' (#{results.size}):")
-          results.each { |pack| puts "  #{format_pack_line(pack)}" }
+          ctx.renderer.info("Packs matching '#{query}' (#{packs.size}):")
+          packs.each { |pack| puts "  #{format_pack_line(pack)}" }
         end
 
         def valid_results?(results)

@@ -38,7 +38,7 @@ RSpec.describe RubynCode::Skills::PackManager do
       manifest = JSON.parse(File.read(manifest_path), symbolize_names: true)
       expect(manifest[:name]).to eq('rails-testing')
       expect(manifest[:version]).to eq('1.0.0')
-      expect(manifest[:file_count]).to eq(2)
+      expect(manifest[:skillCount]).to eq(2)
     end
 
     it 'returns installed pack metadata' do
@@ -99,7 +99,7 @@ RSpec.describe RubynCode::Skills::PackManager do
 
     it 'lists installed packs sorted by name' do
       manager.install(pack_data)
-      manager.install(name: 'aaa-pack', version: '1.0.0', files: [])
+      manager.install({ name: 'aaa-pack', version: '1.0.0', files: [] })
 
       packs = manager.installed
       expect(packs.size).to eq(2)
