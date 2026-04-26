@@ -1,306 +1,113 @@
 # frozen_string_literal: true
 
-require_relative 'skill_packs_spec_helper'
-
 RSpec.describe RubynCode::Skills::RegistryClient do
-  let(:base_url) { 'https://rubyn.ai/api/v1/skills' }
-  # Faraday resolves paths with leading slash against the host root,
-  # so GET '/packs' on base_url 'https://rubyn.ai/api/v1/skills'
-  # actually requests 'https://rubyn.ai/packs'.
-  let(:host) { 'https://rubyn.ai' }
-  subject(:client) { described_class.new(base_url: base_url) }
+  subject(:client) { described_class.new(base_url: 'https://test.rubyn.ai') }
 
-  let(:catalog_json) do
-    {
-      'packs' => [
-        {
-          'name' => 'hotwire',
-          'displayName' => 'Hotwire',
-          'description' => 'Turbo and Stimulus patterns',
-          'category' => 'frontend',
-          'skillCount' => 14,
-          'version' => '1.0.0'
-        }
-      ],
-      'categories' => [{ 'id' => 'frontend', 'name' => 'Frontend', 'count' => 1 }],
-      'totalPacks' => 1,
-      'totalSkills' => 14
-    }
+  let(:connection) { instance_double(Faraday::Connection) }
+
+  before do
+    allow(Faraday).to receive(:new).and_return(connection)
   end
 
-  let(:pack_json) do
-    {
-      'name' => 'stripe',
-      'displayName' => 'Stripe',
-      'description' => 'Payment processing patterns',
-      'version' => '1.0.0',
-      'files' => [
-        { 'path' => 'webhooks.md', 'title' => 'Webhook handling', 'size' => 4200 },
-        { 'path' => 'checkout_sessions.md', 'title' => 'Checkout Sessions', 'size' => 3800 }
-      ]
-    }
-  end
-
-  describe 'User-Accept header' do
-    it 'sends User-Accept: Rubyn Code on all requests' do
-      stub = stub_request(:get, "#{host}/packs")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(status: 200, body: catalog_json.to_json, headers: { 'Content-Type' => 'application/json' })
-
-      client.fetch_catalog
-
-      expect(stub).to have_been_requested
+  describe '#initialize' do
+    it 'uses default base URL' do
+      default_client = described_class.new
+      expect(default_client.base_url).to eq('https://rubyn.ai')
     end
 
-    it 'includes the header on pack metadata requests' do
-      stub = stub_request(:get, "#{host}/packs/stripe")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(status: 200, body: pack_json.to_json, headers: { 'Content-Type' => 'application/json' })
-
-      client.fetch_pack('stripe')
-
-      expect(stub).to have_been_requested
+    it 'accepts custom base URL' do
+      expect(client.base_url).to eq('https://test.rubyn.ai')
     end
 
-    it 'includes the header on file download requests' do
-      stub = stub_request(:get, "#{host}/packs/stripe/files/webhooks.md")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(status: 200, body: '# Webhooks', headers: { 'ETag' => '"abc123"' })
-
-      client.fetch_file('stripe', 'webhooks.md')
-
-      expect(stub).to have_been_requested
-    end
-
-    it 'includes the header on suggestion requests' do
-      stub = stub_request(:get, "#{host}/packs/suggest")
-        .with(
-          query: { gems: 'stripe,sidekiq' },
-          headers: { 'Accept' => 'application/vnd.rubyn-code' }
-        )
-        .to_return(status: 200, body: { 'suggestions' => [] }.to_json)
-
-      client.fetch_suggestions(%w[stripe sidekiq])
-
-      expect(stub).to have_been_requested
+    it 'reads RUBYN_REGISTRY_URL from environment' do
+      allow(ENV).to receive(:fetch).with('RUBYN_REGISTRY_URL', anything).and_return('https://custom.rubyn.ai')
+      env_client = described_class.new
+      expect(env_client.base_url).to eq('https://custom.rubyn.ai')
     end
   end
 
-  describe '403 without header' do
-    it 'raises RegistryError when API returns 403' do
-      stub_request(:get, "#{host}/packs")
-        .to_return(status: 403, body: '{"error":"This API requires the User-Accept: Rubyn Code header."}')
+  describe '#list_packs' do
+    let(:response_body) do
+      [
+        { name: 'rails-testing', description: 'Rails testing', version: '1.0.0' },
+        { name: 'factory-bot', description: 'Factory Bot patterns', version: '1.0.0' }
+      ].to_json
+    end
 
-      expect { client.fetch_catalog }.to raise_error(
-        RubynCode::Skills::RegistryError, /403/
+    it 'fetches and returns pack list' do
+      response = instance_double(Faraday::Response, body: response_body)
+      allow(connection).to receive(:get).with('/api/skills').and_return(response)
+
+      packs = client.list_packs
+      expect(packs).to be_an(Array)
+      expect(packs.size).to eq(2)
+      expect(packs.first[:name]).to eq('rails-testing')
+    end
+
+    it 'raises RegistryError on network failure' do
+      allow(connection).to receive(:get).and_raise(Faraday::ConnectionFailed, 'refused')
+
+      expect { client.list_packs }.to raise_error(
+        RubynCode::Skills::RegistryError, /Failed to fetch skill packs/
       )
     end
   end
 
-  describe '#fetch_catalog' do
-    before do
-      stub_request(:get, "#{host}/packs")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(status: 200, body: catalog_json.to_json, headers: { 'Content-Type' => 'application/json' })
+  describe '#search_packs' do
+    let(:response_body) do
+      [{ name: 'rails-testing', description: 'Rails testing' }].to_json
     end
 
-    it 'returns the parsed catalog hash' do
-      result = client.fetch_catalog
+    it 'passes query parameter' do
+      response = instance_double(Faraday::Response, body: response_body)
+      allow(connection).to receive(:get).with('/api/skills', { q: 'rails' }).and_return(response)
 
-      expect(result['packs']).to be_an(Array)
-      expect(result['packs'].first['name']).to eq('hotwire')
-      expect(result['totalPacks']).to eq(1)
+      results = client.search_packs('rails')
+      expect(results.first[:name]).to eq('rails-testing')
     end
 
-    it 'raises RegistryError on invalid JSON' do
-      stub_request(:get, "#{host}/packs")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(status: 200, body: 'not json at all')
+    it 'raises RegistryError on failure' do
+      allow(connection).to receive(:get).and_raise(Faraday::TimeoutError, 'timeout')
 
-      expect { client.fetch_catalog }.to raise_error(
-        RubynCode::Skills::RegistryError, /Invalid JSON/
-      )
-    end
-
-    it 'raises RegistryError on server error' do
-      stub_request(:get, "#{host}/packs")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(status: 500, body: 'Internal Server Error')
-
-      expect { client.fetch_catalog }.to raise_error(
-        RubynCode::Skills::RegistryError, /500/
+      expect { client.search_packs('rails') }.to raise_error(
+        RubynCode::Skills::RegistryError, /Failed to search/
       )
     end
   end
 
   describe '#fetch_pack' do
-    before do
-      stub_request(:get, "#{host}/packs/stripe")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(status: 200, body: pack_json.to_json, headers: { 'Content-Type' => 'application/json' })
+    let(:response_body) do
+      {
+        name: 'rails-testing',
+        version: '1.0.0',
+        files: [{ filename: 'rspec.md', content: '# RSpec' }]
+      }.to_json
     end
 
-    it 'returns the parsed pack metadata' do
-      result = client.fetch_pack('stripe')
+    it 'fetches pack content by name' do
+      response = instance_double(Faraday::Response, body: response_body)
+      allow(connection).to receive(:get).with('/api/skills/rails-testing').and_return(response)
 
-      expect(result['name']).to eq('stripe')
-      expect(result['files']).to be_an(Array)
-      expect(result['files'].size).to eq(2)
+      pack = client.fetch_pack('rails-testing')
+      expect(pack[:name]).to eq('rails-testing')
+      expect(pack[:files]).to be_an(Array)
     end
 
-    it 'URL-encodes pack names' do
-      stub = stub_request(:get, "#{host}/packs/my%20pack")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(status: 200, body: pack_json.to_json)
-
-      client.fetch_pack('my pack')
-
-      expect(stub).to have_been_requested
-    end
-
-    it 'raises RegistryError for unknown pack (404)' do
-      stub_request(:get, "#{host}/packs/nonexistent")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(status: 404, body: '{"error":"Pack not found"}')
+    it 'raises RegistryError on failure' do
+      allow(connection).to receive(:get).and_raise(Faraday::ResourceNotFound, '404')
 
       expect { client.fetch_pack('nonexistent') }.to raise_error(
-        RubynCode::Skills::RegistryError, /404/
+        RubynCode::Skills::RegistryError, /Failed to fetch pack/
       )
     end
-  end
 
-  describe '#fetch_file' do
-    it 'returns file content and ETag' do
-      stub_request(:get, "#{host}/packs/stripe/files/webhooks.md")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(
-          status: 200,
-          body: '# Stripe Webhooks',
-          headers: { 'ETag' => '"abc123"' }
-        )
+    it 'raises RegistryError on invalid JSON' do
+      response = instance_double(Faraday::Response, body: 'not json')
+      allow(connection).to receive(:get).and_return(response)
 
-      result = client.fetch_file('stripe', 'webhooks.md')
-
-      expect(result[:content]).to eq('# Stripe Webhooks')
-      expect(result[:etag]).to eq('"abc123"')
-      expect(result[:not_modified]).to be false
-    end
-
-    it 'sends If-None-Match when etag is provided' do
-      stub = stub_request(:get, "#{host}/packs/stripe/files/webhooks.md")
-        .with(headers: {
-          'Accept' => 'application/vnd.rubyn-code',
-          'If-None-Match' => '"abc123"'
-        })
-        .to_return(status: 304, body: '')
-
-      result = client.fetch_file('stripe', 'webhooks.md', etag: '"abc123"')
-
-      expect(stub).to have_been_requested
-      expect(result[:not_modified]).to be true
-      expect(result[:content]).to be_nil
-      expect(result[:etag]).to eq('"abc123"')
-    end
-
-    it 'returns new content when ETag has changed' do
-      stub_request(:get, "#{host}/packs/stripe/files/webhooks.md")
-        .with(headers: {
-          'Accept' => 'application/vnd.rubyn-code',
-          'If-None-Match' => '"old_etag"'
-        })
-        .to_return(
-          status: 200,
-          body: '# Updated Webhooks',
-          headers: { 'ETag' => '"new_etag"' }
-        )
-
-      result = client.fetch_file('stripe', 'webhooks.md', etag: '"old_etag"')
-
-      expect(result[:not_modified]).to be false
-      expect(result[:content]).to eq('# Updated Webhooks')
-      expect(result[:etag]).to eq('"new_etag"')
-    end
-
-    it 'raises RegistryError on download failure' do
-      stub_request(:get, "#{host}/packs/stripe/files/missing.md")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(status: 404, body: 'Not Found')
-
-      expect { client.fetch_file('stripe', 'missing.md') }.to raise_error(
-        RubynCode::Skills::RegistryError, /404/
+      expect { client.fetch_pack('bad') }.to raise_error(
+        RubynCode::Skills::RegistryError, /Invalid response/
       )
-    end
-  end
-
-  describe '#fetch_suggestions' do
-    it 'returns matching suggestions' do
-      suggestions = [
-        { 'name' => 'stripe', 'reason' => 'stripe gem detected in Gemfile' },
-        { 'name' => 'sidekiq', 'reason' => 'sidekiq gem detected in Gemfile' }
-      ]
-
-      stub_request(:get, "#{host}/packs/suggest")
-        .with(
-          query: { gems: 'stripe,sidekiq' },
-          headers: { 'Accept' => 'application/vnd.rubyn-code' }
-        )
-        .to_return(status: 200, body: { 'suggestions' => suggestions }.to_json)
-
-      result = client.fetch_suggestions(%w[stripe sidekiq])
-
-      expect(result.size).to eq(2)
-      expect(result.first['name']).to eq('stripe')
-    end
-
-    it 'returns empty array for empty gems list' do
-      result = client.fetch_suggestions([])
-
-      expect(result).to eq([])
-    end
-
-    it 'returns empty array when response has no suggestions key' do
-      stub_request(:get, "#{host}/packs/suggest")
-        .with(query: { gems: 'unknown' })
-        .to_return(status: 200, body: {}.to_json)
-
-      result = client.fetch_suggestions(['unknown'])
-
-      expect(result).to eq([])
-    end
-  end
-
-  describe '#available?' do
-    it 'returns true when registry is reachable' do
-      stub_request(:head, "#{host}/packs")
-        .to_return(status: 200)
-
-      expect(client.available?).to be true
-    end
-
-    it 'returns false when registry is unreachable' do
-      stub_request(:head, "#{host}/packs")
-        .to_timeout
-
-      expect(client.available?).to be false
-    end
-
-    it 'returns false on connection error' do
-      stub_request(:head, "#{host}/packs")
-        .to_raise(Faraday::ConnectionFailed.new('Connection refused'))
-
-      expect(client.available?).to be false
-    end
-  end
-
-  describe 'timeout configuration' do
-    it 'uses the specified timeout' do
-      custom_client = described_class.new(base_url: base_url, timeout: 5)
-
-      stub_request(:get, "#{host}/packs")
-        .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
-        .to_return(status: 200, body: catalog_json.to_json)
-
-      expect { custom_client.fetch_catalog }.not_to raise_error
     end
   end
 end

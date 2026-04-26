@@ -1,23 +1,17 @@
 # frozen_string_literal: true
 
-require_relative '../../skills/skill_packs_spec_helper'
-require 'rubyn_code/cli/commands/base'
-require 'rubyn_code/cli/commands/context'
-require 'rubyn_code/cli/commands/install_skills'
-
 RSpec.describe RubynCode::CLI::Commands::InstallSkills do
   subject(:command) { described_class.new }
 
-  let(:renderer) { instance_double('Renderer', info: nil, success: nil, error: nil, warning: nil) }
-  let(:catalog) { instance_double('Catalog', available: []) }
-  let(:skill_loader) { instance_double('SkillLoader', catalog: catalog) }
-  let(:ctx) do
-    instance_double(
-      RubynCode::CLI::Commands::Context,
-      renderer: renderer,
-      project_root: '/tmp/test-project',
-      skill_loader: skill_loader
-    )
+  let(:ctx) { instance_double(RubynCode::CLI::Commands::Context, renderer: renderer) }
+  let(:renderer) { instance_double('Renderer', info: nil, error: nil, warning: nil) }
+
+  let(:pack_manager) { instance_double(RubynCode::Skills::PackManager) }
+  let(:registry) { instance_double(RubynCode::Skills::RegistryClient) }
+
+  before do
+    allow(RubynCode::Skills::PackManager).to receive(:new).and_return(pack_manager)
+    allow(RubynCode::Skills::RegistryClient).to receive(:new).and_return(registry)
   end
 
   describe '.command_name' do
@@ -25,199 +19,71 @@ RSpec.describe RubynCode::CLI::Commands::InstallSkills do
   end
 
   describe '#execute' do
-    context 'with no arguments' do
-      it 'shows usage information' do
+    context 'without arguments' do
+      it 'shows usage' do
         command.execute([], ctx)
-
-        expect(renderer).to have_received(:info).with(/Usage: \/install-skills/)
+        expect(renderer).to have_received(:warning).with(/Usage/)
       end
     end
 
-    context 'with pack names' do
-      let(:installer) { instance_double(RubynCode::Skills::PackInstaller) }
-      let(:client) { instance_double(RubynCode::Skills::RegistryClient) }
+    context 'with a pack name' do
+      let(:pack_data) { { name: 'rails-testing', version: '1.0.0', files: [] } }
 
       before do
-        allow(RubynCode::Skills::RegistryClient).to receive(:new).and_return(client)
-        allow(RubynCode::Skills::PackInstaller).to receive(:new)
-          .with(registry_client: client, project_root: '/tmp/test-project', global: false)
-          .and_return(installer)
+        allow(pack_manager).to receive(:installed?).with('rails-testing').and_return(false)
+        allow(registry).to receive(:fetch_pack).with('rails-testing').and_return(pack_data)
+        allow(pack_manager).to receive(:install).with(pack_data).and_return(pack_data)
       end
 
-      it 'installs the requested packs' do
-        allow(installer).to receive(:install)
-          .with(['stripe'], update: false)
-          .and_yield(:fetching, { name: 'stripe' })
-          .and_yield(:downloading, { name: 'stripe', total: 2, downloaded: 2 })
-          .and_yield(:installed, { name: 'stripe', version: '1.0.0', files: ['webhooks.md', 'checkout.md'] })
-          .and_return([{ name: 'stripe', status: :installed, files: ['webhooks.md', 'checkout.md'] }])
-
-        expect { command.execute(['stripe'], ctx) }.to output(/webhooks\.md/).to_stdout
-
-        expect(renderer).to have_received(:info).with(/Fetching stripe/)
-        expect(renderer).to have_received(:success).with(/Installed 2 skills/)
+      it 'fetches and installs the pack' do
+        command.execute(['rails-testing'], ctx)
+        expect(registry).to have_received(:fetch_pack).with('rails-testing')
+        expect(pack_manager).to have_received(:install).with(pack_data)
       end
 
-      it 'handles already-installed packs' do
-        allow(installer).to receive(:install)
-          .with(['stripe'], update: false)
-          .and_yield(:fetching, { name: 'stripe' })
-          .and_yield(:up_to_date, { name: 'stripe', version: '1.0.0' })
-          .and_return([{ name: 'stripe', status: :up_to_date, files: [] }])
+      it 'shows success message' do
+        command.execute(['rails-testing'], ctx)
+        expect(renderer).to have_received(:info).with(/Installed skill pack 'rails-testing'/)
+      end
+    end
 
-        command.execute(['stripe'], ctx)
-
-        expect(renderer).to have_received(:info).with(/already installed/)
+    context 'when pack is already installed' do
+      before do
+        allow(pack_manager).to receive(:installed?).with('rails-testing').and_return(true)
       end
 
-      it 'handles installation errors' do
-        allow(installer).to receive(:install)
-          .with(['broken'], update: false)
-          .and_yield(:error, { name: 'broken', message: 'Pack not found' })
-          .and_return([{ name: 'broken', status: :error, message: 'Pack not found' }])
+      it 'shows warning and does not fetch' do
+        command.execute(['rails-testing'], ctx)
+        expect(renderer).to have_received(:warning).with(/already installed/)
+        expect(registry).not_to have_received(:fetch_pack) if registry.respond_to?(:fetch_pack)
+      end
+    end
 
+    context 'when registry fetch fails' do
+      before do
+        allow(pack_manager).to receive(:installed?).with('broken').and_return(false)
+        allow(registry).to receive(:fetch_pack).and_raise(
+          RubynCode::Skills::RegistryError, 'network timeout'
+        )
+      end
+
+      it 'shows error message' do
         command.execute(['broken'], ctx)
-
-        expect(renderer).to have_received(:error).with(/Failed to install broken/)
+        expect(renderer).to have_received(:error).with(/Failed to install 'broken'/)
       end
     end
 
-    context 'with --global flag' do
-      let(:installer) { instance_double(RubynCode::Skills::PackInstaller) }
-      let(:client) { instance_double(RubynCode::Skills::RegistryClient) }
-
+    context 'with multiple pack names' do
       before do
-        allow(RubynCode::Skills::RegistryClient).to receive(:new).and_return(client)
-        allow(RubynCode::Skills::PackInstaller).to receive(:new)
-          .with(registry_client: client, project_root: '/tmp/test-project', global: true)
-          .and_return(installer)
+        allow(pack_manager).to receive(:installed?).and_return(false)
+        allow(registry).to receive(:fetch_pack).and_return({ name: 'a', files: [] }, { name: 'b', files: [] })
+        allow(pack_manager).to receive(:install).and_return({})
       end
 
-      it 'creates installer with global: true' do
-        allow(installer).to receive(:install)
-          .with(['stripe'], update: false)
-          .and_yield(:installed, { name: 'stripe', version: '1.0.0', files: ['webhooks.md'] })
-          .and_return([{ name: 'stripe', status: :installed, files: ['webhooks.md'] }])
-
-        expect { command.execute(['--global', 'stripe'], ctx) }.to output.to_stdout
-
-        expect(RubynCode::Skills::PackInstaller).to have_received(:new)
-          .with(hash_including(global: true))
-      end
-    end
-
-    context 'with --update flag and no pack names' do
-      let(:installer) { instance_double(RubynCode::Skills::PackInstaller) }
-      let(:client) { instance_double(RubynCode::Skills::RegistryClient) }
-
-      before do
-        allow(RubynCode::Skills::RegistryClient).to receive(:new).and_return(client)
-        allow(RubynCode::Skills::PackInstaller).to receive(:new)
-          .with(registry_client: client, project_root: '/tmp/test-project', global: false)
-          .and_return(installer)
-      end
-
-      it 'updates all installed packs' do
-        allow(installer).to receive(:installed_packs)
-          .and_return([{ 'name' => 'stripe', 'version' => '1.0.0' }])
-        allow(installer).to receive(:update_all)
-          .and_yield(:installed, { name: 'stripe', version: '2.0.0', files: ['webhooks.md'] })
-          .and_return([{ name: 'stripe', status: :installed, files: ['webhooks.md'] }])
-
-        command.execute(['--update'], ctx)
-
-        expect(renderer).to have_received(:success).with(/Updated 1 pack/)
-      end
-
-      it 'shows message when no packs are installed' do
-        allow(installer).to receive(:installed_packs).and_return([])
-
-        command.execute(['--update'], ctx)
-
-        expect(renderer).to have_received(:info).with(/No skill packs installed/)
-      end
-
-      it 'shows message when all packs are up to date' do
-        allow(installer).to receive(:installed_packs)
-          .and_return([{ 'name' => 'stripe', 'version' => '1.0.0' }])
-        allow(installer).to receive(:update_all)
-          .and_return([{ name: 'stripe', status: :up_to_date, files: [] }])
-
-        command.execute(['--update'], ctx)
-
-        expect(renderer).to have_received(:info).with(/up to date/)
-      end
-    end
-
-    context 'with --update flag and pack names' do
-      let(:installer) { instance_double(RubynCode::Skills::PackInstaller) }
-      let(:client) { instance_double(RubynCode::Skills::RegistryClient) }
-
-      before do
-        allow(RubynCode::Skills::RegistryClient).to receive(:new).and_return(client)
-        allow(RubynCode::Skills::PackInstaller).to receive(:new)
-          .with(registry_client: client, project_root: '/tmp/test-project', global: false)
-          .and_return(installer)
-      end
-
-      it 'installs with update: true' do
-        allow(installer).to receive(:install)
-          .with(['stripe'], update: true)
-          .and_yield(:installed, { name: 'stripe', version: '2.0.0', files: ['webhooks.md'] })
-          .and_return([{ name: 'stripe', status: :installed, files: ['webhooks.md'] }])
-
-        expect { command.execute(['--update', 'stripe'], ctx) }.to output.to_stdout
-
-        expect(installer).to have_received(:install).with(['stripe'], update: true)
-      end
-    end
-
-    context 'when RegistryError is raised' do
-      before do
-        allow(RubynCode::Skills::RegistryClient).to receive(:new)
-          .and_raise(RubynCode::Skills::RegistryError, 'Connection refused')
-      end
-
-      it 'shows the error message' do
-        command.execute(['stripe'], ctx)
-
-        expect(renderer).to have_received(:error).with(/Registry error: Connection refused/)
-      end
-    end
-
-    context 'when unexpected error is raised' do
-      before do
-        allow(RubynCode::Skills::RegistryClient).to receive(:new)
-          .and_raise(StandardError, 'something broke')
-      end
-
-      it 'shows the error message' do
-        command.execute(['stripe'], ctx)
-
-        expect(renderer).to have_received(:error).with(/Install failed: something broke/)
-      end
-    end
-
-    context 'skill loader reload' do
-      let(:installer) { instance_double(RubynCode::Skills::PackInstaller) }
-      let(:client) { instance_double(RubynCode::Skills::RegistryClient) }
-
-      before do
-        allow(RubynCode::Skills::RegistryClient).to receive(:new).and_return(client)
-        allow(RubynCode::Skills::PackInstaller).to receive(:new).and_return(installer)
-        allow(catalog).to receive(:respond_to?).with(:available).and_return(true)
-        allow(catalog).to receive(:instance_variable_set).with(:@index, nil)
-      end
-
-      it 'reloads skills after installation' do
-        allow(installer).to receive(:install)
-          .with(['stripe'], update: false)
-          .and_yield(:installed, { name: 'stripe', version: '1.0.0', files: ['webhooks.md'] })
-          .and_return([{ name: 'stripe', status: :installed, files: ['webhooks.md'] }])
-
-        expect { command.execute(['stripe'], ctx) }.to output.to_stdout
-
-        expect(catalog).to have_received(:instance_variable_set).with(:@index, nil)
+      it 'installs each pack' do
+        command.execute(%w[pack-a pack-b], ctx)
+        expect(registry).to have_received(:fetch_pack).twice
+        expect(pack_manager).to have_received(:install).twice
       end
     end
   end

@@ -139,8 +139,7 @@ module RubynCode
     autoload :Document, 'rubyn_code/skills/document'
     autoload :TtlManager, 'rubyn_code/skills/ttl_manager'
     autoload :RegistryClient, 'rubyn_code/skills/registry_client'
-    autoload :PackInstaller, 'rubyn_code/skills/pack_installer'
-    autoload :AutoSuggest, 'rubyn_code/skills/auto_suggest'
+    autoload :PackManager, 'rubyn_code/skills/pack_manager'
     autoload :RegistryError, 'rubyn_code/skills/registry_client'
   end
 
@@ -290,7 +289,7 @@ module RubynCode
       autoload :Provider, 'rubyn_code/cli/commands/provider'
       autoload :InstallSkills, 'rubyn_code/cli/commands/install_skills'
       autoload :RemoveSkills, 'rubyn_code/cli/commands/remove_skills'
-      autoload :ListSkills, 'rubyn_code/cli/commands/list_skills'
+      autoload :Skills, 'rubyn_code/cli/commands/skills'
     end
   end
 
