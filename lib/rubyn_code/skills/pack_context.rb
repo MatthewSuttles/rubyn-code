@@ -102,9 +102,9 @@ module RubynCode
 
         lines = []
         lines << "\n## Pack-Informed Review Context"
-        lines << "The following skill packs were detected from the Gemfile and are " \
-                "available for this review (via GitHub App access):"
-        lines << ""
+        lines << 'The following skill packs were detected from the Gemfile and are ' \
+               'available for this review (via GitHub App access):'
+        lines << ''
 
         matched_packs.each do |pack_name|
           pack = fetch_pack(pack_name)
@@ -116,7 +116,7 @@ module RubynCode
           lines << "### Pack: #{pack_name}"
           lines << pack_description(pack)
           lines << pack_skills(pack)
-          lines << ""
+          lines << ''
         rescue StandardError
           lines << "- **[#{pack_name}]** (failed to load — skipped)"
         end
@@ -154,7 +154,7 @@ module RubynCode
         lines = []
         lines << "<skill name=\"#{name}\">"
         lines << content.strip
-        lines << "</skill>"
+        lines << '</skill>'
         lines.join("\n")
       end
     end

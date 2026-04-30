@@ -179,7 +179,7 @@ module RubynCode
       # Only allow alphanumeric, hyphens, underscores, and forward slashes in pack names.
       # Forward slashes are required for namespaced packs like 'stripe/webhooks'.
       def validate_pack_name!(name)
-        return if name.to_s.match?(/\A[a-zA-Z0-9_\-\/]+\z/)
+        return if name.to_s.match?(%r{\A[a-zA-Z0-9_\-/]+\z})
 
         raise RegistryError,
               "Invalid pack name: '#{name}'. Only letters, numbers, hyphens, underscores, and slashes allowed."
@@ -210,7 +210,7 @@ module RubynCode
       def fetch_files_with_content(pack_name, files)
         return files if files.empty?
 
-        files_with_content = files.map do |file|
+        files.map do |file|
           path = fetch_key(file, :path)
           result = fetch_file(pack_name, path)
           { filename: path, content: result[:content] }
@@ -218,8 +218,6 @@ module RubynCode
           # Skip files that fail to load
           nil
         end.compact
-
-        files_with_content
       end
 
       def not_modified_result

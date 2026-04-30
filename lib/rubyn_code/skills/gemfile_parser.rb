@@ -16,7 +16,7 @@ module RubynCode
       GEM_PATTERN = /
         ^\s*gem\s+
         ['"]([^'"]+)['"]
-      /x.freeze
+      /x
 
       # Extract unique gem names from Gemfile content.
       #
