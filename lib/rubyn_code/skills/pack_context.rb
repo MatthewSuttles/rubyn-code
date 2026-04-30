@@ -61,6 +61,16 @@ module RubynCode
       # Returns the list of packs that matched detected gems.
       # Some gems map to pack names (e.g. stripe → stripe/webhooks).
       #
+      # Tradeoff: every detected gem that doesn't appear in SKILL_NAME_OVERRIDES
+      # is queried against the registry as a potential pack name. For a typical
+      # Rails app with 40-80 gems this means up to 80 sequential registry calls,
+      # each returning a 404 for unknown packs. This is intentional for now:
+      #   - Responses are cached in @cache so repeated calls within a session are free
+      #   - The GitHub App context is latency-tolerant (async review runs)
+      #   - A future batch endpoint on the registry API can reduce this to one call
+      # If latency becomes a problem, add a KNOWN_PACKS allowlist and skip gems
+      # that are not in it before fetching.
+      #
       # @return [Array<String>] pack names
       def matched_packs
         @matched_packs ||= gems.filter_map { |gem| pack_name_for(gem) }.uniq

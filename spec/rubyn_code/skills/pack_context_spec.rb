@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative 'skill_packs_spec_helper'
+
 RSpec.describe RubynCode::Skills::PackContext do
   let(:registry_client) { instance_double('RubynCode::Skills::RegistryClient') }
   let(:context) { described_class.new(gems: gems, registry_client: registry_client) }
@@ -46,13 +48,14 @@ RSpec.describe RubynCode::Skills::PackContext do
       expect(empty_context.build_context_block).to eq('')
     end
 
-    it 'returns empty string when registry fetch fails' do
-      allow(registry_client).to receive(:fetch_pack).and_raise(RubynCode::Skills::RegistryError, 'not found')
+    it 'includes a "pack not found" fallback notice when registry fetch fails' do
       allow(registry_client).to receive(:fetch_pack).with('stripe/webhooks').and_raise(
         RubynCode::Skills::RegistryError.new('not found')
       )
       block = context.build_context_block
       expect(block).to include('stripe/webhooks')
+      expect(block).to include('pack not found in registry')
+      expect(block).not_to include('<skill')
     end
 
     it 'formats a valid pack into a context block' do

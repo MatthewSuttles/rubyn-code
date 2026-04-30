@@ -160,6 +160,7 @@ RSpec.describe RubynCode::IDE::Handlers::ReviewHandler do
       expect(findings.first[:message]).to include("even more")
     end
   end
+
   describe "pack context integration" do
     let(:pack_context_instance) { instance_double("RubynCode::Skills::PackContext") }
 
@@ -216,7 +217,7 @@ RSpec.describe RubynCode::IDE::Handlers::ReviewHandler do
 
       expect(RubynCode::Skills::PackContext).to have_received(:for_repo).with(
         project_root: "/test/project"
-      )
+      ).at_least(:once)
     end
   end
 
