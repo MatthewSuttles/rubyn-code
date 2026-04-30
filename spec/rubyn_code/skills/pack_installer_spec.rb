@@ -387,4 +387,33 @@ RSpec.describe RubynCode::Skills::PackInstaller do
       expect(File.read(File.join(pack_dir('stripe'), 'webhooks.md'))).to eq('# Webhooks')
     end
   end
+
+  describe 'offline fallback' do
+    it 'loads cached packs when API is unavailable' do
+      # Install first (simulate having cached data)
+      allow(registry_client).to receive(:fetch_pack).with('stripe').and_return(stripe_meta)
+      allow(registry_client).to receive(:fetch_file)
+        .with('stripe', 'webhooks.md', etag: nil)
+        .and_return({ content: '# Webhooks', etag: '"etag1"', not_modified: false })
+      allow(registry_client).to receive(:fetch_file)
+        .with('stripe', 'checkout_sessions.md', etag: nil)
+        .and_return({ content: '# Checkout', etag: '"etag2"', not_modified: false })
+
+      installer.install(['stripe'])
+
+      # Registry is now down
+      allow(registry_client).to receive(:fetch_pack)
+        .with('stripe')
+        .and_raise(RubynCode::Skills::RegistryError.new('Connection refused'))
+
+      # Verify cached files still exist and are readable
+      webhooks_path = File.join(pack_dir('stripe'), 'webhooks.md')
+      checkout_path = File.join(pack_dir('stripe'), 'checkout_sessions.md')
+
+      expect(File.exist?(webhooks_path)).to be true
+      expect(File.exist?(checkout_path)).to be true
+      expect(File.read(webhooks_path)).to eq('# Webhooks')
+      expect(File.read(checkout_path)).to eq('# Checkout')
+    end
+  end
 end
