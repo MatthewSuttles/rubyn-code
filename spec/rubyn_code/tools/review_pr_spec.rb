@@ -249,4 +249,40 @@ RSpec.describe RubynCode::Tools::ReviewPr do
       expect(described_class.risk_level).to eq(:read)
     end
   end
+
+  describe '#execute with pack_context' do
+    it 'prepends skill pack context to the review output' do
+      with_pr_repo do |dir|
+        tool = build_tool(dir)
+        pack_ctx = "### Pack: stripe/webhooks\n<skill name=\"webhooks\">Always verify signatures.</skill>"
+
+        result = tool.execute(base_branch: 'main', pack_context: pack_ctx)
+
+        expect(result).to include('## Skill Pack Context')
+        expect(result).to include('stripe/webhooks')
+        expect(result).to include('Always verify signatures.')
+      end
+    end
+
+    it 'omits the skill pack section when pack_context is nil' do
+      with_pr_repo do |dir|
+        tool = build_tool(dir)
+
+        result = tool.execute(base_branch: 'main', pack_context: nil)
+
+        expect(result).not_to include('## Skill Pack Context')
+      end
+    end
+
+    it 'omits the skill pack section when pack_context is empty string' do
+      with_pr_repo do |dir|
+        tool = build_tool(dir)
+
+        result = tool.execute(base_branch: 'main', pack_context: '')
+
+        expect(result).not_to include('## Skill Pack Context')
+      end
+    end
+  end
+
 end

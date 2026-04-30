@@ -160,4 +160,91 @@ RSpec.describe RubynCode::IDE::Handlers::ReviewHandler do
       expect(findings.first[:message]).to include("even more")
     end
   end
+
+  describe "pack context integration" do
+    let(:pack_context_instance) { instance_double("RubynCode::Skills::PackContext") }
+
+    before do
+      allow(RubynCode::Skills::PackContext).to receive(:for_repo).and_return(pack_context_instance)
+    end
+
+    it "passes pack context to the review tool when packs are found" do
+      allow(pack_context_instance).to receive(:build_context_block).and_return("### Pack: stripe/webhooks\n<skill name=\"webhooks\">content</skill>")
+      allow(review_tool).to receive(:execute).with(
+        base_branch: "main",
+        focus: "all",
+        pack_context: "### Pack: stripe/webhooks\n<skill name=\"webhooks\">content</skill>"
+      ).and_return("")
+
+      handler.call({ "baseBranch" => "main", "sessionId" => "r-pack" })
+      sleep 0.3
+
+      expect(review_tool).to have_received(:execute).with(
+        hash_including(pack_context: "### Pack: stripe/webhooks\n<skill name=\"webhooks\">content</skill>")
+      )
+    end
+
+    it "passes nil pack_context when no packs match" do
+      allow(pack_context_instance).to receive(:build_context_block).and_return("")
+      allow(review_tool).to receive(:execute).and_return("")
+
+      handler.call({ "baseBranch" => "main", "sessionId" => "r-no-pack" })
+      sleep 0.3
+
+      expect(review_tool).to have_received(:execute).with(
+        hash_including(pack_context: nil)
+      )
+    end
+
+    it "passes nil pack_context when PackContext raises" do
+      allow(RubynCode::Skills::PackContext).to receive(:for_repo).and_raise(StandardError, "network error")
+      allow(review_tool).to receive(:execute).and_return("")
+
+      handler.call({ "baseBranch" => "main", "sessionId" => "r-error" })
+      sleep 0.3
+
+      expect(review_tool).to have_received(:execute).with(
+        hash_including(pack_context: nil)
+      )
+    end
+
+    it "builds PackContext from the server workspace path" do
+      allow(pack_context_instance).to receive(:build_context_block).and_return("")
+      allow(review_tool).to receive(:execute).and_return("")
+
+      handler.call({ "sessionId" => "r-workspace" })
+      sleep 0.3
+
+      expect(RubynCode::Skills::PackContext).to have_received(:for_repo).with(
+        project_root: "/test/project"
+      ).at_least(:once)
+    end
+  end
+
+  describe "#build_pack_context" do
+    let(:pack_context_instance) { instance_double("RubynCode::Skills::PackContext") }
+
+    before do
+      allow(RubynCode::Skills::PackContext).to receive(:for_repo).and_return(pack_context_instance)
+    end
+
+    it "returns the context block when non-empty" do
+      allow(pack_context_instance).to receive(:build_context_block).and_return("pack skills here")
+      result = handler.send(:build_pack_context, "/some/path")
+      expect(result).to eq("pack skills here")
+    end
+
+    it "returns nil when context block is empty" do
+      allow(pack_context_instance).to receive(:build_context_block).and_return("")
+      result = handler.send(:build_pack_context, "/some/path")
+      expect(result).to be_nil
+    end
+
+    it "returns nil on registry errors without raising" do
+      allow(pack_context_instance).to receive(:build_context_block).and_raise(StandardError, "timeout")
+      result = handler.send(:build_pack_context, "/some/path")
+      expect(result).to be_nil
+    end
+  end
+
 end

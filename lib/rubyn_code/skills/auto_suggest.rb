@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'json'
+require_relative 'gemfile_parser'
 
 module RubynCode
   module Skills
@@ -68,8 +69,7 @@ module RubynCode
         gemfile_path = File.join(@project_root, 'Gemfile')
         return [] unless File.exist?(gemfile_path)
 
-        content = File.read(gemfile_path)
-        content.scan(/^\s*gem\s+['"]([^'"]+)['"]/).flatten.uniq
+        GemfileParser.gems(File.read(gemfile_path))
       rescue StandardError
         []
       end
