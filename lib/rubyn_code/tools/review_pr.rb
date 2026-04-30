@@ -24,7 +24,7 @@ module RubynCode
       }.freeze
       RISK_LEVEL = :read
 
-      def execute(base_branch: 'main', focus: 'all')
+      def execute(base_branch: 'main', focus: 'all', pack_context: nil)
         error = validate_git_repo
         return error if error
 
@@ -37,7 +37,7 @@ module RubynCode
         diff = run_git("diff #{base_branch}...HEAD")
         return "No changes found between #{current} and #{base_branch}." if diff.strip.empty?
 
-        build_full_review(current, base_branch, diff, focus)
+        build_full_review(current, base_branch, diff, focus, pack_context: pack_context)
       end
 
       FILE_CATEGORIES = [
@@ -80,8 +80,9 @@ module RubynCode
         [nil, "Error: Base branch '#{base_branch}' not found."]
       end
 
-      def build_full_review(current, base_branch, diff, focus)
-        review = build_review_header(current, base_branch)
+      def build_full_review(current, base_branch, diff, focus, pack_context: nil)
+        review = build_pack_context_section(pack_context)
+        review.concat(build_review_header(current, base_branch))
         review.concat(build_file_categories(base_branch))
         review.concat(build_focus_section(focus))
         review.concat(build_diff_section(diff))
@@ -155,6 +156,16 @@ module RubynCode
           '- Security issues (SQL injection, XSS, mass assignment)',
           '- Missing database indexes for new associations',
           '- Proper error handling'
+        ]
+      end
+
+      def build_pack_context_section(pack_context)
+        return [] if pack_context.nil? || pack_context.strip.empty?
+
+        [
+          '## Skill Pack Context',
+          pack_context.strip,
+          ''
         ]
       end
 

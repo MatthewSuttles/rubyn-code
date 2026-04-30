@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative '../../skills/pack_context'
+
 module RubynCode
   module IDE
     module Handlers
@@ -38,8 +40,9 @@ module RubynCode
                          })
 
           workspace = @server.workspace_path || Dir.pwd
+          pack_context = build_pack_context(workspace)
           review_tool = Tools::ReviewPr.new(project_root: workspace)
-          result = review_tool.execute(base_branch: base_branch, focus: focus)
+          result = review_tool.execute(base_branch: base_branch, focus: focus, pack_context: pack_context)
 
           # Parse the review output into individual findings and emit them
           findings = extract_findings(result)
@@ -66,6 +69,20 @@ module RubynCode
                            'status' => 'error',
                            'error' => e.message
                          })
+        end
+
+        # Fetch skill pack context for gems detected in the repo's Gemfile.
+        # Returns nil on any failure — pack context is best-effort and must never
+        # block the review from running.
+        #
+        # @param workspace [String] absolute path to the repository
+        # @return [String, nil] formatted context block or nil
+        def build_pack_context(workspace)
+          context = Skills::PackContext.for_repo(project_root: workspace)
+          block = context.build_context_block
+          block.empty? ? nil : block
+        rescue StandardError
+          nil
         end
 
         def extract_findings(review_text)
