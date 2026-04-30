@@ -78,15 +78,19 @@ module RubynCode
 
       # Fetch and cache pack content from registry.
       #
+      # RegistryClient#fetch_pack returns a { data:, etag:, not_modified: } wrapper.
+      # We cache and return only the :data payload so callers work with pack attributes
+      # directly (e.g. :description, :files) rather than the transport envelope.
+      #
       # @param pack_name [String]
       # @return [Hash, nil] pack data or nil if not found
       def fetch_pack(pack_name)
         return @cache[pack_name] if @cache.key?(pack_name)
 
-        @cache[pack_name] = @registry_client.fetch_pack(pack_name)
-        @cache[pack_name]
+        result = @registry_client.fetch_pack(pack_name)
+        @cache[pack_name] = result[:data]
       rescue RegistryError
-        nil
+        @cache[pack_name] = nil
       end
 
       # Build a context block listing all detected packs and their skills.
@@ -132,12 +136,15 @@ module RubynCode
       end
 
       def pack_skills(pack)
-        files = pack[:files] || pack['files'] || {}
+        files = pack[:files] || pack['files'] || []
         return '' if files.empty?
 
-        skills = files.map do |name, content|
-          skill_name = File.basename(name, '.*')
-          skill_content = content.is_a?(String) ? content : content[:content].to_s
+        # RegistryClient#fetch_files_with_content returns an Array of
+        # { filename: String, content: String } hashes — not a Hash keyed by name.
+        skills = files.map do |file|
+          filename = file[:filename] || file['filename'] || ''
+          skill_name = File.basename(filename, '.*')
+          skill_content = (file[:content] || file['content']).to_s
           format_skill_block(skill_name, skill_content)
         end
         skills.join("\n")

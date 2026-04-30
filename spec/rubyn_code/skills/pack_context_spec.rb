@@ -59,17 +59,19 @@ RSpec.describe RubynCode::Skills::PackContext do
     end
 
     it 'formats a valid pack into a context block' do
+      # RegistryClient#fetch_pack returns { data:, etag:, not_modified: }.
+      # PackContext#fetch_pack unwraps and caches :data, so we stub the full wrapper.
       pack_data = {
         name: 'stripe/webhooks',
         description: 'Stripe webhook patterns',
-        files: {
-          'webhooks.md' => {
-            content: "# Stripe Webhooks\n\nAlways verify signatures."
-          }
-        }
+        files: [
+          { filename: 'webhooks.md', content: "# Stripe Webhooks\n\nAlways verify signatures." }
+        ]
       }
 
-      allow(registry_client).to receive(:fetch_pack).with('stripe/webhooks').and_return(pack_data)
+      allow(registry_client).to receive(:fetch_pack).with('stripe/webhooks').and_return(
+        { data: pack_data, etag: 'abc123', not_modified: false }
+      )
 
       block = context.build_context_block
       expect(block).to include('stripe/webhooks')
@@ -81,10 +83,12 @@ RSpec.describe RubynCode::Skills::PackContext do
       pack_data = {
         name: 'stripe/webhooks',
         description: 'Stripe webhook patterns',
-        files: { 'webhooks.md' => { content: '# Webhooks' } }
+        files: [{ filename: 'webhooks.md', content: '# Webhooks' }]
       }
 
-      allow(registry_client).to receive(:fetch_pack).with('stripe/webhooks').and_return(pack_data)
+      allow(registry_client).to receive(:fetch_pack).with('stripe/webhooks').and_return(
+        { data: pack_data, etag: 'abc123', not_modified: false }
+      )
 
       block = context.build_context_block
       expect(block).to include('Stripe webhook patterns')

@@ -176,12 +176,13 @@ module RubynCode
         raise RegistryError, "Invalid pack response for '#{name}': missing name or files"
       end
 
-      # Only allow alphanumeric, hyphens, and underscores in pack names.
+      # Only allow alphanumeric, hyphens, underscores, and forward slashes in pack names.
+      # Forward slashes are required for namespaced packs like 'stripe/webhooks'.
       def validate_pack_name!(name)
-        return if name.to_s.match?(/\A[a-zA-Z0-9_-]+\z/)
+        return if name.to_s.match?(/\A[a-zA-Z0-9_\-\/]+\z/)
 
         raise RegistryError,
-              "Invalid pack name: '#{name}'. Only letters, numbers, hyphens, and underscores allowed."
+              "Invalid pack name: '#{name}'. Only letters, numbers, hyphens, underscores, and slashes allowed."
       end
 
       def encode_name(name)
