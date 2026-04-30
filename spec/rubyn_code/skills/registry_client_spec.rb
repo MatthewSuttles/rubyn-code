@@ -160,4 +160,97 @@ RSpec.describe RubynCode::Skills::RegistryClient do
       )
     end
   end
+
+  describe 'User-Accept header' do
+    it 'sets Accept header on connection for catalog requests' do
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/packs})
+        .with(headers: { 'User-Accept' => 'Rubyn Code' })
+        .to_return(status: 200, body: '{"packs":[]}', headers: { 'etag' => '"x"' })
+
+      result = client.fetch_catalog
+
+      expect(result[:data]).to eq([])
+    end
+
+    it 'sets Accept header on connection for pack fetch' do
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/packs/stripe})
+        .with(headers: { 'User-Accept' => 'Rubyn Code' })
+        .to_return(status: 200, body: '{"name":"stripe"}', headers: { 'etag' => '"x"' })
+
+      result = client.fetch_pack('stripe')
+
+      expect(result[:name]).to eq('stripe')
+    end
+  end
+
+  describe '406 response handling' do
+    it 'raises RegistryError when server returns 406' do
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/packs})
+        .to_return(status: 406, body: 'Not Acceptable', headers: {})
+
+      expect { client.list_packs }.to raise_error(RubynCode::Skills::RegistryError)
+    end
+
+    it 'raises RegistryError on 406 for pack fetch' do
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/packs/rails-testing})
+        .to_return(status: 406, body: 'Not Acceptable', headers: {})
+
+      expect { client.fetch_pack('rails-testing') }.to raise_error(RubynCode::Skills::RegistryError)
+    end
+  end
+
+  describe 'ETag caching' do
+    it 'sends If-None-Match header when etag is provided' do
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/packs})
+        .with(headers: { 'If-None-Match' => '"cached-etag"' })
+        .to_return(status: 304, body: '', headers: { 'etag' => '"cached-etag"' })
+
+      result = client.fetch_catalog(etag: '"cached-etag"')
+
+      expect(result[:not_modified]).to be true
+    end
+
+    it 'does not send If-None-Match when no etag provided' do
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/packs})
+        .to_return(status: 200, body: '{"packs":[]}', headers: { 'etag' => '"new"' })
+
+      client.fetch_catalog(etag: nil)
+
+      expect(WebMock).to have_requested(:get, %r{test\.rubyn\.ai/api/v1/skills/packs})
+        .with(headers: { 'If-None-Match' => absent })
+    end
+  end
+
+  describe '#fetch_suggestions' do
+    it 'returns suggested packs based on detected gems' do
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/suggestions})
+        .with(query: { gems: 'stripe,sidekiq' })
+        .to_return(status: 200, body: [
+          { 'name' => 'stripe', 'reason' => 'stripe gem detected' },
+          { 'name' => 'sidekiq', 'reason' => 'sidekiq gem detected' }
+        ].to_json, headers: { 'Content-Type' => 'application/json' })
+
+      result = client.fetch_suggestions(['stripe', 'sidekiq'])
+
+      expect(result.size).to eq(2)
+      expect(result.first['name']).to eq('stripe')
+    end
+
+    it 'returns empty array when no matching suggestions' do
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/suggestions})
+        .with(query: { gems: 'unknown-gem' })
+        .to_return(status: 200, body: [].to_json, headers: { 'Content-Type' => 'application/json' })
+
+      result = client.fetch_suggestions(['unknown-gem'])
+
+      expect(result).to eq([])
+    end
+
+    it 'raises RegistryError on network failure' do
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/suggestions})
+        .to_raise(Faraday::ConnectionFailed.new('Connection refused'))
+
+      expect { client.fetch_suggestions(['stripe']) }.to raise_error(RubynCode::Skills::RegistryError)
+    end
+  end
 end
