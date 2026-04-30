@@ -102,7 +102,9 @@ module RubynCode
 
         lines = []
         lines << "\n## Pack-Informed Review Context"
-        lines << 'The following skill packs were detected from the Gemfile and are available for this review (via GitHub App access):'
+        intro = 'The following skill packs were detected from the Gemfile and ' \
+                'are available for this review (via GitHub App access):'
+        lines << intro
         lines << ''
 
         matched_packs.each do |pack_name|
