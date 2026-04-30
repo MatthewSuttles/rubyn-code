@@ -65,16 +65,15 @@ Install one or more skill packs from the rubyn.ai registry.
 
 | Flag | Description |
 |------|-------------|
-| `--global` | Install to `~/.rubyn-code/skills/` instead of the project directory. Global packs are available across all projects. |
-| `--update` | Update installed packs without prompting. When used alone (`/install-skills --update`), updates all installed packs. When used with a name (`/install-skills --update stripe`), updates that specific pack. |
+| `--global` | Install to `~/.rubyn-code/skills/` instead of the project directory. Global packs are available across all projects on this machine. |
+| `--update` | Update installed packs without prompting. When used alone (`/install-skills --update`), updates all installed packs. When combined with a pack name (`/install-skills --update stripe`), updates that specific pack only. |
 
 **What happens on install:**
 
 1. Fetches pack metadata from the rubyn.ai registry
-2. Checks compatibility with your Rubyn Code and Rails versions
-3. Downloads each skill file (skips unchanged files via ETag caching)
-4. Writes files to `.rubyn-code/skills/<pack>/`
-5. Skills are immediately available — no restart needed
+2. Downloads each skill file (skips unchanged files via ETag — see [ETag Caching](#etag-caching))
+3. Writes files to `.rubyn-code/skills/<pack>/`
+4. Skills are immediately available — no restart needed
 
 **Version handling:**
 
@@ -146,7 +145,7 @@ Available skill packs (8)
 
 | Flag | Description |
 |------|-------------|
-| `--available` | Fetch and display all packs from the rubyn.ai registry. |
+| `--available` | Fetch and display all packs from the rubyn.ai registry. Requires network access. |
 
 ---
 
@@ -173,7 +172,7 @@ Removed skill pack 'hotwire'.
 
 | Flag | Description |
 |------|-------------|
-| `--global` | Remove from the global directory (`~/.rubyn-code/skills/`) instead of the project directory. |
+| `--global` | Remove from the global directory (`~/.rubyn-code/skills/`) instead of the project directory. Required when the pack was installed with `--global`. |
 
 ---
 
@@ -184,14 +183,14 @@ Skill packs install to one of two locations:
 | Location | Path | Scope | Default |
 |----------|------|-------|---------|
 | **Project** | `.rubyn-code/skills/<pack>/` | This project only | ✓ |
-| **Global** | `~/.rubyn-code/skills/<pack>/` | All projects | Use `--global` |
+| **Global** | `~/.rubyn-code/skills/<pack>/` | All projects on this machine | Use `--global` |
 
-**Project-level** is the default. This means the pack is version-controlled with
-your project, so the whole team gets the same skills. Add `.rubyn-code/skills/` to
-your repository.
+**Project-level** is the default. The pack is version-controlled with your project,
+so the whole team gets the same skills. Commit `.rubyn-code/skills/` to your
+repository.
 
-**Global** packs are useful for personal preferences or skills you want across all
-projects (e.g., your preferred testing framework).
+**Global** packs are useful for personal preferences or skills you want available
+across all projects (e.g., your preferred testing framework conventions).
 
 Project-level packs take precedence over global packs with the same name.
 
@@ -213,6 +212,13 @@ Suggestions are shown **once per project per pack**. After you see a suggestion
 (or install/dismiss the pack), it won't appear again. Suggestion state is tracked
 in `.rubyn-code/suggested.json`.
 
+**How suggestions work:**
+
+- Parses all `gem` declarations from your `Gemfile`
+- Queries the registry with those gem names
+- Filters out packs you've already installed or dismissed
+- Silently skips the check if the registry is unreachable (see [Offline Mode](#offline-mode))
+
 ---
 
 ## Offline Mode
@@ -221,10 +227,31 @@ Rubyn Code never blocks session start on a failed registry fetch. If rubyn.ai is
 unreachable:
 
 - **Already installed packs** continue to work normally from the local cache
-- **`/install-skills`** shows a registry error but doesn't crash
-- **Auto-suggestions** are silently skipped
+- **`/install-skills`** shows a registry error but doesn't crash the session
+- **`/skills --available`** shows a registry error; locally installed packs still list correctly
+- **Auto-suggestions** are silently skipped for the session
 
 The next time the registry is reachable, everything works as normal.
+
+---
+
+## ETag Caching
+
+Each skill file download includes an HTTP ETag from the server. Rubyn Code stores
+ETags in `.rubyn-code/skills/<pack>/.etags.json` alongside the skill files.
+
+On subsequent installs or updates, each file is fetched with an
+`If-None-Match: <etag>` header. If the file hasn't changed, the server responds
+`304 Not Modified` and the local copy is kept — no download, no write. Only
+files that actually changed are transferred.
+
+**Practical effect:**
+
+- `/install-skills --update` on an unchanged pack: fast, zero downloads
+- Re-running `/install-skills hotwire` when it's already current: reports "up to date" immediately
+- A pack with 14 skills where 2 changed: downloads exactly 2 files
+
+The `.etags.json` file is an implementation detail. Don't edit it manually.
 
 ---
 
@@ -240,8 +267,8 @@ Installed skill packs work exactly like the built-in skills:
    keywords and method names that signal relevance.
 
 3. **TTL management:** Loaded skills expire after 5 turns of inactivity. Active
-   skills (ones you're referencing) stay loaded. This keeps the context window
-   clean.
+   skills (ones you're still referencing) stay loaded. This keeps the context
+   window clean.
 
 4. **Size cap:** Individual skills are capped at ~800 tokens. This prevents any
    single skill from consuming too much context.
@@ -318,23 +345,42 @@ for the full format reference.
 Registry error: Registry returned 403: ...
 ```
 
-The rubyn.ai API requires the `User-Accept: Rubyn Code` header. This is handled
-automatically by the CLI. If you see this error, make sure you're using the
-`/install-skills` command (not trying to download packs manually).
+The rubyn.ai API requires a specific `Accept` header. This is sent automatically
+by the CLI. If you see this error, make sure you're using the `/install-skills`
+command rather than downloading pack files manually.
 
 ### Skills not loading after install
 
-Skills should be available immediately. If they're not:
+Skills should be available immediately after install. If they're not activating:
+
 - Verify the pack installed: `/skills` should list it under "Community"
 - Check the pack directory exists: `ls .rubyn-code/skills/<pack>/`
-- Skills activate on matching triggers — ask about a topic the pack covers
+- Skills activate on matching triggers — ask about a topic the pack covers, or
+  open a file that uses the relevant gem
 
 ### Offline and can't install
 
-Rubyn Code caches installed packs locally. If you've installed a pack before, it
-works offline. New installs require a connection to rubyn.ai.
+Rubyn Code caches all installed packs locally. If you've installed a pack before,
+it works fully offline. New installs require a connection to rubyn.ai.
 
-### Global vs project confusion
+### Global vs project install confusion
 
 Use `/skills` to see where each skill is loaded from. Project-level packs
 (`.rubyn-code/skills/`) take precedence over global packs (`~/.rubyn-code/skills/`).
+
+To remove a globally-installed pack, use the `--global` flag:
+
+```
+/remove-skills --global devise
+```
+
+### Stale ETag cache
+
+If skills aren't updating after a pack release, force a full re-download by
+removing the `.etags.json` file for that pack:
+
+```bash
+rm .rubyn-code/skills/<pack>/.etags.json
+```
+
+Then run `/install-skills --update <pack>` to re-fetch all files.
