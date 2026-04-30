@@ -106,6 +106,8 @@ module RubynCode
         rescue StandardError
           lines << "- **[#{pack_name}]** (failed to load — skipped)"
         end
+
+        lines.join("\n")
       end
 
       private
