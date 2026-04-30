@@ -249,6 +249,7 @@ RSpec.describe RubynCode::Tools::ReviewPr do
       expect(described_class.risk_level).to eq(:read)
     end
   end
+
   describe '#execute with pack_context' do
     it 'prepends skill pack context to the review output' do
       with_pr_repo do |dir|
