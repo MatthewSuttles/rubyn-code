@@ -82,6 +82,11 @@ RSpec.describe RubynCode::CLI::REPL do
       instance_double(RubynCode::Skills::Loader)
     )
 
+    # AutoSuggest — stub to prevent real HTTP calls during REPL startup
+    allow(RubynCode::Skills::AutoSuggest).to receive(:new).and_return(
+      instance_double(RubynCode::Skills::AutoSuggest, check: nil)
+    )
+
     # Readline setup
     allow(Reline).to receive(:completion_proc=)
     allow(Reline).to receive(:completion_append_character=)
