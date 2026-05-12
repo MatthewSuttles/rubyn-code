@@ -130,7 +130,8 @@ module RubynCode
         end
       end
 
-      def process_signature_line(line, signatures, indent_stack) # rubocop:disable Metrics/AbcSize -- signature extraction dispatch
+      # -- signature extraction dispatch
+      def process_signature_line(line, signatures, indent_stack)
         stripped = line.strip
         if signature_line?(stripped)
           signatures << line

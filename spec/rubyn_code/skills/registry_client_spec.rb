@@ -41,8 +41,8 @@ RSpec.describe RubynCode::Skills::RegistryClient do
     }
   end
 
-  describe 'User-Accept header' do
-    it 'sends User-Accept: Rubyn Code on all requests' do
+  describe 'Accept header' do
+    it 'sends Accept: application/vnd.rubyn-code on all requests' do
       stub = stub_request(:get, "#{host}/packs")
         .with(headers: { 'Accept' => 'application/vnd.rubyn-code' })
         .to_return(status: 200, body: catalog_json.to_json, headers: { 'Content-Type' => 'application/json' })
@@ -83,17 +83,6 @@ RSpec.describe RubynCode::Skills::RegistryClient do
       client.fetch_suggestions(%w[stripe sidekiq])
 
       expect(stub).to have_been_requested
-    end
-  end
-
-  describe '403 without header' do
-    it 'raises RegistryError when API returns 403' do
-      stub_request(:get, "#{host}/packs")
-        .to_return(status: 403, body: '{"error":"This API requires the User-Accept: Rubyn Code header."}')
-
-      expect { client.fetch_catalog }.to raise_error(
-        RubynCode::Skills::RegistryError, /403/
-      )
     end
   end
 

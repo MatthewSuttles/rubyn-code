@@ -55,7 +55,8 @@ module RubynCode
           Auth::TokenStore.save_provider_key(name, opts[:key]) if opts[:key]
         end
 
-        def confirm_added(name, base_url, opts, ctx) # rubocop:disable Metrics/AbcSize -- sequential output lines
+        # -- sequential output lines
+        def confirm_added(name, base_url, opts, ctx)
           ctx.renderer.success("Provider '#{name}' added (#{opts[:api_format] || 'openai'} format)")
           ctx.renderer.info("  base_url: #{base_url}")
           ctx.renderer.info('  api_key: stored') if opts[:key]

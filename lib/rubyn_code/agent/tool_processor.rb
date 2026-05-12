@@ -26,7 +26,8 @@ module RubynCode
         all_tools.select { |t| core_or_discovered?(t) }
       end
 
-      def detect_task_context # rubocop:disable Metrics/CyclomaticComplexity -- safe navigation chain
+      # -- safe navigation chain
+      def detect_task_context
         last_msg = @conversation&.messages&.reverse_each&.find { |m| m[:role] == 'user' } # rubocop:disable Style/SafeNavigationChainLength
         return nil unless last_msg
 
@@ -142,7 +143,8 @@ module RubynCode
         end
       end
 
-      def signal_decision_compactor(tool_name, tool_input, result) # rubocop:disable Metrics/CyclomaticComplexity -- tool dispatch
+      # -- tool dispatch
+      def signal_decision_compactor(tool_name, tool_input, result)
         return unless @decision_compactor
 
         case tool_name

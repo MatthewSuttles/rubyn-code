@@ -53,7 +53,8 @@ module RubynCode
       record('File read (version.rb)', content.include?('VERSION ='))
     end
 
-    def check_file_write_edit_cleanup # rubocop:disable Metrics/AbcSize -- sequential file ops
+    # -- sequential file ops
+    def check_file_write_edit_cleanup
       tmp = File.join(project_root, '.rubyn-code/self_test_tmp.rb')
       FileUtils.mkdir_p(File.dirname(tmp))
 

@@ -90,7 +90,8 @@ module RubynCode
             cat_packs.each do |pack|
               installed = installer.installed?(pack['name'])
               marker = installed ? ' ✓' : ''
-              puts "    #{pack['name'].ljust(20)} #{pack['description']&.slice(0, 50)}  (#{pack['skillCount']} skills)#{marker}"
+              desc = pack['description']&.slice(0, 50) || ''
+              puts "    #{pack['name'].ljust(20)} #{desc}  (#{pack['skillCount']} skills)#{marker}"
             end
             puts
           end

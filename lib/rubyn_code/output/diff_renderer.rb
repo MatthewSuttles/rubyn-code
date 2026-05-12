@@ -97,7 +97,8 @@ module RubynCode
         table
       end
 
-      def fill_lcs_row(table, row, old_lines, new_lines, col_count) # rubocop:disable Metrics/AbcSize -- LCS algorithm step
+      # -- LCS algorithm step
+      def fill_lcs_row(table, row, old_lines, new_lines, col_count)
         (1..col_count).each do |col|
           table[row][col] = if old_lines[row - 1] == new_lines[col - 1]
                               table[row - 1][col - 1] + 1
@@ -121,7 +122,7 @@ module RubynCode
         result
       end
 
-      def backtrack_step(result, table, old_lines, new_lines, old_idx, new_idx) # rubocop:disable Metrics/AbcSize, Metrics/ParameterLists -- LCS backtrack step requires all state
+      def backtrack_step(result, table, old_lines, new_lines, old_idx, new_idx) # rubocop:disable Metrics/ParameterLists -- LCS backtrack step requires all state
         if lines_match?(old_lines, new_lines, old_idx, new_idx)
           result.unshift([:equal, old_idx - 1, new_idx - 1])
           [old_idx - 1, new_idx - 1]

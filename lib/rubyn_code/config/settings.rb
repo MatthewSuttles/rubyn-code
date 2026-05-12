@@ -160,7 +160,8 @@ module RubynCode
 
       # Backfills missing 'models' keys into existing provider configs.
       # Never overwrites user-set values — only adds what's missing.
-      def backfill_provider_models! # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- iterates providers with guard clauses
+      # -- iterates providers with guard clauses
+      def backfill_provider_models!
         providers = @data['providers']
         return unless providers.is_a?(Hash)
 

@@ -23,7 +23,8 @@ module RubynCode
       def self.summarize(output, args)
         pattern = args['pattern'] || args[:pattern] || ''
         count = output.to_s.lines.count
-        count.zero? || output.to_s.start_with?('No matches') ? "grep #{pattern} (0 matches)" : "grep #{pattern} (#{count} lines)"
+        no_matches = count.zero? || output.to_s.start_with?('No matches')
+        no_matches ? "grep #{pattern} (0 matches)" : "grep #{pattern} (#{count} lines)"
       end
 
       def execute(pattern:, path: nil, glob_filter: nil, max_results: 50)

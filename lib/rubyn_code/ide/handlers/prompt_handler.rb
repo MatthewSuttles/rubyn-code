@@ -62,7 +62,8 @@ module RubynCode
 
         private
 
-        def run_agent(session_id, text, context) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength -- orchestrates agent lifecycle with notifications
+        # -- orchestrates agent lifecycle with notifications
+        def run_agent(session_id, text, context)
           @server.notify('agent/status', {
                            'sessionId' => session_id,
                            'status' => 'thinking'
@@ -165,7 +166,8 @@ module RubynCode
         # Install a ToolOutput adapter on the server so AcceptEdit /
         # ApproveToolUse handlers can route responses back to this session.
         def build_tool_output_adapter
-          adapter = IDE::Adapters::ToolOutput.new(@server, permission_mode: @server.permission_mode, hook_runner: build_ide_hook_runner)
+          adapter = IDE::Adapters::ToolOutput.new(@server, permission_mode: @server.permission_mode,
+                                                           hook_runner: build_ide_hook_runner)
           @server.tool_output_adapter = adapter
           adapter
         end
@@ -190,7 +192,8 @@ module RubynCode
           Hooks::Runner.new(registry: registry)
         end
 
-        def build_enriched_input(text, context) # rubocop:disable Metrics/AbcSize -- assembles context parts from multiple optional fields
+        # -- assembles context parts from multiple optional fields
+        def build_enriched_input(text, context)
           parts = []
 
           parts << "[Active file: #{context['activeFile']}]" if context['activeFile']

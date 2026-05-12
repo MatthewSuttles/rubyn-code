@@ -68,7 +68,7 @@ RSpec.describe RubynCode::Skills::AutoSuggest do
       end
 
       it 'does not repeat suggestions already shown' do
-        write_state({ 'shown' => ['stripe', 'sidekiq'] })
+        write_state({ 'shown' => %w[stripe sidekiq] })
 
         message = suggest.check
 

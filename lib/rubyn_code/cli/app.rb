@@ -71,7 +71,8 @@ module RubynCode
 
       private
 
-      def dispatch_command(command) # rubocop:disable Metrics/CyclomaticComplexity -- unavoidable dispatch switch
+      # -- unavoidable dispatch switch
+      def dispatch_command(command)
         case command
         when :version        then puts "rubyn-code #{RubynCode::VERSION}"
         when :auth           then run_auth
@@ -164,7 +165,8 @@ module RubynCode
         idx
       end
 
-      def parse_daemon_value_option(argv, idx, options) # rubocop:disable Metrics/AbcSize -- option dispatch with hash lookup
+      # -- option dispatch with hash lookup
+      def parse_daemon_value_option(argv, idx, options)
         arg = argv[idx]
         daemon = options[:daemon]
         if DAEMON_INT_FLAGS.key?(arg)

@@ -82,7 +82,8 @@ module RubynCode
           messages.map { |m| format_turn(m) }.join("\n\n")
         end
 
-        def format_turn(msg) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- content polymorphism
+        # -- content polymorphism
+        def format_turn(msg)
           role = (msg[:role] || msg['role'] || 'unknown').capitalize
           content = msg[:content] || msg['content']
           text = if content.is_a?(Array)
@@ -121,7 +122,8 @@ module RubynCode
           )
         end
 
-        def parse_response(response) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- response parsing with multiple fallbacks
+        # -- response parsing with multiple fallbacks
+        def parse_response(response)
           return [] if response.nil?
 
           text = if response.respond_to?(:content)

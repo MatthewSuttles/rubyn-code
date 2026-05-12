@@ -184,7 +184,7 @@ module MCPServer
         parse_routes_output(output)
       end
 
-      def parse_routes_output(output) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      def parse_routes_output(output) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
         routes = []
         output.each_line do |line|
           line = line.strip
@@ -215,7 +215,7 @@ module MCPServer
         routes.empty? ? nil : routes
       end
 
-      def extract_routes_from_dsl(content) # rubocop:disable Metrics/AbcSize
+      def extract_routes_from_dsl(content)
         routes = []
 
         content.each_line do |line|

@@ -6,7 +6,9 @@ module RubynCode
     # via the IDE RPC bridge. Only available when running in IDE mode.
     class IdeDiagnostics < Base
       TOOL_NAME = 'ide_diagnostics'
-      DESCRIPTION = 'Get VS Code diagnostics (errors, warnings) for a file or the whole workspace. Only available in IDE mode.'
+      DESCRIPTION =
+        'Get VS Code diagnostics (errors, warnings) for a file or the whole workspace. ' \
+        'Only available in IDE mode.'
       PARAMETERS = {
         file: {
           type: 'string',

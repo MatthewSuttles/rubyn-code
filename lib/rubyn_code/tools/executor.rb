@@ -16,7 +16,8 @@ module RubynCode
         Registry.load_all!
       end
 
-      def execute(tool_name, params) # rubocop:disable Metrics/AbcSize -- maps tool errors to results
+      # -- maps tool errors to results
+      def execute(tool_name, params)
         # File cache intercept: serve cached reads, invalidate on writes
         cached = try_file_cache(tool_name, params)
         return cached if cached
@@ -73,7 +74,8 @@ module RubynCode
         allowed.empty? ? symbolized : symbolized.slice(*allowed)
       end
 
-      def inject_dependencies(tool, tool_name) # rubocop:disable Metrics/CyclomaticComplexity -- tool-specific dependency injection
+      # -- tool-specific dependency injection
+      def inject_dependencies(tool, tool_name)
         case tool_name
         when 'spawn_agent', 'spawn_teammate'
           inject_agent_deps(tool)

@@ -25,7 +25,8 @@ module RubynCode
 
       # Parse a JSON string into a request hash.
       # Returns either a valid request hash or an error response hash.
-      def parse(line) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- JSON-RPC validation checks
+      # -- JSON-RPC validation checks
+      def parse(line)
         begin
           data = JSON.parse(line)
         rescue JSON::ParserError

@@ -177,7 +177,8 @@ module RubynCode
                                      id_str_key: 'tool_use_id')
       end
 
-      def collect_block_ids(formatted, role:, type:, id_key:, id_str_key:) # rubocop:disable Metrics/CyclomaticComplexity -- iterates blocks with type+role guards
+      # -- iterates blocks with type+role guards
+      def collect_block_ids(formatted, role:, type:, id_key:, id_str_key:)
         ids = Set.new
         formatted.each do |msg|
           next unless msg[:role] == role && msg[:content].is_a?(Array)

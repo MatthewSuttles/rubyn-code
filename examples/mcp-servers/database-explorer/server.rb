@@ -159,7 +159,7 @@ module MCPServer
         JSON.pretty_generate(tables: tables, count: tables.size)
       end
 
-      def call_describe_table(arguments) # rubocop:disable Metrics/AbcSize
+      def call_describe_table(arguments)
         table_name = arguments['table_name']
         return 'Error: table_name is required' unless table_name
 

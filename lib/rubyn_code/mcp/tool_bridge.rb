@@ -51,7 +51,7 @@ module RubynCode
           klass
         end
 
-        def create_tool_class(tool_name, description, parameters, mcp_client, remote_name) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength -- dynamic class creation requires setting many constants
+        def create_tool_class(tool_name, description, parameters, mcp_client, remote_name) # rubocop:disable Metrics/MethodLength -- dynamic class creation requires setting many constants
           bridge = self
 
           Class.new(Tools::Base) do

@@ -85,7 +85,8 @@ module RubynCode
         html.scan(%r{<a[^>]+href="(https?://(?!lite\.duckduckgo)[^"]+)"[^>]*>(.*?)</a>}i)
       end
 
-      def build_ddg_results(links, snippets, max) # rubocop:disable Metrics/AbcSize -- HTML parsing with filtering
+      # -- HTML parsing with filtering
+      def build_ddg_results(links, snippets, max)
         results = []
         links.each_with_index do |match, idx|
           break if results.length >= max

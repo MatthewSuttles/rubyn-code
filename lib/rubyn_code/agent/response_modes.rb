@@ -45,7 +45,8 @@ module RubynCode
         # @param message [String] the user's input
         # @param tool_calls [Array] recent tool calls (for context)
         # @return [Symbol] one of the MODES keys
-        def detect(message, tool_calls: []) # rubocop:disable Metrics/CyclomaticComplexity -- mode detection dispatch
+        # -- mode detection dispatch
+        def detect(message, tool_calls: [])
           return :implementing if implementation_signal?(message)
           return :debugging    if debugging_signal?(message)
           return :reviewing    if reviewing_signal?(message)
