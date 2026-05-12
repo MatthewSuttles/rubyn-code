@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative 'skill_packs_spec_helper'
+
 RSpec.describe RubynCode::Skills::GemfileParser do
   describe '.gems' do
     it 'extracts simple gem names' do

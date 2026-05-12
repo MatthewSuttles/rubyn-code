@@ -8,8 +8,10 @@
 
 $LOAD_PATH.unshift File.expand_path('../../../lib', __dir__)
 
+require 'rubyn_code/skills/gemfile_parser'
 require 'rubyn_code/skills/registry_client'
 require 'rubyn_code/skills/pack_installer'
+require 'rubyn_code/skills/pack_context'
 require 'rubyn_code/skills/auto_suggest'
 require 'webmock/rspec'
 
