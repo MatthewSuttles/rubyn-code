@@ -15,7 +15,7 @@ Hotwire, Stripe, Devise, Sidekiq, and more.
 ```
 rubyn > /install-skills hotwire
 
-Fetching hotwire pack from rubyn.ai...
+Fetching pack 'hotwire' from registry...
   Downloading 14 skill files...
   → hotwire/turbo_drive.md
   → hotwire/turbo_frames.md
@@ -23,7 +23,7 @@ Fetching hotwire pack from rubyn.ai...
   → hotwire/stimulus_controllers.md
   ...
 
-Installed 14 skills to .rubyn-code/skills/hotwire/
+Installed 14 skills to ~/.rubyn-code/skill-packs/hotwire/
 These skills load on demand when you work with related code.
 ```
 
@@ -44,65 +44,72 @@ Install one or more skill packs from the rubyn.ai registry.
 
 **Examples:**
 
-```bash
-# Install a single pack
-/install-skills hotwire
-
-# Install multiple packs at once
-/install-skills hotwire stripe sidekiq
-
-# Install to the global directory (~/.rubyn-code/skills/)
-/install-skills --global devise
-
-# Update all installed packs to their latest versions
-/install-skills --update
-
-# Update a specific pack
-/install-skills --update stripe
 ```
+rubyn > /install-skills hotwire
 
-**Flags:**
-
-| Flag | Description |
-|------|-------------|
-| `--global` | Install to `~/.rubyn-code/skills/` instead of the project directory. Global packs are available across all projects. |
-| `--update` | Update installed packs without prompting. When used alone (`/install-skills --update`), updates all installed packs. When used with a name (`/install-skills --update stripe`), updates that specific pack. |
+rubyn > /install-skills hotwire stripe sidekiq
+```
 
 **What happens on install:**
 
 1. Fetches pack metadata from the rubyn.ai registry
-2. Checks compatibility with your Rubyn Code and Rails versions
-3. Downloads each skill file (skips unchanged files via ETag caching)
-4. Writes files to `.rubyn-code/skills/<pack>/`
-5. Skills are immediately available — no restart needed
+2. Downloads each skill file (unchanged files are skipped via ETag — see [ETag Caching](#etag-caching))
+3. Writes files to `~/.rubyn-code/skill-packs/<pack>/`
+4. Skills are immediately available — no restart needed
 
-**Version handling:**
+**Already installed:** if the pack is already present, Rubyn Code reports it
+and suggests using `/remove-skills` first if you want to reinstall.
 
-- If a pack is already installed at the same version, it reports "up to date"
-- If a newer version is available, it prompts you to update (or updates silently with `--update`)
-- ETag caching means re-installs and updates only download files that actually changed
+**CLI flag (outside the REPL):**
 
-**CLI flag:**
-
-You can also install packs from the terminal before starting a session:
+You can also install packs before starting a session using the `--install-skills`
+CLI flag. This variant supports project-level installs and update operations:
 
 ```bash
+# Install to the project directory (.rubyn-code/skills/<pack>/)
 rubyn-code --install-skills hotwire
+
+# Install multiple packs
+rubyn-code --install-skills hotwire stripe sidekiq
+
+# Install to the global directory (~/.rubyn-code/skills/) — available across all projects
+rubyn-code --install-skills --global devise
+
+# Update all installed packs to their latest versions
+rubyn-code --install-skills --update
+
+# Update a specific pack
+rubyn-code --install-skills --update stripe
 ```
+
+| CLI Flag | Description |
+|----------|-------------|
+| `--global` | Install to `~/.rubyn-code/skills/` instead of the project `.rubyn-code/skills/` directory. Packs installed globally are available across all projects on this machine. |
+| `--update` | Update installed packs without prompting. When used alone, updates all installed packs. When combined with a pack name, updates that pack only. |
+
+> **Note:** `--global` and `--update` are only available as CLI flags
+> (`rubyn-code --install-skills`). They are not options to the REPL
+> `/install-skills` command.
 
 ---
 
 ### `/skills`
 
-List all loaded skills — both built-in and community packs.
+List loaded skills and browse or search the registry.
+
+**Subcommands:**
+
+| Usage | Description |
+|-------|-------------|
+| `/skills` | List all loaded skills — built-in and installed community packs |
+| `/skills available` | Fetch and display all packs from the rubyn.ai registry |
+| `/skills search <term>` | Search the registry for packs matching a keyword |
+
+**`/skills` — list loaded skills:**
 
 ```
-/skills
-```
+rubyn > /skills
 
-**Output:**
-
-```
 Loaded skills (126 total)
 
   Built-in (112)
@@ -112,20 +119,19 @@ Loaded skills (126 total)
     ruby: blocks, classes, concurrency, ...
 
   Community: hotwire (14)
-
 ```
 
-**Browse the registry:**
+If no community packs are installed:
 
 ```
-/skills --available
+  Community: none installed
+  Run /skills available to browse, or /install-skills <name> to install.
 ```
 
-Lists all packs in the rubyn.ai registry, grouped by category. Installed packs
-are marked with ✓.
+**`/skills available` — browse the registry:**
 
 ```
-Available skill packs (8)
+rubyn > /skills available
 
   Auth
     devise               OAuth, JWT, confirmable, security hardening  (8 skills) ✓
@@ -137,16 +143,21 @@ Available skill packs (8)
     hotwire              Turbo Drive, Frames, Streams, Stimulus       (14 skills) ✓
     view-component       Components, slots, previews, Stimulus        (7 skills)
 
-  ...
-
   Install with: /install-skills <name>
 ```
 
-**Flags:**
+Installed packs are marked with ✓. Requires network access to rubyn.ai.
 
-| Flag | Description |
-|------|-------------|
-| `--available` | Fetch and display all packs from the rubyn.ai registry. |
+**`/skills search <term>` — search the registry:**
+
+```
+rubyn > /skills search stripe
+
+Packs matching 'stripe' (1)
+  stripe — Stripe payments in Rails: intents, webhooks, subscriptions
+```
+
+Searches pack names, descriptions, and tags. Requires network access.
 
 ---
 
@@ -155,7 +166,7 @@ Available skill packs (8)
 Remove an installed skill pack.
 
 ```
-/remove-skills <name>
+/remove-skills <name> [name2] [name3]
 ```
 
 **Example:**
@@ -163,150 +174,157 @@ Remove an installed skill pack.
 ```
 rubyn > /remove-skills hotwire
 
-Remove hotwire (14 skills)? This cannot be undone.
-  Confirm (y/N): y
-
 Removed skill pack 'hotwire'.
 ```
 
-**Flags:**
-
-| Flag | Description |
-|------|-------------|
-| `--global` | Remove from the global directory (`~/.rubyn-code/skills/`) instead of the project directory. |
+> **Removing CLI-installed packs:** Packs installed via
+> `rubyn-code --install-skills --global` live in `~/.rubyn-code/skills/`.
+> Remove them by deleting the directory:
+> ```bash
+> rm -rf ~/.rubyn-code/skills/devise
+> ```
 
 ---
 
 ## Installation Directories
 
-Skill packs install to one of two locations:
+Where files land depends on how the pack was installed:
 
-| Location | Path | Scope | Default |
-|----------|------|-------|---------|
-| **Project** | `.rubyn-code/skills/<pack>/` | This project only | ✓ |
-| **Global** | `~/.rubyn-code/skills/<pack>/` | All projects | Use `--global` |
+| Method | Location | Scope |
+|--------|----------|-------|
+| `/install-skills <name>` (REPL) | `~/.rubyn-code/skill-packs/<name>/` | Machine-wide |
+| `rubyn-code --install-skills <name>` (CLI) | `.rubyn-code/skills/<name>/` | Project only |
+| `rubyn-code --install-skills --global <name>` (CLI) | `~/.rubyn-code/skills/<name>/` | Machine-wide |
 
-**Project-level** is the default. This means the pack is version-controlled with
-your project, so the whole team gets the same skills. Add `.rubyn-code/skills/` to
-your repository.
-
-**Global** packs are useful for personal preferences or skills you want across all
-projects (e.g., your preferred testing framework).
-
-Project-level packs take precedence over global packs with the same name.
+When the same pack exists at both the project and global level, the project-level
+version takes precedence.
 
 ---
 
 ## Auto-Suggestion
 
-When Rubyn Code starts in a project, it parses your `Gemfile` and checks the
-registry for matching skill packs. If matches are found, you see a one-time
-suggestion:
+When you open a file or start a conversation, Rubyn Code checks the gems in your
+`Gemfile` against the skill pack registry. If a pack exists for a gem you have
+installed but haven't loaded, Rubyn Code suggests it:
 
 ```
-Skill packs available: stripe (stripe gem detected in Gemfile),
-  sidekiq (sidekiq gem detected in Gemfile)
-Run /install-skills stripe sidekiq to install.
+Tip: You have 'sidekiq' in your Gemfile. Install the sidekiq skill pack for
+job patterns and best practices:
+  /install-skills sidekiq
 ```
 
-Suggestions are shown **once per project per pack**. After you see a suggestion
-(or install/dismiss the pack), it won't appear again. Suggestion state is tracked
-in `.rubyn-code/suggested.json`.
+Auto-suggestions appear once per session per pack and are suppressed after
+installation. They do not run in offline mode.
 
 ---
 
 ## Offline Mode
 
-Rubyn Code never blocks session start on a failed registry fetch. If rubyn.ai is
-unreachable:
+All installed skill files are cached locally. If you have previously installed
+a pack, it works fully offline — no network access required.
 
-- **Already installed packs** continue to work normally from the local cache
-- **`/install-skills`** shows a registry error but doesn't crash
-- **Auto-suggestions** are silently skipped
+**What works offline:**
 
-The next time the registry is reachable, everything works as normal.
+- All installed packs load and activate normally
+- `/skills` lists your installed packs
+- `/remove-skills` removes packs
+
+**What requires network access:**
+
+- `/install-skills` (fetching new packs)
+- `/skills available` (browsing the registry)
+- `/skills search <term>` (searching the registry)
+- Pack updates via `rubyn-code --install-skills --update`
+
+If a network request fails, Rubyn Code reports the error and continues. Installed
+packs are unaffected.
+
+---
+
+## ETag Caching
+
+Rubyn Code uses HTTP ETags to avoid re-downloading skill files that haven't
+changed. Update runs are fast: only modified files are fetched.
+
+**How it works:**
+
+1. On first install, the server returns an ETag for each file
+2. ETags are stored alongside the pack files in `.etags.json`
+3. On subsequent updates, Rubyn Code sends `If-None-Match` headers
+4. The server returns `304 Not Modified` for unchanged files — no download
+5. Changed files return a new ETag and updated content
+
+ETag cache locations:
+
+| Install method | Cache file |
+|----------------|------------|
+| REPL `/install-skills` | `~/.rubyn-code/skill-packs/.etags.json` |
+| CLI `--install-skills` (project) | `.rubyn-code/skills/.etags.json` |
+| CLI `--install-skills --global` | `~/.rubyn-code/skills/.etags.json` |
+
+Running `rubyn-code --install-skills --update` on an up-to-date pack typically
+downloads zero bytes.
 
 ---
 
 ## How Skills Load
 
-Installed skill packs work exactly like the built-in skills:
+Skills load automatically based on triggers defined in each skill file's
+frontmatter. A trigger fires when:
 
-1. **On-demand loading:** Skills activate when you work with related code or ask
-   about related topics. A Stripe skill loads when you ask about webhooks or edit
-   a file with `Stripe::Webhook`.
+- You ask a question containing a matching keyword or phrase
+- You open or edit a file that references a matching class or method name
+- A gem in your `Gemfile` matches the skill's `gems` field
 
-2. **Trigger matching:** Each skill declares `triggers` in its YAML frontmatter —
-   keywords and method names that signal relevance.
-
-3. **TTL management:** Loaded skills expire after 5 turns of inactivity. Active
-   skills (ones you're referencing) stay loaded. This keeps the context window
-   clean.
-
-4. **Size cap:** Individual skills are capped at ~800 tokens. This prevents any
-   single skill from consuming too much context.
-
-5. **Shadowing:** Project-level skills with the same name as built-in skills take
-   precedence. Community packs don't conflict with built-in skills because they
-   cover different domains (specific gems vs. core Ruby/Rails).
-
-For more on how skills work internally, see [Skills Authoring Guide](SKILLS.md).
+Skills load into context on demand — not all at startup. The system prompt stays
+lean; skills appear only when relevant.
 
 ---
 
 ## Available Packs
 
-The registry at rubyn.ai hosts curated skill packs. Use `/skills --available` to
-see the current catalog, or visit [rubyn.ai/skills](https://rubyn.ai/skills) to
-browse online.
+Run `/skills available` to browse the current catalog, or visit
+[rubyn.ai/skills](https://rubyn.ai/skills) to browse online.
 
-### Launch Packs
+### Wave 1 Packs
 
-| Pack | Skills | Category | Gems |
-|------|--------|----------|------|
-| **hotwire** | 14 | Frontend | `turbo-rails`, `stimulus-rails` |
-| **devise** | 8 | Authentication | `devise` |
-| **sidekiq** | 8 | Background Jobs | `sidekiq` |
-| **stripe** | 11 | Payments | `stripe`, `pay` |
-| **graphql-ruby** | 9 | API | `graphql` |
-| **view-component** | 7 | Frontend | `view_component` |
-| **pundit** | 6 | Authorization | `pundit` |
-| **kamal** | 7 | Infrastructure | `kamal` |
-
-### Creating Your Own Packs
-
-Want to contribute a pack for a gem you know well? See the
-[Contributing Guide](https://github.com/Rubyn-AI/skill-packs/blob/main/CONTRIBUTING.md)
-in the skill-packs repository.
+| Pack | Description |
+|------|-------------|
+| `devise` | Authentication, OAuth, confirmable, security hardening |
+| `graphql-ruby` | Schema design, resolvers, mutations, subscriptions |
+| `hotwire` | Turbo Drive, Frames, Streams, Stimulus controllers |
+| `kamal` | Deploy configuration, secrets, zero-downtime deploys |
+| `pundit` | Policy objects, scopes, authorization patterns |
+| `sidekiq` | Job patterns, queues, retries, batches, testing |
+| `stripe` | Payment intents, webhooks, subscriptions, testing |
+| `view-component` | Components, slots, previews, Stimulus integration |
 
 ---
 
 ## Project-Specific Skills
 
-You can also write custom skills for your own project without publishing them to
-the registry. Create markdown files in `.rubyn-code/skills/`:
+You can add custom skill files to your project without going through the
+registry. Place `.md` files with valid YAML frontmatter in:
 
-```bash
-mkdir -p .rubyn-code/skills
+```
+.rubyn-code/skills/<category>/<skill-name>.md
 ```
 
-```markdown
-# .rubyn-code/skills/our-api-patterns.md
+These load alongside installed packs. The `triggers` frontmatter field is
+required for auto-loading to work.
 
 ---
-name: our-api-patterns
-description: API conventions for this project
-tags: [api, conventions]
----
-
-# API Design Patterns
 
 ## Authentication
-All API endpoints use Bearer token authentication...
-```
 
-These load alongside built-in and community skills. See [Skills Authoring Guide](SKILLS.md)
-for the full format reference.
+Installing and updating packs does not require authentication. The rubyn.ai
+registry is publicly readable.
+
+If you have a Rubyn account, log in to unlock:
+
+- Pack usage analytics
+- Private organization packs
+- PR review integration (GitHub App)
 
 ---
 
@@ -315,26 +333,46 @@ for the full format reference.
 ### Pack won't install
 
 ```
-Registry error: Registry returned 403: ...
+rubyn > /install-skills hotwire
+Registry error: Failed to fetch pack 'hotwire': ...
 ```
 
-The rubyn.ai API requires the `User-Accept: Rubyn Code` header. This is handled
-automatically by the CLI. If you see this error, make sure you're using the
-`/install-skills` command (not trying to download packs manually).
+- Check your network connection
+- Verify the pack name: `/skills available`
+- Try again — transient network errors are common
 
 ### Skills not loading after install
 
-Skills should be available immediately. If they're not:
-- Verify the pack installed: `/skills` should list it under "Community"
-- Check the pack directory exists: `ls .rubyn-code/skills/<pack>/`
-- Skills activate on matching triggers — ask about a topic the pack covers
+Skills activate on matching triggers. If a skill isn't loading:
+
+- Run `/skills` to confirm the pack is listed under "Community"
+- Ask about a topic the pack covers, or open a file that imports the gem
+- Check that the pack directory exists: `ls ~/.rubyn-code/skill-packs/`
+
+### Pack already installed warning
+
+```
+Pack 'hotwire' is already installed. Use /remove-skills first to reinstall.
+```
+
+Run `/remove-skills hotwire` then `/install-skills hotwire`.
 
 ### Offline and can't install
 
-Rubyn Code caches installed packs locally. If you've installed a pack before, it
-works offline. New installs require a connection to rubyn.ai.
+New installs require a connection to rubyn.ai. Packs already installed work
+fully offline. There is no offline install from a local archive.
 
-### Global vs project confusion
+### Stale ETag cache
 
-Use `/skills` to see where each skill is loaded from. Project-level packs
-(`.rubyn-code/skills/`) take precedence over global packs (`~/.rubyn-code/skills/`).
+If a pack isn't updating after a registry release, force a full re-download by
+removing its ETag cache and reinstalling:
+
+```bash
+# REPL-installed packs
+rm ~/.rubyn-code/skill-packs/.etags.json
+
+# CLI project-installed packs
+rm .rubyn-code/skills/.etags.json
+```
+
+Then reinstall: `/remove-skills <name>` followed by `/install-skills <name>`.
