@@ -138,6 +138,7 @@ module RubynCode
     autoload :Catalog, 'rubyn_code/skills/catalog'
     autoload :Document, 'rubyn_code/skills/document'
     autoload :Matcher, 'rubyn_code/skills/matcher'
+    autoload :RegistryAutoload, 'rubyn_code/skills/registry_autoload'
     autoload :TtlManager, 'rubyn_code/skills/ttl_manager'
     autoload :RegistryClient, 'rubyn_code/skills/registry_client'
     autoload :PackManager, 'rubyn_code/skills/pack_manager'

@@ -12,8 +12,20 @@ RSpec.describe RubynCode::IDE::Handlers::ReviewHandler do
   end
 
   before do
+    @threads_before = Thread.list.dup
     allow(RubynCode::Tools::ReviewPr).to receive(:new).and_return(review_tool)
     server.workspace_path = "/test/project"
+  end
+
+  # The handler spawns an unjoined Thread per call. On slow CI runners
+  # `sleep 0.3` in a test isn't always enough for that thread to finish,
+  # and a leaked thread calling Tools::ReviewPr.new in the next test hits
+  # the next test's stub — manifesting as "execute received: N times"
+  # where N exceeds the number of handler.call invocations in the test
+  # under inspection.
+  after do
+    leaked = Thread.list - @threads_before
+    leaked.each { |t| t.join(5) if t.alive? }
   end
 
   describe "accepts review" do

@@ -126,10 +126,16 @@ module RubynCode
       # Match the current user message against every skill's :triggers and
       # inject the body of any new match into the conversation so the LLM sees
       # it on the next call. Per-session dedup lives in the Matcher.
+      #
+      # When the message matches a registry pack the user hasn't installed,
+      # @web_skill_autoload silently fetches it, installs it, refreshes the
+      # catalog, and surfaces any new skill matches. Web fallback failures
+      # are silent so the turn proceeds normally.
       def autoload_triggered_skills(user_input)
         return unless @skill_matcher && @skill_loader
 
         matches = @skill_matcher.match(user_input)
+        matches += @web_skill_autoload.try(user_input) if @web_skill_autoload
         return if matches.empty?
 
         names = matches.map { |m| m[:name] }

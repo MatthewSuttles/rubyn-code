@@ -24,6 +24,13 @@ module RubynCode
         @index
       end
 
+      # Force the index to be rebuilt on next access. Used after installing
+      # a skill pack so newly-written files become discoverable in the same
+      # session.
+      def refresh!
+        @index = nil
+      end
+
       def list
         available.map { |e| e[:name] }
       end
