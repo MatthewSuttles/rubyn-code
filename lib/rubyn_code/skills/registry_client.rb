@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'erb'
 require 'faraday'
 require 'json'
 
@@ -35,7 +36,7 @@ module RubynCode
       # @return [Hash] { data: Array<Hash>, etag: String|nil, not_modified: Boolean }
       # @raise [RegistryError] on network or parse failure
       def fetch_catalog(etag: nil)
-        response = conditional_get('/api/v1/skills/packs', etag: etag)
+        response = conditional_get('/api/v1/skills/packs.json', etag: etag)
         return not_modified_result if response.status == 304
 
         data = validate_and_parse(response)
@@ -90,7 +91,7 @@ module RubynCode
       # @raise [RegistryError] on not found, validation, or network failure
       def fetch_pack(name, etag: nil)
         validate_pack_name!(name)
-        response = conditional_get("/api/v1/skills/packs/#{encode_name(name)}", etag: etag)
+        response = conditional_get("/api/v1/skills/packs/#{encode_name(name)}.json", etag: etag)
         return not_modified_result if response.status == 304
 
         data = validate_and_parse(response)
@@ -137,6 +138,7 @@ module RubynCode
           f.response :raise_error
           f.options.timeout = TIMEOUT_SECONDS
           f.options.open_timeout = TIMEOUT_SECONDS
+          f.headers['Accept'] = 'application/json'
           f.headers['User-Accept'] = USER_ACCEPT_HEADER
           f.headers['User-Agent'] = "rubyn-code/#{RubynCode::VERSION}"
         end
@@ -155,6 +157,13 @@ module RubynCode
       def validate_and_parse(response)
         body = response.body.to_s.strip
         raise RegistryError, 'Empty response from registry' if body.empty?
+
+        content_type = response.headers['content-type'].to_s
+        if !content_type.include?('json') && body.start_with?('<')
+          raise RegistryError,
+                "Registry endpoint returned HTML instead of JSON " \
+                "(content-type: #{content_type}). The skill packs API may not be available at #{base_url}."
+        end
 
         JSON.parse(body, symbolize_names: true)
       rescue JSON::ParserError => e

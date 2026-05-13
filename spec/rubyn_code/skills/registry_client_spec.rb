@@ -38,7 +38,7 @@ RSpec.describe RubynCode::Skills::RegistryClient do
 
     it 'fetches and returns pack list' do
       response = instance_double(Faraday::Response, body: response_body, status: 200, headers: { 'etag' => '"abc"' })
-      allow(connection).to receive(:get).with('/api/v1/skills/packs').and_return(response)
+      allow(connection).to receive(:get).with('/api/v1/skills/packs.json').and_return(response)
 
       packs = client.list_packs
       expect(packs).to be_an(Array)
@@ -67,7 +67,7 @@ RSpec.describe RubynCode::Skills::RegistryClient do
 
     it 'filters packs by query locally' do
       response = instance_double(Faraday::Response, body: response_body, status: 200, headers: { 'etag' => '"abc"' })
-      allow(connection).to receive(:get).with('/api/v1/skills/packs').and_return(response)
+      allow(connection).to receive(:get).with('/api/v1/skills/packs.json').and_return(response)
 
       results = client.search_packs('rails')
       expect(results[:data].size).to eq(1)
@@ -76,7 +76,7 @@ RSpec.describe RubynCode::Skills::RegistryClient do
 
     it 'searches in description' do
       response = instance_double(Faraday::Response, body: response_body, status: 200, headers: { 'etag' => '"abc"' })
-      allow(connection).to receive(:get).with('/api/v1/skills/packs').and_return(response)
+      allow(connection).to receive(:get).with('/api/v1/skills/packs.json').and_return(response)
 
       results = client.search_packs('patterns')
       expect(results[:data].size).to eq(1)
@@ -116,7 +116,7 @@ RSpec.describe RubynCode::Skills::RegistryClient do
       )
 
       allow(connection).to receive(:get)
-        .with('/api/v1/skills/packs/rails-testing').and_return(pack_response)
+        .with('/api/v1/skills/packs/rails-testing.json').and_return(pack_response)
       allow(connection).to receive(:get)
         .with('/api/v1/skills/packs/rails-testing/files/rspec.md')
         .and_return(file_response)
@@ -136,7 +136,7 @@ RSpec.describe RubynCode::Skills::RegistryClient do
         status: 200, headers: { 'etag' => '"def"' }
       )
       allow(connection).to receive(:get)
-        .with('/api/v1/skills/packs/empty-pack').and_return(pack_response)
+        .with('/api/v1/skills/packs/empty-pack.json').and_return(pack_response)
 
       result = client.fetch_pack('empty-pack')
       expect(result[:data][:name]).to eq('empty-pack')
@@ -153,7 +153,7 @@ RSpec.describe RubynCode::Skills::RegistryClient do
 
     it 'raises RegistryError on invalid JSON' do
       response = instance_double(Faraday::Response, body: 'not json', status: 200, headers: {})
-      allow(connection).to receive(:get).with('/api/v1/skills/packs/bad').and_return(response)
+      allow(connection).to receive(:get).with('/api/v1/skills/packs/bad.json').and_return(response)
 
       expect { client.fetch_pack('bad') }.to raise_error(
         RubynCode::Skills::RegistryError, /Invalid response/
