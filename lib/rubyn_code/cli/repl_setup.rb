@@ -139,6 +139,8 @@ module RubynCode
         dirs << project_skills if Dir.exist?(project_skills)
         user_skills = File.join(Config::Defaults::HOME_DIR, 'skills')
         dirs << user_skills if Dir.exist?(user_skills)
+        skill_packs = File.join(Config::Defaults::HOME_DIR, 'skill-packs')
+        dirs << skill_packs if Dir.exist?(skill_packs)
         dirs
       end
 

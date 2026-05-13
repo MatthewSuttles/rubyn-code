@@ -7,12 +7,15 @@ module RubynCode
     class Document
       FRONTMATTER_PATTERN = /\A---\s*\n(.+?\n)---\s*\n(.*)\z/m
 
-      attr_reader :name, :description, :tags, :body
+      attr_reader :name, :description, :tags, :triggers, :gems, :rails, :body
 
-      def initialize(name:, description:, tags:, body:)
+      def initialize(name:, description:, tags:, body:, triggers: [], gems: [], rails: nil) # rubocop:disable Metrics/ParameterLists -- frontmatter-driven, keyword-only is clearer than a metadata hash
         @name = name
         @description = description
         @tags = tags
+        @triggers = triggers
+        @gems = gems
+        @rails = rails
         @body = body
       end
 
@@ -28,6 +31,9 @@ module RubynCode
             name: frontmatter['name'].to_s,
             description: frontmatter['description'].to_s,
             tags: Array(frontmatter['tags']),
+            triggers: Array(frontmatter['triggers']).map(&:to_s),
+            gems: Array(frontmatter['gems']).map(&:to_s),
+            rails: frontmatter['rails']&.to_s,
             body: match[2].to_s.strip
           )
         end

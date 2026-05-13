@@ -156,4 +156,46 @@ RSpec.describe RubynCode::Skills::Catalog do
       expect(catalog.categories).not_to include('')
     end
   end
+
+  describe 'autoload metadata in index entries' do
+    let(:packs_dir) { File.join(tmpdir, 'skill-packs', 'hotwire') }
+
+    before do
+      FileUtils.mkdir_p(packs_dir)
+      File.write(File.join(packs_dir, 'turbo_drive.md'), <<~MD)
+        ---
+        name: turbo-drive
+        description: Turbo Drive navigation
+        triggers:
+          - turbo drive
+          - page navigation
+        gems:
+          - turbo-rails
+        rails: ">=7.0"
+        ---
+        Body.
+      MD
+    end
+
+    subject(:catalog) { described_class.new(tmpdir) }
+
+    it 'exposes triggers on the entry' do
+      entry = catalog.available.find { |e| e[:name] == 'turbo-drive' }
+      expect(entry[:triggers]).to eq(['turbo drive', 'page navigation'])
+    end
+
+    it 'exposes gems on the entry' do
+      entry = catalog.available.find { |e| e[:name] == 'turbo-drive' }
+      expect(entry[:gems]).to eq(['turbo-rails'])
+    end
+
+    it 'exposes the rails constraint on the entry' do
+      entry = catalog.available.find { |e| e[:name] == 'turbo-drive' }
+      expect(entry[:rails]).to eq('>=7.0')
+    end
+
+    it 'discovers skills nested under a skill-packs directory' do
+      expect(catalog.list).to include('turbo-drive')
+    end
+  end
 end

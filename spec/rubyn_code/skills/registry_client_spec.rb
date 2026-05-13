@@ -5,11 +5,16 @@ RSpec.describe RubynCode::Skills::RegistryClient do
 
   let(:connection) { instance_double(Faraday::Connection) }
 
-  before do
-    allow(Faraday).to receive(:new).and_return(connection)
+  # Stub Faraday for unit-style tests that drive the connection directly.
+  # The WebMock-based contexts (`User-Accept header`, `406 response handling`,
+  # `ETag caching`, `#fetch_suggestions`) need real Faraday and override this.
+  shared_context 'stubbed Faraday' do
+    before { allow(Faraday).to receive(:new).and_return(connection) }
   end
 
   describe '#initialize' do
+    include_context 'stubbed Faraday'
+
     it 'uses default base URL' do
       default_client = described_class.new
       expect(default_client.base_url).to eq('https://rubyn.ai')
@@ -27,6 +32,7 @@ RSpec.describe RubynCode::Skills::RegistryClient do
   end
 
   describe '#list_packs' do
+    include_context 'stubbed Faraday'
     let(:response_body) do
       {
         packs: [
@@ -56,6 +62,7 @@ RSpec.describe RubynCode::Skills::RegistryClient do
   end
 
   describe '#search_packs' do
+    include_context 'stubbed Faraday'
     let(:response_body) do
       {
         packs: [
@@ -93,6 +100,7 @@ RSpec.describe RubynCode::Skills::RegistryClient do
   end
 
   describe '#fetch_pack' do
+    include_context 'stubbed Faraday'
     let(:response_body) do
       {
         name: 'rails-testing',
@@ -179,7 +187,7 @@ RSpec.describe RubynCode::Skills::RegistryClient do
 
       result = client.fetch_pack('stripe')
 
-      expect(result[:name]).to eq('stripe')
+      expect(result[:data][:name]).to eq('stripe')
     end
   end
 
@@ -216,30 +224,39 @@ RSpec.describe RubynCode::Skills::RegistryClient do
 
       client.fetch_catalog(etag: nil)
 
-      expect(WebMock).to have_requested(:get, %r{test\.rubyn\.ai/api/v1/skills/packs})
-        .with(headers: { 'If-None-Match' => absent })
+      expect(WebMock).to have_requested(:get, %r{test\.rubyn\.ai/api/v1/skills/packs}) do |req|
+        !req.headers.key?('If-None-Match')
+      end
     end
   end
 
   describe '#fetch_suggestions' do
     it 'returns suggested packs based on detected gems' do
-      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/suggestions})
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/packs/suggest})
         .with(query: { gems: 'stripe,sidekiq' })
-        .to_return(status: 200, body: [
-          { 'name' => 'stripe', 'reason' => 'stripe gem detected' },
-          { 'name' => 'sidekiq', 'reason' => 'sidekiq gem detected' }
-        ].to_json, headers: { 'Content-Type' => 'application/json' })
+        .to_return(
+          status: 200,
+          body: { suggestions: [
+            { name: 'stripe', reason: 'stripe gem detected' },
+            { name: 'sidekiq', reason: 'sidekiq gem detected' }
+          ] }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
 
-      result = client.fetch_suggestions(['stripe', 'sidekiq'])
+      result = client.fetch_suggestions(%w[stripe sidekiq])
 
       expect(result.size).to eq(2)
-      expect(result.first['name']).to eq('stripe')
+      expect(result.first[:name]).to eq('stripe')
     end
 
     it 'returns empty array when no matching suggestions' do
-      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/suggestions})
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/packs/suggest})
         .with(query: { gems: 'unknown-gem' })
-        .to_return(status: 200, body: [].to_json, headers: { 'Content-Type' => 'application/json' })
+        .to_return(
+          status: 200,
+          body: { suggestions: [] }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
 
       result = client.fetch_suggestions(['unknown-gem'])
 
@@ -247,7 +264,7 @@ RSpec.describe RubynCode::Skills::RegistryClient do
     end
 
     it 'raises RegistryError on network failure' do
-      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/suggestions})
+      stub_request(:get, %r{test\.rubyn\.ai/api/v1/skills/packs/suggest})
         .to_raise(Faraday::ConnectionFailed.new('Connection refused'))
 
       expect { client.fetch_suggestions(['stripe']) }.to raise_error(RubynCode::Skills::RegistryError)

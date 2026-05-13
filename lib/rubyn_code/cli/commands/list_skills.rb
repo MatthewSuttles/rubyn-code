@@ -21,46 +21,69 @@ module RubynCode
 
         private
 
-        def list_installed(ctx) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength -- readable sequential display
+        def list_installed(ctx)
           catalog = ctx.skill_loader.catalog
           all_skills = catalog.available
-
-          # Partition into built-in vs community
-          community_dir = File.join(ctx.project_root, '.rubyn-code', 'skills')
-          global_dir = File.join(Config::Defaults::HOME_DIR, 'skills')
-
-          builtin = []
-          community = []
-
-          all_skills.each do |skill|
-            path = skill[:path].to_s
-            if path.start_with?(community_dir) || path.start_with?(global_dir)
-              community << skill
-            else
-              builtin << skill
-            end
-          end
+          buckets = partition_skills(all_skills, ctx)
 
           ctx.renderer.info("Loaded skills (#{all_skills.size} total)")
           puts
 
-          # Built-in
+          render_builtin(buckets[:builtin], catalog)
+          render_packs(buckets[:packs])
+          render_community(buckets[:community], buckets[:packs].any?)
+        end
+
+        def partition_skills(all_skills, ctx)
+          community_dir = File.join(ctx.project_root, '.rubyn-code', 'skills')
+          global_dir = File.join(Config::Defaults::HOME_DIR, 'skills')
+          pack_dir = File.join(Config::Defaults::HOME_DIR, 'skill-packs')
+
+          buckets = { builtin: [], community: [], packs: [] }
+          all_skills.each do |skill|
+            buckets[bucket_for(skill[:path].to_s, pack_dir, community_dir, global_dir)] << skill
+          end
+          buckets
+        end
+
+        def bucket_for(path, pack_dir, community_dir, global_dir)
+          return :packs if path.start_with?(pack_dir)
+          return :community if path.start_with?(community_dir) || path.start_with?(global_dir)
+
+          :builtin
+        end
+
+        def render_builtin(builtin, catalog)
           puts "  Built-in (#{builtin.size})"
-          builtin_categories = builtin.group_by { |s| category_from_path(s[:path], catalog.skills_dirs) }
-          builtin_categories.sort_by { |cat, _| cat }.each do |cat, skills|
+          builtin.group_by { |s| category_from_path(s[:path], catalog.skills_dirs) }
+                 .sort_by { |cat, _| cat }
+                 .each do |cat, skills|
             label = cat.empty? ? 'general' : cat
             puts "    #{label}: #{skills.map { |s| s[:name] }.join(', ')}"
           end
+        end
 
-          # Community packs
+        def render_packs(packs)
+          return if packs.empty?
+
+          puts
+          summary = packs.group_by { |s| pack_from_path(s[:path]) }
+                         .sort
+                         .map { |pack, skills| "#{pack} (#{skills.size})" }
+                         .join(', ')
+          puts "  Skill packs: #{summary}"
+        end
+
+        def render_community(community, packs_present)
           if community.any?
             puts
-            packs = community.group_by { |s| pack_from_path(s[:path]) }
-            pack_summary = packs.map { |pack, skills| "#{pack} (#{skills.size})" }.join(', ')
-            puts "  Community: #{pack_summary}"
-          else
+            summary = community.group_by { |s| pack_from_path(s[:path]) }
+                               .map { |pack, skills| "#{pack} (#{skills.size})" }
+                               .join(', ')
+            puts "  Community: #{summary}"
+          elsif !packs_present
             puts
-            puts '  Community: none installed'
+            puts '  Skill packs: none installed'
             puts '  Run /skills --available to browse, or /install-skills <name> to install.'
           end
         end
@@ -112,12 +135,13 @@ module RubynCode
         end
 
         def pack_from_path(path)
-          # Community skills are at .rubyn-code/skills/<pack>/<file>.md
+          # Pack-style layouts: .rubyn-code/skills/<pack>/<file>.md
+          # or .rubyn-code/skill-packs/<pack>/<file>.md
           parts = path.to_s.split('/')
-          skills_idx = parts.index('skills')
-          return 'unknown' unless skills_idx
+          idx = parts.rindex('skill-packs') || parts.rindex('skills')
+          return 'unknown' unless idx
 
-          parts[skills_idx + 1] || 'unknown'
+          parts[idx + 1] || 'unknown'
         end
       end
     end
