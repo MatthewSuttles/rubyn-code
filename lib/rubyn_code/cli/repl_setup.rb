@@ -43,19 +43,38 @@ module RubynCode
         @background_worker = Background::Worker.new(project_root: @project_root)
         @skill_loader = Skills::Loader.new(Skills::Catalog.new(skill_dirs))
         @skill_matcher = build_skill_matcher
+        @web_skill_autoload = build_web_skill_autoload
         @session_persistence = Memory::SessionPersistence.new(@db)
       end
 
       def build_skill_matcher
-        return nil unless Config::Settings.new.skills_autoload
+        return nil unless skills_autoload_enabled?
 
         Skills::Matcher.new(catalog: @skill_loader.catalog, project_root: @project_root)
+      end
+
+      def build_web_skill_autoload
+        return nil unless @skill_matcher && skills_autoload_enabled?
+
+        Skills::RegistryAutoload.new(
+          loader: @skill_loader,
+          matcher: @skill_matcher,
+          on_fetching: on_pack_fetching_callback
+        )
+      end
+
+      def skills_autoload_enabled?
+        Config::Settings.new.skills_autoload
       rescue Config::Settings::LoadError
-        Skills::Matcher.new(catalog: @skill_loader.catalog, project_root: @project_root)
+        true
       end
 
       def on_skills_autoloaded_callback
         ->(names) { @renderer.system_message("📚 Loaded: #{names.join(' · ')}") }
+      end
+
+      def on_pack_fetching_callback
+        ->(name) { @renderer.system_message("📥 Fetching skill pack '#{name}' from registry…") }
       end
 
       def setup_executor_callbacks!
@@ -122,6 +141,7 @@ module RubynCode
           on_text: ->(text) { handle_on_text(text) },
           on_skills_autoloaded: on_skills_autoloaded_callback,
           skill_loader: @skill_loader, skill_matcher: @skill_matcher,
+          web_skill_autoload: @web_skill_autoload,
           project_root: @project_root
         )
       end
