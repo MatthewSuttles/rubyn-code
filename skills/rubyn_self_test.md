@@ -115,102 +115,80 @@ Score: 18/22 (82%) — 4 failures
 - **glob**: Check that all 16 layer directories exist under `lib/rubyn_code/`. PASS if at least 14 found.
 - **read_file**: Read `lib/rubyn_code.rb` and verify it has modules for Agent, Tools, Context, Skills, Memory, Observability, Learning. PASS if all 7 found.
 
-### 15. Skill-Pack Autoload Pipeline
+### 15. Skill-Pack Autoload — Live Registry Roundtrip
 
-Exercises the trigger-based autoload end-to-end: frontmatter parsing, the `Matcher` matching/dedup/gem-gate algorithm, the loader's view of installed packs, and the live notification path.
+End-to-end exercise of the autoload pipeline against the real registry at `rubyn.ai`: fetch the catalog, install a pack the user does **not** already have, verify it works on disk + in the catalog + through the matcher, then remove it. The user's pre-existing installed packs are not touched.
 
-- **Loader scan path**: `grep` for `skill-packs` in `lib/rubyn_code/cli/repl_setup.rb`. PASS if at least 1 match (confirms `~/.rubyn-code/skill-packs/` is on the loader's search path).
+- **Live roundtrip**: `bash` with the script below. PASS if the final line is `ROUNDTRIP: PASS`. SKIP if the final line starts with `SKIP:` (means every registry pack is already installed locally — rare).
 
-- **Frontmatter parsing — triggers / gems / rails**: `bash`:
   ```bash
   bundle exec ruby -e '
     require_relative "lib/rubyn_code"
-    content = "---\nname: x\ntriggers:\n  - foo\ngems:\n  - bar\nrails: \">=7.0\"\n---\nbody"
-    doc = RubynCode::Skills::Document.parse(content)
-    puts [doc.triggers, doc.gems, doc.rails].inspect
-  '
-  ```
-  PASS if output is `[["foo"], ["bar"], ">=7.0"]`.
 
-- **Matcher — substring match (case-insensitive)**: `bash`:
-  ```bash
-  bundle exec ruby -e '
-    require_relative "lib/rubyn_code"
-    require "tmpdir"
-    Dir.mktmpdir do |dir|
-      File.write(File.join(dir, "s.md"), "---\nname: s\ntriggers:\n  - turbo drive\n---\nbody")
-      m = RubynCode::Skills::Matcher.new(catalog: RubynCode::Skills::Catalog.new(dir))
-      puts m.match("how do I use Turbo Drive").map { |h| h[:name] }.inspect
+    client = RubynCode::Skills::RegistryClient.new
+    pack_manager = RubynCode::Skills::PackManager.new
+
+    catalog_packs = client.fetch_catalog[:data] || []
+    abort "FAIL: empty registry catalog" if catalog_packs.empty?
+
+    already_installed = catalog_packs.map { |p| p[:name] || p["name"] }
+                                     .select { |n| pack_manager.installed?(n) }
+    target = catalog_packs.find { |p| !already_installed.include?(p[:name] || p["name"]) }
+    abort "SKIP: every registry pack is already installed" if target.nil?
+
+    name = target[:name] || target["name"]
+    puts "TEST PACK: #{name}"
+
+    success = false
+    begin
+      result = client.fetch_pack(name)
+      pack_manager.install(result[:data], etag: result[:etag])
+      raise "install did not create directory" unless pack_manager.installed?(name)
+      puts "STEP install: PASS"
+
+      catalog_obj = RubynCode::Skills::Catalog.new(
+        File.join(Dir.home, ".rubyn-code", "skill-packs")
+      )
+      skills = catalog_obj.available.select { |e| e[:path].include?("/#{name}/") }
+      raise "catalog sees no skills" if skills.empty?
+      raise "no skills have triggers" if skills.none? { |s| !s[:triggers].empty? }
+      puts "STEP catalog: PASS (#{skills.size} skills, #{skills.count { |s| !s[:triggers].empty? }} with triggers)"
+
+      sample = skills.find { |s| !s[:triggers].empty? }
+      matcher = RubynCode::Skills::Matcher.new(catalog: catalog_obj)
+      hits = matcher.match("question about #{sample[:triggers].first}")
+      raise "matcher did not hit on \"#{sample[:triggers].first}\"" if hits.none? { |h| h[:name] == sample[:name] }
+      puts "STEP matcher: PASS (hit \"#{sample[:name]}\" via \"#{sample[:triggers].first}\")"
+      success = true
+    ensure
+      pack_manager.remove(name)
+      if pack_manager.installed?(name)
+        puts "STEP cleanup: FAIL (pack still on disk)"
+      else
+        puts "STEP cleanup: PASS"
+      end
     end
+
+    puts(success ? "ROUNDTRIP: PASS" : "ROUNDTRIP: FAIL")
   '
   ```
-  PASS if output is `["s"]`.
 
-- **Matcher — per-session dedup**: `bash`:
-  ```bash
-  bundle exec ruby -e '
-    require_relative "lib/rubyn_code"
-    require "tmpdir"
-    Dir.mktmpdir do |dir|
-      File.write(File.join(dir, "s.md"), "---\nname: s\ntriggers:\n  - x\n---\nbody")
-      m = RubynCode::Skills::Matcher.new(catalog: RubynCode::Skills::Catalog.new(dir))
-      first = m.match("x please").size
-      second = m.match("x again").size
-      puts "#{first}/#{second}"
-    end
-  '
+  The script:
+  1. Fetches the registry catalog (proves the static API at `rubyn.ai/api/v1/skills/packs.json` is reachable).
+  2. Picks the first pack the user does **not** have installed, so we never touch their existing packs.
+  3. Installs the pack via `RegistryClient#fetch_pack` + `PackManager#install` — exactly the path the autoload pipeline uses.
+  4. Reads the disk back through a fresh `Skills::Catalog` and confirms the new skills are visible with parsed triggers.
+  5. Runs `Skills::Matcher#match` against a real trigger from one of the freshly-installed skills, confirming the matcher would have fired in a real session.
+  6. Removes the pack in an `ensure` block so a partial failure still leaves the user's system clean.
+
+  PASS criteria: `STEP install`, `STEP catalog`, `STEP matcher`, and `STEP cleanup` all `PASS`, with a final `ROUNDTRIP: PASS`.
+
+- **Live autoload notification (manual verification, not scored)**: This isn't a tool call — it's a hint to surface in the scorecard for the user. Tell them: after the self-test completes, send a follow-up prompt that includes a trigger word from any pack in the registry (e.g. `"explain turbo drive"`). The Rubyn renderer should print:
   ```
-  PASS if output is `1/0`.
-
-- **Matcher — gem gate blocks missing gems**: `bash`:
-  ```bash
-  bundle exec ruby -e '
-    require_relative "lib/rubyn_code"
-    require "tmpdir"
-    Dir.mktmpdir do |dir|
-      File.write(File.join(dir, "s.md"), "---\nname: s\ntriggers:\n  - x\ngems:\n  - devise\n---\nbody")
-      File.write(File.join(dir, "Gemfile"), "gem \"rails\"")
-      m = RubynCode::Skills::Matcher.new(catalog: RubynCode::Skills::Catalog.new(dir), project_root: dir)
-      puts m.match("x please").size
-    end
-  '
+  📥 Fetching skill pack 'hotwire' from registry…
+  📚 Loaded: turbo-drive
   ```
-  PASS if output is `0`.
-
-- **Matcher — gem gate allows present gems**: `bash`:
-  ```bash
-  bundle exec ruby -e '
-    require_relative "lib/rubyn_code"
-    require "tmpdir"
-    Dir.mktmpdir do |dir|
-      File.write(File.join(dir, "s.md"), "---\nname: s\ntriggers:\n  - x\ngems:\n  - devise\n---\nbody")
-      File.write(File.join(dir, "Gemfile"), "gem \"devise\"")
-      m = RubynCode::Skills::Matcher.new(catalog: RubynCode::Skills::Catalog.new(dir), project_root: dir)
-      puts m.match("x please").size
-    end
-  '
-  ```
-  PASS if output is `1`.
-
-- **Live installed packs — catalog parses their triggers**: `bash`:
-  ```bash
-  bundle exec ruby -e '
-    require_relative "lib/rubyn_code"
-    dir = File.join(Dir.home, ".rubyn-code", "skill-packs")
-    if !Dir.exist?(dir) || Dir.empty?(dir)
-      puts "SKIP"
-    else
-      entries = RubynCode::Skills::Catalog.new(dir).available
-      with_triggers = entries.count { |e| !e[:triggers].empty? }
-      puts "#{with_triggers}/#{entries.size}"
-    end
-  '
-  ```
-  PASS if output is `SKIP` (no packs installed), or `N/M` where `N > 0`.
-
-- **`load_skill` reaches an installed pack skill**: List installed packs with `bash` `ls ~/.rubyn-code/skill-packs 2>/dev/null`. If at least one pack directory is listed, pick any `*.md` file inside it, read its frontmatter `name:` value, then call `load_skill` with that name. PASS if the tool returns a non-empty `<skill name="…">…</skill>` block. SKIP if no packs are installed.
-
-- **Live autoload notification (manual verification, not scored)**: This isn't a tool call — it's a hint to surface in the scorecard for the user. Tell them: after the self-test completes, send a follow-up prompt that includes a trigger word from any installed pack (e.g. `"explain turbo drive"` if `hotwire` is installed). The Rubyn renderer should print a dim line like `📚 Loaded: turbo-drive` before the next response. Do **not** count this as PASS/FAIL — just mention it in the scorecard so the user can verify the renderer side themselves.
+  before the next response (the `📥` line appears only if the pack wasn't already installed). Do **not** count this as PASS/FAIL — just mention it in the scorecard so the user can verify the renderer side themselves.
 
 ## Scoring
 
