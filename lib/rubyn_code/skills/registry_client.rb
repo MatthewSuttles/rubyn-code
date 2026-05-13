@@ -97,8 +97,10 @@ module RubynCode
         data = validate_and_parse(response)
         validate_pack_response!(data, name)
 
-        # Fetch individual file contents
-        files = fetch_key(data, :files) || []
+        # Fetch individual file contents. Manifests may list files under
+        # :files (as { path: ... } hashes) or :skills (as filename strings).
+        files = fetch_key(data, :files) || fetch_key(data, :skills) || []
+        files = files.map { |f| f.is_a?(String) ? { path: f } : f }
         data[:files] = fetch_files_with_content(name, files)
 
         { data: data, etag: response.headers['etag'], not_modified: false }

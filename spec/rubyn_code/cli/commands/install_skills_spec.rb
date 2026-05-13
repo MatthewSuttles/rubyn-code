@@ -28,17 +28,18 @@ RSpec.describe RubynCode::CLI::Commands::InstallSkills do
 
     context 'with a pack name' do
       let(:pack_data) { { name: 'rails-testing', version: '1.0.0', files: [] } }
+      let(:fetch_result) { { data: pack_data, etag: '"abc"', not_modified: false } }
 
       before do
         allow(pack_manager).to receive(:installed?).with('rails-testing').and_return(false)
-        allow(registry).to receive(:fetch_pack).with('rails-testing').and_return(pack_data)
-        allow(pack_manager).to receive(:install).with(pack_data).and_return(pack_data)
+        allow(registry).to receive(:fetch_pack).with('rails-testing').and_return(fetch_result)
+        allow(pack_manager).to receive(:install).with(pack_data, etag: '"abc"').and_return(pack_data)
       end
 
       it 'fetches and installs the pack' do
         command.execute(['rails-testing'], ctx)
         expect(registry).to have_received(:fetch_pack).with('rails-testing')
-        expect(pack_manager).to have_received(:install).with(pack_data)
+        expect(pack_manager).to have_received(:install).with(pack_data, etag: '"abc"')
       end
 
       it 'shows success message' do
@@ -76,7 +77,10 @@ RSpec.describe RubynCode::CLI::Commands::InstallSkills do
     context 'with multiple pack names' do
       before do
         allow(pack_manager).to receive(:installed?).and_return(false)
-        allow(registry).to receive(:fetch_pack).and_return({ name: 'a', files: [] }, { name: 'b', files: [] })
+        allow(registry).to receive(:fetch_pack).and_return(
+          { data: { name: 'a', files: [] }, etag: nil, not_modified: false },
+          { data: { name: 'b', files: [] }, etag: nil, not_modified: false }
+        )
         allow(pack_manager).to receive(:install).and_return({})
       end
 
