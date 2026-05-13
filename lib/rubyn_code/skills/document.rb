@@ -9,7 +9,7 @@ module RubynCode
 
       attr_reader :name, :description, :tags, :triggers, :gems, :rails, :body
 
-      def initialize(name:, description:, tags:, body:, triggers: [], gems: [], rails: nil)
+      def initialize(name:, description:, tags:, body:, triggers: [], gems: [], rails: nil) # rubocop:disable Metrics/ParameterLists -- frontmatter-driven, keyword-only is clearer than a metadata hash
         @name = name
         @description = description
         @tags = tags

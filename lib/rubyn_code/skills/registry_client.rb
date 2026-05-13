@@ -163,7 +163,7 @@ module RubynCode
         content_type = response.headers['content-type'].to_s
         if !content_type.include?('json') && body.start_with?('<')
           raise RegistryError,
-                "Registry endpoint returned HTML instead of JSON " \
+                'Registry endpoint returned HTML instead of JSON ' \
                 "(content-type: #{content_type}). The skill packs API may not be available at #{base_url}."
         end
 
