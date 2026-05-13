@@ -59,6 +59,7 @@ module RubynCode
         inject_skill_listing unless @skills_injected
         @decision_compactor&.detect_topic_switch(user_input)
         @skill_ttl&.tick!
+        autoload_triggered_skills(user_input)
         @conversation.add_user_message(user_input)
         reset_iteration_state
 
@@ -93,6 +94,7 @@ module RubynCode
         @background_manager = opts[:background_manager]
         @stall_detector     = opts.fetch(:stall_detector, LoopDetector.new)
         @skill_loader       = opts[:skill_loader]
+        @skill_matcher      = opts[:skill_matcher]
         @project_root       = opts[:project_root]
         @tool_wrapper       = opts[:tool_wrapper]
         @decision_compactor = build_decision_compactor
@@ -134,9 +136,10 @@ module RubynCode
       end
 
       def assign_callbacks(opts)
-        @on_tool_call   = opts[:on_tool_call]
-        @on_tool_result = opts[:on_tool_result]
-        @on_text        = opts[:on_text]
+        @on_tool_call          = opts[:on_tool_call]
+        @on_tool_result        = opts[:on_tool_result]
+        @on_text               = opts[:on_text]
+        @on_skills_autoloaded  = opts[:on_skills_autoloaded]
         @skills_injected = false
       end
 

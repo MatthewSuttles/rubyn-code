@@ -137,9 +137,14 @@ module RubynCode
     autoload :Loader, 'rubyn_code/skills/loader'
     autoload :Catalog, 'rubyn_code/skills/catalog'
     autoload :Document, 'rubyn_code/skills/document'
+    autoload :Matcher, 'rubyn_code/skills/matcher'
     autoload :TtlManager, 'rubyn_code/skills/ttl_manager'
     autoload :RegistryClient, 'rubyn_code/skills/registry_client'
     autoload :PackManager, 'rubyn_code/skills/pack_manager'
+    autoload :PackInstaller, 'rubyn_code/skills/pack_installer'
+    autoload :PackContext, 'rubyn_code/skills/pack_context'
+    autoload :GemfileParser, 'rubyn_code/skills/gemfile_parser'
+    autoload :AutoSuggest, 'rubyn_code/skills/auto_suggest'
     autoload :RegistryError, 'rubyn_code/skills/registry_client'
   end
 

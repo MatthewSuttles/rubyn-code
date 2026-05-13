@@ -42,7 +42,20 @@ module RubynCode
         @budget_enforcer = Observability::BudgetEnforcer.new(@db, session_id: current_session_id)
         @background_worker = Background::Worker.new(project_root: @project_root)
         @skill_loader = Skills::Loader.new(Skills::Catalog.new(skill_dirs))
+        @skill_matcher = build_skill_matcher
         @session_persistence = Memory::SessionPersistence.new(@db)
+      end
+
+      def build_skill_matcher
+        return nil unless Config::Settings.new.skills_autoload
+
+        Skills::Matcher.new(catalog: @skill_loader.catalog, project_root: @project_root)
+      rescue Config::Settings::LoadError
+        Skills::Matcher.new(catalog: @skill_loader.catalog, project_root: @project_root)
+      end
+
+      def on_skills_autoloaded_callback
+        ->(names) { @renderer.system_message("📚 Loaded: #{names.join(' · ')}") }
       end
 
       def setup_executor_callbacks!
@@ -107,7 +120,9 @@ module RubynCode
           on_tool_call: ->(name, params) { handle_on_tool_call(name, params) },
           on_tool_result: ->(name, result, _is_error = false) { handle_on_tool_result(name, result) },
           on_text: ->(text) { handle_on_text(text) },
-          skill_loader: @skill_loader, project_root: @project_root
+          on_skills_autoloaded: on_skills_autoloaded_callback,
+          skill_loader: @skill_loader, skill_matcher: @skill_matcher,
+          project_root: @project_root
         )
       end
 
