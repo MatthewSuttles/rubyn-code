@@ -123,6 +123,39 @@ module RubynCode
         @skills_injected = true
       end
 
+      # Match the current user message against every skill's :triggers and
+      # inject the body of any new match into the conversation so the LLM sees
+      # it on the next call. Per-session dedup lives in the Matcher.
+      def autoload_triggered_skills(user_input)
+        return unless @skill_matcher && @skill_loader
+
+        matches = @skill_matcher.match(user_input)
+        return if matches.empty?
+
+        names = matches.map { |m| m[:name] }
+        bodies = names.filter_map do |name|
+          @skill_loader.load(name)
+        rescue StandardError => e
+          RubynCode::Debug.warn("Failed to autoload skill '#{name}': #{e.message}")
+          nil
+        end
+        return if bodies.empty?
+
+        inject_autoloaded_bodies(bodies)
+        @on_skills_autoloaded&.call(names)
+      end
+
+      def inject_autoloaded_bodies(bodies)
+        @conversation.add_user_message(
+          '[system] The following skills are auto-loaded based on the next user ' \
+          "message's triggers. Use them as context. Do not mention this message " \
+          "to the user.\n\n#{bodies.join("\n\n")}"
+        )
+        @conversation.add_assistant_message(
+          [{ type: 'text', text: 'Understood.' }]
+        )
+      end
+
       def append_deferred_tools(parts)
         deferred = deferred_tool_names
         return if deferred.empty?

@@ -16,6 +16,7 @@ module RubynCode
         session_budget_usd daily_budget_usd
         oauth_client_id oauth_redirect_uri oauth_authorize_url
         oauth_token_url oauth_scopes
+        skills_autoload
       ].freeze
 
       DEFAULT_MAP = {
@@ -35,7 +36,8 @@ module RubynCode
         oauth_redirect_uri: Defaults::OAUTH_REDIRECT_URI,
         oauth_authorize_url: Defaults::OAUTH_AUTHORIZE_URL,
         oauth_token_url: Defaults::OAUTH_TOKEN_URL,
-        oauth_scopes: Defaults::OAUTH_SCOPES
+        oauth_scopes: Defaults::OAUTH_SCOPES,
+        skills_autoload: Defaults::SKILLS_AUTOLOAD
       }.freeze
 
       attr_reader :config_path, :data

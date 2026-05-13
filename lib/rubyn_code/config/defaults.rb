@@ -31,6 +31,8 @@ module RubynCode
       POLL_INTERVAL = 5
       IDLE_TIMEOUT = 60
 
+      SKILLS_AUTOLOAD = true
+
       SESSION_BUDGET_USD = 5.00
       DAILY_BUDGET_USD = 10.00
 

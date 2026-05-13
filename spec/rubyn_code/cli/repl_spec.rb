@@ -75,11 +75,13 @@ RSpec.describe RubynCode::CLI::REPL do
     )
 
     # Skills — touches filesystem
-    allow(RubynCode::Skills::Catalog).to receive(:new).and_return(
-      instance_double(RubynCode::Skills::Catalog)
-    )
+    catalog_double = instance_double(RubynCode::Skills::Catalog)
+    allow(RubynCode::Skills::Catalog).to receive(:new).and_return(catalog_double)
     allow(RubynCode::Skills::Loader).to receive(:new).and_return(
-      instance_double(RubynCode::Skills::Loader)
+      instance_double(RubynCode::Skills::Loader, catalog: catalog_double)
+    )
+    allow(RubynCode::Skills::Matcher).to receive(:new).and_return(
+      instance_double(RubynCode::Skills::Matcher)
     )
 
     # AutoSuggest — stub to prevent real HTTP calls during REPL startup
