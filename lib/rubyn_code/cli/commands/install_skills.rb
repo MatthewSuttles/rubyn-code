@@ -30,8 +30,8 @@ module RubynCode
           end
 
           ctx.renderer.info("Fetching pack '#{name}' from registry...")
-          pack_data = registry.fetch_pack(name)
-          pack_manager.install(pack_data)
+          result = registry.fetch_pack(name)
+          pack_manager.install(result[:data], etag: result[:etag])
           ctx.renderer.info("Installed skill pack '#{name}' successfully.")
         rescue RubynCode::Skills::RegistryError => e
           ctx.renderer.error("Failed to install '#{name}': #{e.message}")
