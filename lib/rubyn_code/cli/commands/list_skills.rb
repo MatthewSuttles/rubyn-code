@@ -25,16 +25,19 @@ module RubynCode
           catalog = ctx.skill_loader.catalog
           all_skills = catalog.available
 
-          # Partition into built-in vs community
           community_dir = File.join(ctx.project_root, '.rubyn-code', 'skills')
           global_dir = File.join(Config::Defaults::HOME_DIR, 'skills')
+          pack_dir = File.join(Config::Defaults::HOME_DIR, 'skill-packs')
 
           builtin = []
           community = []
+          packs = []
 
           all_skills.each do |skill|
             path = skill[:path].to_s
-            if path.start_with?(community_dir) || path.start_with?(global_dir)
+            if path.start_with?(pack_dir)
+              packs << skill
+            elsif path.start_with?(community_dir) || path.start_with?(global_dir)
               community << skill
             else
               builtin << skill
@@ -44,7 +47,6 @@ module RubynCode
           ctx.renderer.info("Loaded skills (#{all_skills.size} total)")
           puts
 
-          # Built-in
           puts "  Built-in (#{builtin.size})"
           builtin_categories = builtin.group_by { |s| category_from_path(s[:path], catalog.skills_dirs) }
           builtin_categories.sort_by { |cat, _| cat }.each do |cat, skills|
@@ -52,15 +54,21 @@ module RubynCode
             puts "    #{label}: #{skills.map { |s| s[:name] }.join(', ')}"
           end
 
-          # Community packs
+          if packs.any?
+            puts
+            grouped = packs.group_by { |s| pack_from_path(s[:path]) }
+            summary = grouped.sort.map { |pack, skills| "#{pack} (#{skills.size})" }.join(', ')
+            puts "  Skill packs: #{summary}"
+          end
+
           if community.any?
             puts
-            packs = community.group_by { |s| pack_from_path(s[:path]) }
-            pack_summary = packs.map { |pack, skills| "#{pack} (#{skills.size})" }.join(', ')
-            puts "  Community: #{pack_summary}"
-          else
+            grouped = community.group_by { |s| pack_from_path(s[:path]) }
+            summary = grouped.map { |pack, skills| "#{pack} (#{skills.size})" }.join(', ')
+            puts "  Community: #{summary}"
+          elsif packs.empty?
             puts
-            puts '  Community: none installed'
+            puts '  Skill packs: none installed'
             puts '  Run /skills --available to browse, or /install-skills <name> to install.'
           end
         end
@@ -112,12 +120,13 @@ module RubynCode
         end
 
         def pack_from_path(path)
-          # Community skills are at .rubyn-code/skills/<pack>/<file>.md
+          # Pack-style layouts: .rubyn-code/skills/<pack>/<file>.md
+          # or .rubyn-code/skill-packs/<pack>/<file>.md
           parts = path.to_s.split('/')
-          skills_idx = parts.index('skills')
-          return 'unknown' unless skills_idx
+          idx = parts.rindex('skill-packs') || parts.rindex('skills')
+          return 'unknown' unless idx
 
-          parts[skills_idx + 1] || 'unknown'
+          parts[idx + 1] || 'unknown'
         end
       end
     end

@@ -36,7 +36,8 @@ module RubynCode
         skills_dirs = [
           File.expand_path('../../../skills', __dir__), # bundled gem skills
           File.join(project_root, '.rubyn-code', 'skills'), # project skills
-          File.join(Dir.home, '.rubyn-code', 'skills') # global user skills
+          File.join(Dir.home, '.rubyn-code', 'skills'), # global user skills
+          File.join(Dir.home, '.rubyn-code', 'skill-packs') # registry-installed packs
         ]
         catalog = Skills::Catalog.new(skills_dirs.select { |d| Dir.exist?(d) })
         Skills::Loader.new(catalog)

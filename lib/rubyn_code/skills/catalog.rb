@@ -103,6 +103,9 @@ module RubynCode
           name: name,
           description: doc.description,
           tags: doc.tags,
+          triggers: doc.triggers,
+          gems: doc.gems,
+          rails: doc.rails,
           path: File.expand_path(path)
         }
       rescue StandardError
