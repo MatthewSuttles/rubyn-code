@@ -162,6 +162,12 @@ module RubynCode
     autoload :Models, 'rubyn_code/tasks/models'
   end
 
+  # Layer 7b: Megaplan
+  module Megaplan
+    autoload :PlanProposer, 'rubyn_code/megaplan/plan_proposer'
+    autoload :CiRecovery, 'rubyn_code/megaplan/ci_recovery'
+  end
+
   # Layer 8: Background
   module Background
     autoload :Worker, 'rubyn_code/background/worker'
