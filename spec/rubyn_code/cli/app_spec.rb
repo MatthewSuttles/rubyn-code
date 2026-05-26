@@ -44,6 +44,21 @@ RSpec.describe RubynCode::CLI::App do
       expect(options[:command]).to eq(:repl)
     end
 
+    it "captures --dir as workspace_dir so IDE mode can adopt the workspace" do
+      app = described_class.new(["--ide", "--dir", "/Users/me/my-app"])
+      options = app.instance_variable_get(:@options)
+      expect(options[:command]).to eq(:ide)
+      expect(options[:workspace_dir]).to eq("/Users/me/my-app")
+    end
+
+    it "passes --dir through to IDE::Server.new" do
+      server_double = instance_double(RubynCode::IDE::Server, run: nil)
+      allow(RubynCode::IDE::Server).to receive(:new).and_return(server_double)
+      described_class.new(["--ide", "--dir", "/tmp/x"]).run
+      expect(RubynCode::IDE::Server)
+        .to have_received(:new).with(hash_including(workspace_path: "/tmp/x"))
+    end
+
     context 'daemon subcommand' do
       it 'parses the daemon command' do
         app = described_class.new(['daemon'])

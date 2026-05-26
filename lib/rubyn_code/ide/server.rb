@@ -21,7 +21,7 @@ module RubynCode
                     :permission_mode
       attr_reader :ide_client
 
-      def initialize(permission_mode: :default, yolo: false)
+      def initialize(permission_mode: :default, yolo: false, workspace_path: nil)
         @permission_mode = yolo ? :bypass : permission_mode.to_sym
         @running = false
         @write_mutex = Mutex.new
@@ -34,7 +34,25 @@ module RubynCode
         @tool_output_adapter = nil
         @ide_client = Client.new(self)
 
+        apply_initial_workspace(workspace_path)
+
         Handlers.register_all(self)
+      end
+
+      # Adopt a workspace path supplied on the command line (--dir). Done
+      # before the `initialize` JSON-RPC handshake so tools that resolve
+      # their project_root at construction time don't fall back to Dir.pwd
+      # — which in some launch contexts (Docker, double-clicked VS Code on
+      # macOS) is something useless like `/app` or `/`.
+      def apply_initial_workspace(path)
+        return unless path && !path.empty?
+
+        if Dir.exist?(path)
+          Dir.chdir(path)
+          @workspace_path = path
+        else
+          warn "[IDE::Server] --dir path does not exist, ignoring: #{path}"
+        end
       end
 
       # Backward-compatible reader: true when permission_mode is :bypass.

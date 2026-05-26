@@ -64,7 +64,7 @@ module RubynCode
         '--auth' => :auth, '--setup' => :setup
       }.freeze
       BOOLEAN_FLAGS = { '--yolo' => :yolo, '--debug' => :debug, '--skip-setup' => :skip_setup, '--ide' => :ide }.freeze
-      VALUE_FLAGS = { '--permission-mode' => :permission_mode }.freeze
+      VALUE_FLAGS = { '--permission-mode' => :permission_mode, '--dir' => :workspace_dir }.freeze
       DAEMON_INT_FLAGS = { '--max-runs' => :max_runs, '--idle-timeout' => :idle_timeout,
                            '--poll-interval' => :poll_interval }.freeze
       DAEMON_STR_FLAGS = { '--name' => :agent_name, '--role' => :role }.freeze
@@ -209,7 +209,7 @@ module RubynCode
 
       def run_ide
         mode = resolve_permission_mode
-        IDE::Server.new(permission_mode: mode).run
+        IDE::Server.new(permission_mode: mode, workspace_path: @options[:workspace_dir]).run
       end
 
       def run_daemon
