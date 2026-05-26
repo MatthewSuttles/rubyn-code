@@ -14,6 +14,8 @@ require_relative 'handlers/session_reset_handler'
 require_relative 'handlers/session_list_handler'
 require_relative 'handlers/session_resume_handler'
 require_relative 'handlers/session_fork_handler'
+require_relative 'handlers/plan_propose_handler'
+require_relative 'handlers/recover_ci_handler'
 
 module RubynCode
   module IDE
@@ -33,7 +35,9 @@ module RubynCode
         'session/reset' => SessionResetHandler,
         'session/list' => SessionListHandler,
         'session/resume' => SessionResumeHandler,
-        'session/fork' => SessionForkHandler
+        'session/fork' => SessionForkHandler,
+        'plan/propose' => PlanProposeHandler,
+        'recover_ci' => RecoverCiHandler
       }.freeze
 
       # Short name => method name mapping (for handler_instance lookups).
@@ -51,7 +55,9 @@ module RubynCode
         session_reset: 'session/reset',
         session_list: 'session/list',
         session_resume: 'session/resume',
-        session_fork: 'session/fork'
+        session_fork: 'session/fork',
+        plan_propose: 'plan/propose',
+        recover_ci: 'recover_ci'
       }.freeze
 
       # Register all handlers on the given server instance.

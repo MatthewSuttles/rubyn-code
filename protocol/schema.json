@@ -152,6 +152,93 @@
       "required": ["cancelled"]
     },
 
+    "plan_propose_params": {
+      "type": "object",
+      "properties": {
+        "feature": {
+          "type": "string",
+          "description": "Free-form feature description for the megaplan to decompose."
+        }
+      },
+      "required": ["feature"]
+    },
+
+    "plan_phase_payload": {
+      "type": "object",
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "slug": { "type": "string" },
+        "name": { "type": "string" },
+        "summary": { "type": "string" },
+        "requirements_md": { "type": "string" },
+        "design_md": { "type": "string" },
+        "tasks_md": { "type": "string" }
+      },
+      "required": ["number", "name", "summary", "requirements_md", "design_md", "tasks_md"]
+    },
+
+    "plan_propose_result": {
+      "type": "object",
+      "properties": {
+        "slug": { "type": "string" },
+        "feature": { "type": "string" },
+        "phases": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/plan_phase_payload" }
+        }
+      },
+      "required": ["slug", "feature", "phases"]
+    },
+
+    "recover_ci_params": {
+      "type": "object",
+      "properties": {
+        "planId": { "type": "string" },
+        "phaseNumber": { "type": "integer", "minimum": 1 },
+        "branch": { "type": "string" },
+        "prNumber": { "type": "integer", "minimum": 1 },
+        "failingCheckName": { "type": "string" },
+        "fullLog": { "type": "string" },
+        "trimmedLog": { "type": "string" },
+        "commitSha": { "type": "string" },
+        "attemptNumber": { "type": "integer", "minimum": 1 },
+        "maxAttempts": { "type": "integer", "minimum": 1 },
+        "phase": { "$ref": "#/$defs/plan_phase_payload" },
+        "sessionId": { "type": "string" }
+      },
+      "required": [
+        "planId", "phaseNumber", "branch", "prNumber",
+        "trimmedLog", "attemptNumber", "maxAttempts"
+      ]
+    },
+
+    "recover_ci_result": {
+      "type": "object",
+      "properties": {
+        "accepted": { "type": "boolean" },
+        "sessionId": { "type": "string" }
+      },
+      "required": ["accepted"]
+    },
+
+    "recovery_outcome_params": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "planId": { "type": "string" },
+        "phaseNumber": { "type": "integer", "minimum": 1 },
+        "kind": {
+          "type": "string",
+          "enum": ["fixed", "no_fix", "errored"]
+        },
+        "commitSha": { "type": "string" },
+        "summary": { "type": "string" }
+      },
+      "required": ["planId", "phaseNumber", "kind"]
+    },
+
     "review_params": {
       "type": "object",
       "properties": {
@@ -650,7 +737,9 @@
             "session/reset":   { "$ref": "#/$defs/_method_meta_session_reset" },
             "session/list":    { "$ref": "#/$defs/_method_meta_session_list" },
             "session/resume":  { "$ref": "#/$defs/_method_meta_session_resume" },
-            "session/fork":    { "$ref": "#/$defs/_method_meta_session_fork" }
+            "session/fork":    { "$ref": "#/$defs/_method_meta_session_fork" },
+            "plan/propose":    { "$ref": "#/$defs/_method_meta_plan_propose" },
+            "recover_ci":      { "$ref": "#/$defs/_method_meta_recover_ci" }
           }
         },
         "server_requests": {
@@ -679,7 +768,8 @@
             "file/create":      { "$ref": "#/$defs/_notif_meta_file_create" },
             "review/finding":   { "$ref": "#/$defs/_notif_meta_review_finding" },
             "session/cost":     { "$ref": "#/$defs/_notif_meta_session_cost" },
-            "config/changed":   { "$ref": "#/$defs/_notif_meta_config_changed" }
+            "config/changed":   { "$ref": "#/$defs/_notif_meta_config_changed" },
+            "recovery/outcome": { "$ref": "#/$defs/_notif_meta_recovery_outcome" }
           }
         }
       }
@@ -699,6 +789,8 @@
     "_method_meta_session_list":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/session_list_params" },      "result": { "$ref": "#/$defs/session_list_result" } } },
     "_method_meta_session_resume":    { "type": "object", "properties": { "params": { "$ref": "#/$defs/session_resume_params" },    "result": { "$ref": "#/$defs/session_resume_result" } } },
     "_method_meta_session_fork":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/session_fork_params" },      "result": { "$ref": "#/$defs/session_fork_result" } } },
+    "_method_meta_plan_propose":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/plan_propose_params" },      "result": { "$ref": "#/$defs/plan_propose_result" } } },
+    "_method_meta_recover_ci":        { "type": "object", "properties": { "params": { "$ref": "#/$defs/recover_ci_params" },        "result": { "$ref": "#/$defs/recover_ci_result" } } },
 
     "_method_meta_ide_open_diff":            { "type": "object", "properties": { "params": { "$ref": "#/$defs/ide_open_diff_params" },            "result": { "$ref": "#/$defs/ide_open_diff_result" } } },
     "_method_meta_ide_read_selection":        { "type": "object", "properties": { "result": { "$ref": "#/$defs/ide_read_selection_result" } } },
@@ -717,6 +809,7 @@
     "_notif_meta_file_create":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/file_create_params" } } },
     "_notif_meta_review_finding":   { "type": "object", "properties": { "params": { "$ref": "#/$defs/review_finding_params" } } },
     "_notif_meta_session_cost":     { "type": "object", "properties": { "params": { "$ref": "#/$defs/session_cost_params" } } },
-    "_notif_meta_config_changed":   { "type": "object", "properties": { "params": { "$ref": "#/$defs/config_changed_params" } } }
+    "_notif_meta_config_changed":   { "type": "object", "properties": { "params": { "$ref": "#/$defs/config_changed_params" } } },
+    "_notif_meta_recovery_outcome": { "type": "object", "properties": { "params": { "$ref": "#/$defs/recovery_outcome_params" } } }
   }
 }
