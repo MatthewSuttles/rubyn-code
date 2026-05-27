@@ -12,11 +12,13 @@ module RubynCode
 
         def initialize(server, factory: nil)
           @server = server
-          @factory = factory || -> { Megaplan::InterviewSession.new }
+          @factory = factory || ->(workspace_path:) {
+            Megaplan::InterviewSession.new(workspace_path: workspace_path)
+          }
         end
 
         def call(_params)
-          session = @factory.call
+          session = @factory.call(workspace_path: @server.workspace_path || Dir.pwd)
           @server.register_interview_session(session)
           outcome = session.start
           emit_outcome(session, outcome)

@@ -3,15 +3,24 @@
 require 'json'
 require 'securerandom'
 
+# Eager-load so LLM::TextBlock / LLM::ToolUseBlock constants resolve at
+# class definition time — we reference them directly in `assistant_turn_blocks`
+# before any MessageBuilder call has had a chance to trigger autoload.
+require_relative '../llm/message_builder'
+
 module RubynCode
   module Megaplan
     # Drives a multi-turn LLM conversation that gathers enough context to
-    # produce a megaplan. Each turn the LLM emits one of two JSON shapes:
+    # produce a megaplan. The model has a small whitelist of READ-ONLY
+    # tools (read_file, grep, glob, git_status, git_diff, git_log) so it
+    # can inspect the codebase before asking sharper questions — but it
+    # cannot edit, run shell mutations, or call any side-effecting tool.
+    #
+    # Each interview turn ends in one of two JSON shapes:
     #
     #   { "question": { "text": "...", "options": ["a", "b"] | null } }
     #   { "plan": { "slug": ..., "feature": ..., "phases": [...] } }
     #
-    # The session ends when the LLM emits a plan or the caller cancels.
     # Validation of the plan payload is delegated to PlanProposer's
     # existing rules so both /megaplan paths stay consistent.
     class InterviewSession
@@ -22,14 +31,44 @@ module RubynCode
         def open? = options.nil? || options.empty?
       end
 
-      DEFAULT_INTERVIEW_PROMPT = <<~PROMPT.freeze
-        You are a senior Ruby/Rails architect interviewing a developer to plan a
-        multi-phase feature delivery (a "megaplan"). Your job is to ask sharp,
-        one-at-a-time questions until you have enough to produce a vertical-slice
-        plan, then output the plan.
+      SKILL_PATH = File.expand_path('megaplan_skill.md', __dir__)
 
-        On EVERY turn, respond with a single JSON object — no markdown fences,
-        no commentary — in exactly one of these two shapes:
+      # Whitelist of read-only tools the interviewer may call. Picked from
+      # the existing Tools::Registry by name. Anything that writes, runs
+      # shell mutations, or spawns sub-agents is intentionally excluded.
+      INTERVIEW_TOOLS = %w[
+        read_file
+        glob
+        grep
+        git_status
+        git_diff
+        git_log
+      ].freeze
+
+      # Safety cap on the interview's per-turn tool loop. A well-behaved
+      # interviewer should read at most a handful of files before asking
+      # its next question; this stops a runaway model from stalling the
+      # session indefinitely. Per-turn, not per-session.
+      MAX_TOOL_TURNS = 10
+
+      # Strict output contract bolted on top of the megaplan skill body.
+      # The skill teaches *what* a megaplan is and *how* to interview; this
+      # contract teaches the LLM the wire format the gem expects on every
+      # turn AND that its tool palette is read-only.
+      JSON_OUTPUT_CONTRACT = <<~CONTRACT.freeze
+        # Output contract (overrides any other formatting instinct)
+
+        You are an interviewer, not a coding agent. You have a READ-ONLY
+        tool palette: `read_file`, `glob`, `grep`, `git_status`, `git_diff`,
+        `git_log`. Use them sparingly — only when looking at the code would
+        let you ask a SHARPER question (e.g. confirming a column already
+        exists before asking about it). You must NOT edit, write, run
+        shell mutations, or call any other tool. There are no other tools
+        available.
+
+        After any tool use, your next message must be a single JSON object
+        — no markdown fences, no prose before or after — in one of these
+        two shapes:
 
           { "question": { "text": "<one focused question>", "options": ["a", "b", "c"] | null } }
 
@@ -44,29 +83,35 @@ module RubynCode
           - Ask one question at a time. Never bundle multiple.
           - Prefer numbered options (3-5 choices) when there's an obvious option set.
           - Use null `options` only for genuinely open questions (end-state, constraints prose).
-          - Lead with the goal in user-facing terms, then constraints, then existing
-            assets, then ordering, then test strategy, then per-phase done criteria.
-          - Skip topics the user has already covered.
+          - Walk the megaplan-skill agenda (goal → constraints → assets → ordering
+            → external deps → destructive ops → tests → done-per-phase). Skip
+            topics already obvious from context — including anything you've
+            confirmed via a read-only tool.
+          - Stop interviewing when you're 95% sure of the shape; emit the plan.
 
         Plan rules:
           - 1 to 12 phases. Each phase is a vertical slice that ships independently.
           - Trunk works at every phase boundary.
           - tasks_md uses `[ ]` checkboxes; requirements_md uses EARS-style SHALL
             statements when phrasing acceptance criteria.
-          - Emit the plan when (and only when) you have a clear vertical-slice
-            breakdown. Don't pad with filler questions.
 
-        Output ONLY the JSON object. No prefatory text. No trailing commentary.
-      PROMPT
+        When you emit your final answer for a turn (a question or a plan),
+        produce ONLY the JSON object. No prefatory text. No trailing
+        commentary. Never produce free-form coding-agent output.
+      CONTRACT
+
+      DEFAULT_INTERVIEW_PROMPT = "#{File.read(SKILL_PATH)}\n\n#{JSON_OUTPUT_CONTRACT}".freeze
 
       attr_reader :session_id
 
-      def initialize(llm_client: nil, system_prompt: nil)
+      def initialize(llm_client: nil, system_prompt: nil, workspace_path: nil, executor: nil)
         @llm_client = llm_client || LLM::Client.new
         @system_prompt = system_prompt || DEFAULT_INTERVIEW_PROMPT
         @session_id = SecureRandom.uuid
         @history = []
         @last_question = nil
+        @workspace_path = workspace_path || Dir.pwd
+        @executor = executor || Tools::Executor.new(project_root: @workspace_path)
       end
 
       # Returns a Question to ask the user, or a Hash (validated plan payload)
@@ -90,10 +135,64 @@ module RubynCode
 
       def ask_llm(prompt)
         @history << { role: 'user', content: prompt } if @history.empty? || @history.last[:content] != prompt
-        response = @llm_client.chat(messages: @history, system: @system_prompt)
-        text = extract_text(response)
-        @history << { role: 'assistant', content: text }
-        parse_outcome(text)
+
+        MAX_TOOL_TURNS.times do
+          response = @llm_client.chat(
+            messages: @history,
+            system: @system_prompt,
+            tools: interview_tool_definitions
+          )
+
+          tool_calls = response.respond_to?(:tool_calls) ? response.tool_calls : []
+          if tool_calls.any?
+            @history << assistant_turn_blocks(response)
+            @history << tool_results_turn(tool_calls)
+            next
+          end
+
+          text = extract_text(response)
+          @history << { role: 'assistant', content: text }
+          return parse_outcome(text)
+        end
+
+        raise MalformedResponseError,
+              "Interview tool loop exceeded #{MAX_TOOL_TURNS} turns without producing a question or plan"
+      end
+
+      def interview_tool_definitions
+        @executor.tool_definitions.select do |defn|
+          INTERVIEW_TOOLS.include?(defn[:name].to_s)
+        end
+      end
+
+      def assistant_turn_blocks(response)
+        blocks = response.content.filter_map do |block|
+          case block
+          when LLM::TextBlock
+            { type: 'text', text: block.text }
+          when LLM::ToolUseBlock
+            { type: 'tool_use', id: block.id, name: block.name, input: block.input }
+          end
+        end
+        { role: 'assistant', content: blocks }
+      end
+
+      def tool_results_turn(tool_calls)
+        content = tool_calls.map do |call|
+          result = if INTERVIEW_TOOLS.include?(call.name.to_s)
+                     @executor.execute(call.name, stringify_keys(call.input))
+                   else
+                     "Tool '#{call.name}' is not available in interview mode (read-only palette: #{INTERVIEW_TOOLS.join(', ')})."
+                   end
+          { type: 'tool_result', tool_use_id: call.id, content: result.to_s }
+        end
+        { role: 'user', content: content }
+      end
+
+      def stringify_keys(input)
+        return input unless input.is_a?(Hash)
+
+        input.each_with_object({}) { |(k, v), out| out[k.to_s] = v }
       end
 
       # Mirrors PlanProposer#extract_text so both /megaplan paths handle
