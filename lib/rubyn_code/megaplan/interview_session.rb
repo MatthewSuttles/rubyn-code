@@ -22,14 +22,23 @@ module RubynCode
         def open? = options.nil? || options.empty?
       end
 
-      DEFAULT_INTERVIEW_PROMPT = <<~PROMPT.freeze
-        You are a senior Ruby/Rails architect interviewing a developer to plan a
-        multi-phase feature delivery (a "megaplan"). Your job is to ask sharp,
-        one-at-a-time questions until you have enough to produce a vertical-slice
-        plan, then output the plan.
+      SKILL_PATH = File.expand_path('megaplan_skill.md', __dir__)
 
-        On EVERY turn, respond with a single JSON object — no markdown fences,
-        no commentary — in exactly one of these two shapes:
+      # Strict output contract bolted on top of the megaplan skill body.
+      # The skill teaches *what* a megaplan is and *how* to interview; this
+      # contract teaches the LLM the wire format the gem expects on every
+      # turn. Drift means the JSON parser rejects the response and the
+      # interview surfaces an error.
+      JSON_OUTPUT_CONTRACT = <<~CONTRACT.freeze
+        # Output contract (overrides any other formatting instinct)
+
+        You are NOT in a coding session. You do NOT have tools available. You
+        must NOT search files, read code, edit, or call any function. Your
+        entire job is to either ask the next interview question OR emit the
+        final megaplan, by writing a single JSON object.
+
+        On EVERY turn, respond with exactly one JSON object — no markdown
+        fences, no prose before or after — in one of these two shapes:
 
           { "question": { "text": "<one focused question>", "options": ["a", "b", "c"] | null } }
 
@@ -44,20 +53,22 @@ module RubynCode
           - Ask one question at a time. Never bundle multiple.
           - Prefer numbered options (3-5 choices) when there's an obvious option set.
           - Use null `options` only for genuinely open questions (end-state, constraints prose).
-          - Lead with the goal in user-facing terms, then constraints, then existing
-            assets, then ordering, then test strategy, then per-phase done criteria.
-          - Skip topics the user has already covered.
+          - Walk the megaplan-skill agenda (goal → constraints → assets → ordering
+            → external deps → destructive ops → tests → done-per-phase). Skip
+            topics already obvious from context.
+          - Stop interviewing when you're 95% sure of the shape; emit the plan.
 
         Plan rules:
           - 1 to 12 phases. Each phase is a vertical slice that ships independently.
           - Trunk works at every phase boundary.
           - tasks_md uses `[ ]` checkboxes; requirements_md uses EARS-style SHALL
             statements when phrasing acceptance criteria.
-          - Emit the plan when (and only when) you have a clear vertical-slice
-            breakdown. Don't pad with filler questions.
 
         Output ONLY the JSON object. No prefatory text. No trailing commentary.
-      PROMPT
+        Never produce free-form coding-agent output.
+      CONTRACT
+
+      DEFAULT_INTERVIEW_PROMPT = "#{File.read(SKILL_PATH)}\n\n#{JSON_OUTPUT_CONTRACT}".freeze
 
       attr_reader :session_id
 
@@ -90,7 +101,10 @@ module RubynCode
 
       def ask_llm(prompt)
         @history << { role: 'user', content: prompt } if @history.empty? || @history.last[:content] != prompt
-        response = @llm_client.chat(messages: @history, system: @system_prompt)
+        # tools: nil + a JSON-only system prompt is how we keep the LLM out
+        # of "coding agent" mode. Passing the gem's regular tools here
+        # would let the model search/edit instead of conducting the interview.
+        response = @llm_client.chat(messages: @history, system: @system_prompt, tools: nil)
         text = extract_text(response)
         @history << { role: 'assistant', content: text }
         parse_outcome(text)

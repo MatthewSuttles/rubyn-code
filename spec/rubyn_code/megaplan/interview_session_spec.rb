@@ -115,4 +115,24 @@ RSpec.describe RubynCode::Megaplan::InterviewSession do
     allow(llm).to receive(:chat).and_return(fenced)
     expect(session.start.text).to eq("Q")
   end
+
+  describe "system prompt" do
+    it "embeds the megaplan skill body so the LLM sees the full workflow guidance" do
+      expect(described_class::DEFAULT_INTERVIEW_PROMPT).to include("Vertical slices, not horizontal")
+      expect(described_class::DEFAULT_INTERVIEW_PROMPT).to include("Ask one question at a time")
+    end
+
+    it "appends a strict JSON-output contract that disables coding-agent behavior" do
+      expect(described_class::DEFAULT_INTERVIEW_PROMPT).to include("You do NOT have tools available")
+      expect(described_class::DEFAULT_INTERVIEW_PROMPT).to include('"question"')
+      expect(described_class::DEFAULT_INTERVIEW_PROMPT).to include('"plan"')
+      expect(described_class::DEFAULT_INTERVIEW_PROMPT).to include("Never produce free-form coding-agent output")
+    end
+  end
+
+  it "passes tools: nil to the LLM so it can't fall back into agent mode" do
+    allow(llm).to receive(:chat).and_return(question_json("Q", ["A"]))
+    session.start
+    expect(llm).to have_received(:chat).with(hash_including(tools: nil))
+  end
 end
