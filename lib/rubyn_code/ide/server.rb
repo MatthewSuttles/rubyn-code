@@ -125,6 +125,9 @@ module RubynCode
         end
 
         dispatch(msg)
+      rescue Protocol::JsonRpcError => e
+        id = msg.is_a?(Hash) ? msg['id'] : nil
+        write(Protocol.error(id, e.code, e.message)) if id
       rescue StandardError => e
         warn "[IDE::Server] error handling message: #{e.message}"
         warn e.backtrace&.first(5)&.join("\n")

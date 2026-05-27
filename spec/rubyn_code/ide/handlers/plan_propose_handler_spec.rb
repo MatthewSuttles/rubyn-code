@@ -33,29 +33,33 @@ RSpec.describe RubynCode::IDE::Handlers::PlanProposeHandler do
     expect(result["phases"].size).to eq(1)
   end
 
-  it "rejects an empty feature with a -32602 error" do
-    result = handler.call({ "feature" => "  " })
-    expect(result["error"]["code"]).to eq(-32_602)
-    expect(result["error"]["message"]).to include("feature is required")
+  it "raises a JsonRpcError with INVALID_PARAMS when feature is empty" do
+    expect { handler.call({ "feature" => "  " }) }
+      .to raise_error(RubynCode::IDE::Protocol::JsonRpcError) do |err|
+        expect(err.code).to eq(RubynCode::IDE::Protocol::INVALID_PARAMS)
+        expect(err.message).to include("feature is required")
+      end
   end
 
-  it "rejects a missing feature with a -32602 error" do
-    result = handler.call({})
-    expect(result["error"]["code"]).to eq(-32_602)
+  it "raises a JsonRpcError with INVALID_PARAMS when feature is missing" do
+    expect { handler.call({}) }
+      .to raise_error(RubynCode::IDE::Protocol::JsonRpcError) do |err|
+        expect(err.code).to eq(RubynCode::IDE::Protocol::INVALID_PARAMS)
+      end
   end
 
-  it "surfaces InvalidProposalError as a -32001 error" do
+  it "surfaces InvalidProposalError as a JsonRpcError with -32001" do
     allow(proposer).to receive(:propose)
       .and_raise(RubynCode::Megaplan::PlanProposer::InvalidProposalError, "phases is empty")
-    result = handler.call({ "feature" => "x" })
-    expect(result["error"]["code"]).to eq(described_class::INVALID_PROPOSAL_CODE)
-    expect(result["error"]["message"]).to include("phases is empty")
+    expect { handler.call({ "feature" => "x" }) }
+      .to raise_error(RubynCode::IDE::Protocol::JsonRpcError) do |err|
+        expect(err.code).to eq(described_class::INVALID_PROPOSAL_CODE)
+        expect(err.message).to include("phases is empty")
+      end
   end
 
-  it "surfaces any other error as -32000 (generic server error)" do
+  it "lets other errors propagate (the server rescue converts them to INTERNAL_ERROR)" do
     allow(proposer).to receive(:propose).and_raise(StandardError, "llm down")
-    result = handler.call({ "feature" => "x" })
-    expect(result["error"]["code"]).to eq(-32_000)
-    expect(result["error"]["message"]).to include("llm down")
+    expect { handler.call({ "feature" => "x" }) }.to raise_error(StandardError, "llm down")
   end
 end

@@ -27,22 +27,13 @@ module RubynCode
 
         def call(params)
           feature = params['feature'].to_s.strip
-          return error_response('feature is required', code: -32_602) if feature.empty?
+          raise Protocol::JsonRpcError.new(Protocol::INVALID_PARAMS, 'feature is required') if feature.empty?
 
           proposer = @proposer || Megaplan::PlanProposer.new
           proposer.propose(feature)
         rescue Megaplan::PlanProposer::InvalidProposalError => e
           warn "[PlanProposeHandler] invalid proposal: #{e.message}"
-          error_response(e.message, code: INVALID_PROPOSAL_CODE)
-        rescue StandardError => e
-          warn "[PlanProposeHandler] error: #{e.message}"
-          error_response(e.message)
-        end
-
-        private
-
-        def error_response(message, code: -32_000)
-          { 'error' => { 'code' => code, 'message' => message } }
+          raise Protocol::JsonRpcError.new(INVALID_PROPOSAL_CODE, e.message)
         end
       end
     end
