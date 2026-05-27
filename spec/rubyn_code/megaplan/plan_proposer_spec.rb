@@ -85,5 +85,12 @@ RSpec.describe RubynCode::Megaplan::PlanProposer do
     end
     proposer.propose("Whatever")
   end
+
+  it "accepts a response object that responds to #text (LLM::Response Data)" do
+    response_double = double("LLM::Response", text: valid_payload.to_json)
+    allow(llm_client).to receive(:chat).and_return(response_double)
+    result = proposer.propose("Soft-delete posts")
+    expect(result["slug"]).to eq("soft-delete-posts")
+  end
 end
 

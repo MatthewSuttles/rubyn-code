@@ -69,13 +69,24 @@ module RubynCode
           system: @system_prompt
         )
 
-        text = response.is_a?(Hash) ? response[:text] || response['text'] : response.to_s
+        text = extract_text(response)
         payload = parse_payload(text)
         validate!(payload, feature)
         normalize(payload, feature)
       end
 
       private
+
+      # LLM::Client#chat returns a `LLM::Response` Data object whose `.text`
+      # joins all text blocks. Tests and older callers may pass a String or
+      # a Hash — handle all three so the proposer doesn't crash with
+      # `#<data ...>` ending up as parser input.
+      def extract_text(response)
+        return response.text if response.respond_to?(:text) && !response.is_a?(String)
+        return response[:text] || response['text'] if response.is_a?(Hash)
+
+        response.to_s
+      end
 
       def feature_prompt(feature)
         "Plan this feature as a megaplan:\n\n#{feature.strip}"
