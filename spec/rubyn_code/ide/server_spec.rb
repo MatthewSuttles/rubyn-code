@@ -3,6 +3,7 @@
 require "spec_helper"
 require "rubyn_code/ide/server"
 require "stringio"
+require "tmpdir"
 require "json"
 require_relative "support/server_helper"
 
@@ -41,6 +42,26 @@ RSpec.describe RubynCode::IDE::Server do
 
     it "starts with nil workspace_path" do
       expect(server.workspace_path).to be_nil
+    end
+
+    it "adopts workspace_path from constructor when the directory exists" do
+      original_pwd = Dir.pwd
+      Dir.mktmpdir do |dir|
+        s = described_class.new(workspace_path: dir)
+        expect(s.workspace_path).to eq(dir)
+      end
+    ensure
+      Dir.chdir(original_pwd) if original_pwd && Dir.exist?(original_pwd)
+    end
+
+    it "ignores a non-existent workspace_path and stays nil" do
+      s = described_class.new(workspace_path: "/definitely/not/a/real/path/xyzzy")
+      expect(s.workspace_path).to be_nil
+    end
+
+    it "treats an empty workspace_path as absent" do
+      s = described_class.new(workspace_path: "")
+      expect(s.workspace_path).to be_nil
     end
 
     it "starts with empty client_capabilities" do
