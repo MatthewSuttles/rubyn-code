@@ -6,7 +6,7 @@ require "rubyn_code/ide/server"
 RSpec.describe RubynCode::IDE::Handlers::PlanInterviewStartHandler do
   let(:server)  { RubynCode::IDE::Server.new }
   let(:session) { instance_double("RubynCode::Megaplan::InterviewSession") }
-  let(:factory) { -> { session } }
+  let(:factory) { ->(workspace_path:) { session } }
   let(:handler) { described_class.new(server, factory: factory) }
 
   before do
