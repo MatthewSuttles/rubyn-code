@@ -21,6 +21,21 @@ module RubynCode
       SESSION_NOT_FOUND = -2
       BUDGET_EXCEEDED   = -3
 
+      # Raise from a handler to emit a JSON-RPC error response with a
+      # specific code. The dispatcher catches this and converts it to a
+      # proper `error` envelope — handlers don't have to know how to write
+      # to the wire. Use this instead of returning `{ 'error' => ... }` as
+      # the handler result, which the dispatcher would otherwise serialize
+      # as a successful `result` payload (the very bug this class fixes).
+      class JsonRpcError < StandardError
+        attr_reader :code
+
+        def initialize(code, message)
+          super(message)
+          @code = code
+        end
+      end
+
       module_function
 
       # Parse a JSON string into a request hash.
