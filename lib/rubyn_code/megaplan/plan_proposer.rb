@@ -75,6 +75,26 @@ module RubynCode
         normalize(payload, feature)
       end
 
+      # Validate a parsed plan_proposal Hash. Public so the interview path
+      # (which produces the same shape via a different LLM workflow) can
+      # reuse the rule set without reaching into a private method.
+      def validate!(payload, _feature = nil)
+        raise InvalidProposalError, 'payload is not an object' unless payload.is_a?(Hash)
+
+        phases = payload['phases']
+        raise InvalidProposalError, 'phases must be an array' unless phases.is_a?(Array)
+        raise InvalidProposalError, 'phases is empty' if phases.empty?
+        raise InvalidProposalError, "too many phases (max #{@max_phases})" if phases.size > @max_phases
+
+        phases.each_with_index do |phase, idx|
+          %w[name summary requirements_md design_md tasks_md].each do |key|
+            next unless phase[key].nil? || phase[key].to_s.strip.empty?
+
+            raise InvalidProposalError, "phase #{idx + 1} missing #{key}"
+          end
+        end
+      end
+
       private
 
       # LLM::Client#chat returns a `LLM::Response` Data object whose `.text`
@@ -100,23 +120,6 @@ module RubynCode
         JSON.parse(cleaned)
       rescue JSON::ParserError => e
         raise InvalidProposalError, "LLM response is not valid JSON: #{e.message}"
-      end
-
-      def validate!(payload, _feature)
-        raise InvalidProposalError, 'payload is not an object' unless payload.is_a?(Hash)
-
-        phases = payload['phases']
-        raise InvalidProposalError, 'phases must be an array' unless phases.is_a?(Array)
-        raise InvalidProposalError, 'phases is empty' if phases.empty?
-        raise InvalidProposalError, "too many phases (max #{@max_phases})" if phases.size > @max_phases
-
-        phases.each_with_index do |phase, idx|
-          %w[name summary requirements_md design_md tasks_md].each do |key|
-            next unless phase[key].nil? || phase[key].to_s.strip.empty?
-
-            raise InvalidProposalError, "phase #{idx + 1} missing #{key}"
-          end
-        end
       end
 
       def normalize(payload, feature)

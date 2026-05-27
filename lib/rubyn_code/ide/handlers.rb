@@ -15,6 +15,9 @@ require_relative 'handlers/session_list_handler'
 require_relative 'handlers/session_resume_handler'
 require_relative 'handlers/session_fork_handler'
 require_relative 'handlers/plan_propose_handler'
+require_relative 'handlers/plan_interview_start_handler'
+require_relative 'handlers/plan_interview_answer_handler'
+require_relative 'handlers/plan_interview_cancel_handler'
 require_relative 'handlers/recover_ci_handler'
 
 module RubynCode
@@ -37,6 +40,9 @@ module RubynCode
         'session/resume' => SessionResumeHandler,
         'session/fork' => SessionForkHandler,
         'plan/propose' => PlanProposeHandler,
+        'plan/interview/start' => PlanInterviewStartHandler,
+        'plan/interview/answer' => PlanInterviewAnswerHandler,
+        'plan/interview/cancel' => PlanInterviewCancelHandler,
         'recover_ci' => RecoverCiHandler
       }.freeze
 
@@ -57,6 +63,9 @@ module RubynCode
         session_resume: 'session/resume',
         session_fork: 'session/fork',
         plan_propose: 'plan/propose',
+        plan_interview_start: 'plan/interview/start',
+        plan_interview_answer: 'plan/interview/answer',
+        plan_interview_cancel: 'plan/interview/cancel',
         recover_ci: 'recover_ci'
       }.freeze
 
