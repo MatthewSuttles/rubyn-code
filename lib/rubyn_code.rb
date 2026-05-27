@@ -165,6 +165,7 @@ module RubynCode
   # Layer 7b: Megaplan
   module Megaplan
     autoload :PlanProposer, 'rubyn_code/megaplan/plan_proposer'
+    autoload :InterviewSession, 'rubyn_code/megaplan/interview_session'
     autoload :CiRecovery, 'rubyn_code/megaplan/ci_recovery'
   end
 

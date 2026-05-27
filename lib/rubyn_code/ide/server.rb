@@ -33,10 +33,27 @@ module RubynCode
         @session_persistence = nil
         @tool_output_adapter = nil
         @ide_client = Client.new(self)
+        @interview_sessions = {}
 
         apply_initial_workspace(workspace_path)
 
         Handlers.register_all(self)
+      end
+
+      # ── Interview session registry ──────────────────────────────────
+      # Owned by the IDE Server so handlers can look up the same session
+      # across start / answer / cancel JSON-RPC calls.
+
+      def register_interview_session(session)
+        @interview_sessions[session.session_id] = session
+      end
+
+      def lookup_interview_session(session_id)
+        @interview_sessions[session_id]
+      end
+
+      def drop_interview_session(session_id)
+        @interview_sessions.delete(session_id)
       end
 
       # Adopt a workspace path supplied on the command line (--dir). Done
