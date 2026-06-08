@@ -95,6 +95,19 @@ module RubynCode
           #
           # To regenerate: rubyn-code --setup
           # To remove:     rm #{path}
+          if [ ! -x "#{pinned_ruby}" ] || [ ! -f "#{gem_wrapper}" ]; then
+            echo "rubyn-code: launcher target missing" >&2
+            [ ! -x "#{pinned_ruby}" ] && echo "  pinned Ruby: #{pinned_ruby}" >&2
+            [ ! -f "#{gem_wrapper}" ] && echo "  gem wrapper: #{gem_wrapper}" >&2
+            echo >&2
+            echo "The Ruby that 'rubyn-code --setup' was pinned against (or the gem" >&2
+            echo "itself) was removed. To recover under your current Ruby:" >&2
+            echo >&2
+            echo "  rm '$0'" >&2
+            echo "  gem install rubyn-code" >&2
+            echo "  rubyn-code --setup" >&2
+            exit 127
+          fi
           exec "#{pinned_ruby}" "#{gem_wrapper}" "$@"
         BASH
       end
