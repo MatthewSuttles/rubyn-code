@@ -23,7 +23,8 @@ module RubynCode
           Commands::Plan, Commands::ContextInfo, Commands::Diff,
           Commands::Model, Commands::NewSession, Commands::Mcp,
           Commands::Provider, Commands::InstallSkills,
-          Commands::RemoveSkills, Commands::Skills
+          Commands::RemoveSkills, Commands::Skills,
+          Commands::Megaplan
         ].each { |cmd| @command_registry.register(cmd) }
       end
 

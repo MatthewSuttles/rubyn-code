@@ -303,6 +303,7 @@ module RubynCode
       autoload :InstallSkills, 'rubyn_code/cli/commands/install_skills'
       autoload :RemoveSkills, 'rubyn_code/cli/commands/remove_skills'
       autoload :Skills, 'rubyn_code/cli/commands/skills'
+      autoload :Megaplan, 'rubyn_code/cli/commands/megaplan'
     end
   end
 

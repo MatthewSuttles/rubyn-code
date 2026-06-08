@@ -1,3 +1,18 @@
+---
+name: megaplan
+description: Phased project planning. Interview the user one question at a time, then scaffold numbered phase folders (requirements/design/tasks). Trigger phrases include "megaplan", "mega plan", "plan phases", "phase this out", or any feature spanning 3+ PRs.
+tags:
+  - planning
+  - process
+  - phases
+  - megaplan
+triggers:
+  - megaplan
+  - mega plan
+  - plan phases
+  - phase this out
+---
+
 # Megaplan — Phased Project Planning
 
 Ship in vertical slices. Each phase merges cleanly and leaves the trunk working.

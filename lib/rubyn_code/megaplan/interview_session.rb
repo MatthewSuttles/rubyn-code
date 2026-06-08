@@ -31,7 +31,17 @@ module RubynCode
         def open? = options.nil? || options.empty?
       end
 
-      SKILL_PATH = File.expand_path('megaplan_skill.md', __dir__)
+      # The megaplan skill lives in the gem's shared skill catalog
+      # (skills/megaplan/megaplan.md) so it's also reachable as
+      # `/skill megaplan` from the REPL and the chat. We load the file
+      # body directly (skipping the YAML frontmatter) for the system
+      # prompt.
+      SKILL_PATH = File.expand_path('../../../skills/megaplan/megaplan.md', __dir__)
+
+      def self.load_skill_body
+        raw = File.read(SKILL_PATH)
+        raw.sub(/\A---\s*\n.+?\n---\s*\n/m, '')
+      end
 
       # Whitelist of read-only tools the interviewer may call. Picked from
       # the existing Tools::Registry by name. Anything that writes, runs
@@ -100,7 +110,7 @@ module RubynCode
         commentary. Never produce free-form coding-agent output.
       CONTRACT
 
-      DEFAULT_INTERVIEW_PROMPT = "#{File.read(SKILL_PATH)}\n\n#{JSON_OUTPUT_CONTRACT}".freeze
+      DEFAULT_INTERVIEW_PROMPT = "#{load_skill_body}\n\n#{JSON_OUTPUT_CONTRACT}".freeze
 
       attr_reader :session_id
 
