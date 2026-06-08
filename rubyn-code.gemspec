@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
                        'featuring a 16-layer agentic architecture, local SQLite persistence, and Claude OAuth.'
   spec.homepage      = 'https://rubyn.dev'
   spec.license       = 'MIT'
-  spec.required_ruby_version = '>= 4.0' # rubocop:disable Gemspec/RequiredRubyVersion
+  spec.required_ruby_version = '>= 4.0.2' # rubocop:disable Gemspec/RequiredRubyVersion
 
   spec.files         = Dir['lib/**/*', 'exe/*', 'skills/**/*', 'db/**/*', 'LICENSE', 'README.md']
   spec.bindir        = 'exe'
@@ -40,8 +40,7 @@ Gem::Specification.new do |spec|
     Rubyn Code installed! Run `rubyn-code --setup` to pin it to this Ruby
     so it works in any project regardless of .ruby-version.
 
-    Tip: Install with your latest Ruby for best performance:
-      RBENV_VERSION=4.0.2 gem install rubyn-code && rubyn-code --setup
+    Tip: install under your latest Ruby for best performance.
   MSG
   spec.metadata['rubygems_mfa_required'] = 'true'
 end
