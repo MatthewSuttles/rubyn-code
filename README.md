@@ -35,9 +35,11 @@ Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code f
 - [MCP — External Tool Servers](#mcp--external-tool-servers)
 - [Codebase Indexing](#codebase-indexing)
 - [112 Best Practice Skills](#112-best-practice-skills)
+- [Skill Packs — Registry-Backed Extensions](#skill-packs--registry-backed-extensions)
 - [Context Architecture](#context-architecture)
 - [RUBYN.md — Project Instructions](#rubynmd--project-instructions)
 - [PR Review](#pr-review)
+- [Megaplan — Phased Planning](#megaplan--phased-planning)
 - [Sub-Agents & Teams](#sub-agents--teams)
 - [GOLEM — Autonomous Daemon](#golem--autonomous-daemon)
 - [Continuous Learning](#continuous-learning)
@@ -61,14 +63,15 @@ Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code f
 
 - **Rails-native** — understands service object extraction, RSpec conventions, ActiveRecord patterns, and Hotwire
 - **Context-aware** — automatically incorporates schema, routes, specs, factories, and models
-- **Best practices built in** — ships with 112 curated Ruby and Rails guidelines that load on demand
+- **Best practices built in** — ships with 112 curated Ruby and Rails guidelines that load on demand, plus registry-backed [skill packs](#skill-packs--registry-backed-extensions) that autoload as you need them
+- **Plans big work in phases** — [`/megaplan`](#megaplan--phased-planning) runs a read-only interview, then breaks rewrites and migrations into vertical-slice phases that ship one at a time
 - **Agentic** — doesn't just answer questions. Reads files, writes code, runs specs, commits, reviews PRs, spawns sub-agents, and remembers what it learns
 - **IDE-ready** — works in the terminal and inside VS Code with full bidirectional communication
 - **Extensible** — connect external tool servers via MCP, add custom skills, or wire up your own providers
 
 ## Install
 
-Requires **Ruby 4.0+**. Install with your latest Ruby, then pin it so it works in every project:
+Requires **Ruby 4.0.2+**. Install with your latest Ruby, then pin it so it works in every project:
 
 ```bash
 # Install the gem
@@ -83,11 +86,11 @@ That's it. `rubyn-code` now works in any project regardless of `.ruby-version`.
 <details>
 <summary>Using rbenv?</summary>
 
-If you manage multiple Rubies with rbenv, install on your latest:
+If you manage multiple Rubies with rbenv, install on your latest (run `rbenv versions` to list what you have):
 
 ```bash
-RBENV_VERSION=4.0.2 gem install rubyn-code
-RBENV_VERSION=4.0.2 rubyn-code --setup
+RBENV_VERSION=<your-ruby-version> gem install rubyn-code
+RBENV_VERSION=<your-ruby-version> rubyn-code --setup
 ```
 
 The `--setup` command creates a launcher in `~/.local/bin` that calls the gem wrapper directly, skipping rbenv's shim. As long as `~/.local/bin` is in your PATH before `~/.rbenv/shims`, you're good.
@@ -98,7 +101,7 @@ The `--setup` command creates a launcher in `~/.local/bin` that calls the gem wr
 <summary>Using rvm?</summary>
 
 ```bash
-rvm use 4.0.2
+rvm use <your-ruby-version>
 gem install rubyn-code
 rubyn-code --setup
 ```
@@ -203,7 +206,7 @@ Rubyn Code includes a VS Code extension that provides a full IDE experience with
 | `default` | Per-tool approval required |
 | `bypass` | YOLO — skip all approval prompts |
 
-The extension communicates over 14 RPC methods: `initialize`, `prompt`, `cancel`, `review`, `approveToolUse`, `acceptEdit`, `session/*`, `config/*`, `models/list`, and `shutdown`.
+The extension communicates over 19 RPC methods: `initialize`, `prompt`, `cancel`, `review`, `approveToolUse`, `acceptEdit`, `session/*`, `config/*`, `models/list`, `plan/propose`, `plan/interview/*` (chat-resident [megaplan](#megaplan--phased-planning)), `recover_ci`, and `shutdown`.
 
 ## 29 Built-in Tools
 
@@ -316,6 +319,29 @@ mkdir -p ~/.rubyn-code/skills
 echo "# Use double quotes for strings" > ~/.rubyn-code/skills/my_style.md
 ```
 
+## Skill Packs — Registry-Backed Extensions
+
+Beyond the 112 built-in skills, Rubyn can pull additional skill packs from the [rubyn.ai](https://rubyn.ai) registry. Packs are bundles of related skills published by the community or by Rubyn itself.
+
+```
+rubyn > /skills                    # list installed packs and browse the registry
+rubyn > /install-skills sidekiq    # install a pack by name
+rubyn > /install-skills graphql viewcomponent  # install multiple at once
+rubyn > /remove-skills sidekiq     # uninstall
+```
+
+Installed packs live at `~/.rubyn-code/skill-packs/<pack-name>/` and load alongside the built-in catalog.
+
+### Auto-suggest from your Gemfile
+
+On session start, Rubyn parses your `Gemfile` and quietly suggests matching packs the first time it sees a gem (e.g. detects `sidekiq` → suggests the sidekiq pack). Suggestions are recorded in `.rubyn-code/suggested.json` so you only see each one once.
+
+### Trigger-based autoload
+
+If your message mentions a topic that matches an uninstalled pack's name or tags, Rubyn fetches the pack from the registry on the fly, installs it, and feeds the relevant skills into the same turn. Registry failures are silent — the conversation continues as if the autoload weren't there.
+
+Point at a custom registry with `RUBYN_REGISTRY_URL=https://your-registry.example.com`.
+
 ## Context Architecture
 
 Rubyn automatically loads relevant context based on what you're working on:
@@ -363,6 +389,34 @@ rubyn > /review main security  # security focus only
 Focus areas: `all`, `security`, `performance`, `style`, `testing`
 
 Severity ratings: **[critical]** **[warning]** **[suggestion]** **[nitpick]**
+
+## Megaplan — Phased Planning
+
+For work too big for a single PR — rewrites, migrations, multi-feature initiatives — Rubyn ships a planning workflow that breaks the feature into vertical-slice phases before any code gets written.
+
+```
+rubyn > /megaplan extract billing into its own service
+  Megaplan mode — interviewer with read-only tools
+
+  Decisions so far: (none yet)
+
+  Q1. What triggers the extraction now — a scaling issue, a team boundary,
+      or a compliance constraint?
+        1. Scaling (recommended — billing is the hottest table)
+        2. Team boundary
+        3. Compliance
+```
+
+What happens when you run `/megaplan`:
+
+- Loads the **megaplan** skill into context.
+- Flips the agent into **plan mode** — only read-only tools (file reads, search, git status) are available. No edits, no shell mutations.
+- Conducts a one-question-at-a-time interview to lock down scope, constraints, and risk before proposing phases.
+- Outputs a numbered phase breakdown, each phase shippable on its own with the trunk staying green.
+
+Trigger phrases like "megaplan", "mega plan", "plan phases", or "phase this out" in normal conversation will surface the skill via [trigger-based autoload](#skill-packs--registry-backed-extensions) too.
+
+In the VS Code extension the same workflow runs as a chat-resident interview with structured question cards instead of free-text Q&A. Same skill driving both surfaces.
 
 ## Sub-Agents & Teams
 
@@ -707,7 +761,7 @@ Checks Ruby version, bundler, database state, authentication, skills, project ty
 
 ## Development
 
-Requires Ruby 4.0+.
+Requires Ruby 4.0.2+.
 
 ```bash
 git clone https://github.com/MatthewSuttles/rubyn-code.git
