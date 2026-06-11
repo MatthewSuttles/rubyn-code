@@ -9,6 +9,8 @@ module RubynCode
     #
     # Messages are stored in the `mailbox_messages` table with structured
     # JSON content. Each message tracks read/unread state per recipient.
+    # Supports structured data payloads and correlation IDs for
+    # request/response tracking.
     class Mailbox
       # @param db [DB::Connection] the database connection
       def initialize(db)
@@ -22,8 +24,11 @@ module RubynCode
       # @param to [String] recipient agent name
       # @param content [String] message body
       # @param message_type [String] type of message (default: "message")
+      # @param correlation_id [String, nil] optional correlation ID for request/response pairing
+      # @param data [Hash, nil] optional structured data payload
       # @return [String] the message id
-      def send(from:, to:, content:, message_type: 'message')
+      # rubocop:disable Metrics/ParameterLists
+      def send(from:, to:, content:, message_type: 'message', correlation_id: nil, data: nil)
         id = SecureRandom.uuid
         now = Time.now.utc.iso8601
 
@@ -36,25 +41,54 @@ module RubynCode
                                   timestamp: now
                                 })
 
+        data_json = data ? JSON.generate(data) : nil
+
         @db.execute(
           <<~SQL,
-            INSERT INTO mailbox_messages (id, sender, recipient, message_type, payload, read, created_at)
-            VALUES (?, ?, ?, ?, ?, 0, ?)
+            INSERT INTO mailbox_messages (id, sender, recipient, message_type, payload, correlation_id, data, read, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
           SQL
-          [id, from, to, message_type, payload, now]
+          [id, from, to, message_type, payload, correlation_id, data_json, now]
         )
 
         id
       end
+      # rubocop:enable Metrics/ParameterLists
+
+      # Sends a structured message with typed data payload.
+      # Convenience wrapper around #send for machine-to-machine communication.
+      #
+      # @param from [String] sender agent name
+      # @param to [String] recipient agent name
+      # @param type [String] message type (e.g. 'task', 'result', 'error')
+      # @param data [Hash] structured data payload
+      # @param content [String] human-readable summary (default: auto-generated)
+      # @param correlation_id [String, nil] optional correlation ID
+      # @return [String] the message id
+      # rubocop:disable Metrics/ParameterLists
+      def send_structured(from:, to:, type:, data:, content: nil, correlation_id: nil)
+        content ||= "#{type}: #{data.inspect}"[0, 200]
+        correlation_id ||= SecureRandom.uuid
+
+        send(
+          from: from,
+          to: to,
+          content: content,
+          message_type: type,
+          correlation_id: correlation_id,
+          data: data
+        )
+      end
+      # rubocop:enable Metrics/ParameterLists
 
       # Reads all unread messages for the given agent and marks them as read.
       #
       # @param name [String] the recipient agent name
-      # @return [Array<Hash>] parsed message hashes
+      # @return [Array<Hash>] parsed message hashes with optional :data key
       def read_inbox(name)
         rows = @db.query(
           <<~SQL,
-            SELECT id, payload FROM mailbox_messages
+            SELECT id, payload, correlation_id, data FROM mailbox_messages
             WHERE recipient = ? AND read = 0
             ORDER BY created_at ASC
           SQL
@@ -64,7 +98,7 @@ module RubynCode
         return [] if rows.empty?
 
         ids = rows.map { |r| r['id'] }
-        messages = rows.map { |r| JSON.parse(r['payload'], symbolize_names: true) }
+        messages = rows.map { |r| parse_message_row(r) }
 
         # Mark all fetched messages as read in a single statement
         placeholders = ids.map { '?' }.join(', ')
@@ -74,6 +108,24 @@ module RubynCode
         )
 
         messages
+      end
+
+      # Finds all messages matching a correlation ID.
+      # Useful for tracking request/response chains.
+      #
+      # @param correlation_id [String] the correlation ID to search for
+      # @return [Array<Hash>] matched messages ordered by creation time
+      def find_by_correlation_id(correlation_id)
+        rows = @db.query(
+          <<~SQL,
+            SELECT id, payload, correlation_id, data FROM mailbox_messages
+            WHERE correlation_id = ?
+            ORDER BY created_at ASC
+          SQL
+          [correlation_id]
+        ).to_a
+
+        rows.map { |r| parse_message_row(r) }
       end
 
       # Broadcasts a message from one agent to all other agents.
@@ -98,14 +150,14 @@ module RubynCode
       def pending_for(name)
         rows = @db.query(
           <<~SQL,
-            SELECT payload FROM mailbox_messages
+            SELECT id, payload, correlation_id, data FROM mailbox_messages
             WHERE recipient = ? AND read = 0
             ORDER BY created_at ASC
           SQL
           [name]
         ).to_a
 
-        rows.map { |r| JSON.parse(r['payload'], symbolize_names: true) }
+        rows.map { |r| parse_message_row(r) }
       end
 
       # Returns the count of unread messages for the given agent.
@@ -122,8 +174,22 @@ module RubynCode
 
       private
 
+      # Parses a message row into a hash, merging structured data if present.
+      #
+      # @param row [Hash] database row
+      # @return [Hash] parsed message with optional :data and :correlation_id keys
+      def parse_message_row(row)
+        msg = JSON.parse(row['payload'], symbolize_names: true)
+        msg[:correlation_id] = row['correlation_id'] if row['correlation_id']
+        msg[:data] = JSON.parse(row['data'], symbolize_names: true) if row['data']
+        msg
+      rescue JSON::ParserError
+        { content: row['payload'].to_s, parse_error: true }
+      end
+
       # Creates the mailbox_messages table if it does not already exist.
-      # Schema must stay in sync with db/migrations/009_create_teams.sql.
+      # Schema must stay in sync with db/migrations/009_create_teams.sql
+      # and 014_multi_agent_upgrade.rb.
       def ensure_table!
         @db.execute(<<~SQL)
           CREATE TABLE IF NOT EXISTS mailbox_messages (
@@ -133,6 +199,8 @@ module RubynCode
             message_type TEXT NOT NULL DEFAULT 'message'
               CHECK(message_type IN ('message','task','result','error','broadcast','shutdown_request','shutdown_response','status_change')),
             payload TEXT NOT NULL,
+            correlation_id TEXT,
+            data TEXT,
             read INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
           )
@@ -141,6 +209,11 @@ module RubynCode
         @db.execute(<<~SQL)
           CREATE INDEX IF NOT EXISTS idx_mailbox_recipient_read
           ON mailbox_messages (recipient, read)
+        SQL
+
+        @db.execute(<<~SQL)
+          CREATE INDEX IF NOT EXISTS idx_mailbox_correlation
+          ON mailbox_messages (correlation_id)
         SQL
       end
     end

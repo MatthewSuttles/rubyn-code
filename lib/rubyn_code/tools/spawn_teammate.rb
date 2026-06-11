@@ -25,13 +25,18 @@ module RubynCode
           type: :string,
           description: 'Initial task or instruction for the teammate',
           required: true
+        },
+        parent_agent_id: {
+          type: :string,
+          description: 'ID of the parent agent spawning this teammate (for lineage tracking)',
+          required: false
         }
       }.freeze
       RISK_LEVEL = :execute
 
       attr_writer :llm_client, :on_status, :db
 
-      def execute(name:, role:, prompt:)
+      def execute(name:, role:, prompt:, parent_agent_id: nil)
         callback = @on_status || method(:default_status)
 
         raise Error, 'LLM client not available' unless @llm_client
@@ -40,7 +45,7 @@ module RubynCode
         mailbox = Teams::Mailbox.new(@db)
         manager = Teams::Manager.new(@db, mailbox: mailbox)
 
-        teammate = manager.spawn(name: name, role: role)
+        teammate = manager.spawn(name: name, role: role, parent_agent_id: parent_agent_id)
         callback.call(:started, "Spawning teammate '#{name}' as #{role}...")
 
         Thread.new do
