@@ -181,6 +181,7 @@ module RubynCode
     autoload :Manager, 'rubyn_code/teams/manager'
     autoload :Mailbox, 'rubyn_code/teams/mailbox'
     autoload :Teammate, 'rubyn_code/teams/teammate'
+    autoload :AgentRegistry, 'rubyn_code/teams/agent_registry'
   end
 
   # Layer 10: Protocols

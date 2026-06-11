@@ -8,7 +8,7 @@ module RubynCode
     VALID_STATUSES = %w[idle active offline].freeze
 
     Teammate = Data.define(
-      :id, :name, :role, :persona, :model, :status, :metadata, :created_at
+      :id, :name, :role, :persona, :model, :status, :parent_agent_id, :metadata, :created_at
     ) do
       # @return [Boolean]
       def idle? = status == 'idle'
@@ -19,6 +19,9 @@ module RubynCode
       # @return [Boolean]
       def offline? = status == 'offline'
 
+      # @return [Boolean] true if this teammate was not spawned by another agent
+      def root? = parent_agent_id.nil?
+
       # @return [Hash]
       def to_h
         {
@@ -28,6 +31,7 @@ module RubynCode
           persona: persona,
           model: model,
           status: status,
+          parent_agent_id: parent_agent_id,
           metadata: metadata,
           created_at: created_at
         }
