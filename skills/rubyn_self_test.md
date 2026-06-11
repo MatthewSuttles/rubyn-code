@@ -190,6 +190,98 @@ End-to-end exercise of the autoload pipeline against the real registry at `rubyn
   ```
   before the next response (the `📥` line appears only if the pack wasn't already installed). Do **not** count this as PASS/FAIL — just mention it in the scorecard so the user can verify the renderer side themselves.
 
+### 10. Teams System — Multi-Agent
+
+Run the following inline Ruby script with `bash`. It exercises the teammate manager, mailbox (including structured messaging), and agent registry in a single SQLite-backed round-trip. PASS if the final line is `ALL PASS`.
+
+  ```bash
+  bundle exec ruby -e '
+    require_relative "lib/rubyn_code"
+    require "sqlite3"
+
+    db = SQLite3::Database.new(":memory:")
+    db.results_as_hash = true
+
+    mailbox = RubynCode::Teams::Mailbox.new(db)
+    manager = RubynCode::Teams::Manager.new(db, mailbox: mailbox)
+    registry = RubynCode::Teams::AgentRegistry.new(manager: manager, mailbox: mailbox)
+
+    # 1. Spawn root + child teammates
+    root = manager.spawn(name: "lead", role: "coordinator")
+    child = manager.spawn(name: "coder", role: "developer", parent_agent_id: root.id)
+    raise "spawn failed" unless root.root? && !child.root?
+    puts "STEP spawn: PASS"
+
+    # 2. Parent-child tracking
+    kids = manager.children_of(root.id)
+    raise "children_of broken" unless kids.size == 1 && kids.first.name == "coder"
+    raise "roots broken" unless manager.roots.size == 1
+    tree = manager.agent_tree(root.id)
+    raise "tree broken" unless tree[:children].size == 1
+    puts "STEP lineage: PASS"
+
+    # 3. Structured messaging with correlation_id
+    corr_id = mailbox.send_structured(
+      from: "lead", to: "coder", type: "task",
+      data: { action: "write_tests", files: ["user.rb"] },
+      content: "Write tests for user.rb"
+    )
+    raise "send_structured returned nil" if corr_id.nil?
+
+    msgs = mailbox.read_inbox("coder")
+    raise "inbox empty" if msgs.empty?
+    msg = msgs.first
+    raise "missing data" unless msg[:data].is_a?(Hash) && msg[:data][:action] == "write_tests"
+    raise "missing correlation_id" unless msg[:correlation_id].is_a?(String)
+    puts "STEP structured_msg: PASS"
+
+    # 4. Correlation chain
+    mailbox.send(
+      from: "coder", to: "lead", content: "Done",
+      message_type: "result", correlation_id: msg[:correlation_id],
+      data: { status: "ok", tests: 5 }
+    )
+    chain = mailbox.find_by_correlation_id(msg[:correlation_id])
+    raise "correlation chain broken (#{chain.size})" unless chain.size == 2
+    puts "STEP correlation: PASS"
+
+    # 5. Agent discovery
+    manager.update_status("coder", "active")
+    snap = registry.snapshot
+    raise "snapshot broken" unless snap.size == 2
+    actives = registry.active
+    raise "active filter broken" unless actives.size == 1 && actives.first[:name] == "coder"
+    forest = registry.forest
+    raise "forest broken" unless forest.size == 1 && forest.first[:children].size == 1
+    lineage = registry.lineage(child.id)
+    raise "lineage broken" unless lineage.size == 1 && lineage.first.name == "lead"
+    report = registry.status_report
+    raise "status_report broken" unless report.include?("lead") && report.include?("coder")
+    puts "STEP discovery: PASS"
+
+    # 6. Cleanup + unread_count
+    raise "unread wrong" unless mailbox.unread_count("lead") == 1
+    mailbox.read_inbox("lead")
+    raise "read didnt clear" unless mailbox.unread_count("lead") == 0
+    manager.remove("coder")
+    manager.remove("lead")
+    raise "cleanup failed" unless manager.list.empty?
+    puts "STEP cleanup: PASS"
+
+    puts "ALL PASS"
+  '
+  ```
+
+  The script tests:
+  1. **Spawn** — root and child teammates with parent tracking
+  2. **Lineage** — `children_of`, `roots`, `agent_tree`
+  3. **Structured messaging** — `send_structured` with typed data payloads
+  4. **Correlation chains** — request/response pairing via `correlation_id`
+  5. **Agent discovery** — `snapshot`, `active`, `forest`, `lineage`, `status_report`
+  6. **Cleanup** — `unread_count`, `read_inbox`, `remove`
+
+  PASS criteria: all 6 `STEP` lines say PASS and the final line is `ALL PASS`.
+
 ## Scoring
 
 Count total PASS results out of total tests run. Report the percentage.
