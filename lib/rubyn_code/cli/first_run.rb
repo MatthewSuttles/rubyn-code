@@ -136,7 +136,7 @@ module RubynCode
       def default_model(provider)
         return 'gpt-5.4' if provider == 'openai'
 
-        'claude-opus-4-6'
+        'claude-opus-4-8'
       end
 
       def display_summary

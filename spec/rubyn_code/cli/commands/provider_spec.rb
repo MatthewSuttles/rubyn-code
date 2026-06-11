@@ -14,7 +14,7 @@ RSpec.describe RubynCode::CLI::Commands::Provider do
   let(:settings_data) do
     {
       'providers' => {
-        'anthropic' => { 'env_key' => 'ANTHROPIC_API_KEY', 'models' => { 'top' => 'claude-opus-4-6' } },
+        'anthropic' => { 'env_key' => 'ANTHROPIC_API_KEY', 'models' => { 'top' => 'claude-opus-4-8' } },
         'openai' => { 'env_key' => 'OPENAI_API_KEY', 'models' => { 'top' => 'gpt-4o' } },
         'groq' => { 'base_url' => 'https://api.groq.com/openai/v1', 'models' => %w[llama-3.3-70b] }
       }
@@ -47,7 +47,7 @@ RSpec.describe RubynCode::CLI::Commands::Provider do
 
       it 'shows models for each provider' do
         command.execute(['list'], ctx)
-        expect(renderer).to have_received(:info).with(/claude-opus-4-6/)
+        expect(renderer).to have_received(:info).with(/claude-opus-4-8/)
         expect(renderer).to have_received(:info).with(/llama-3.3-70b/)
       end
 
