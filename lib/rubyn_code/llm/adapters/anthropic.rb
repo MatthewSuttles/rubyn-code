@@ -18,8 +18,9 @@ module RubynCode
         RETRY_DELAYS = [2, 5, 10].freeze
 
         AVAILABLE_MODELS = %w[
+          claude-fable-5
+          claude-opus-4-8
           claude-sonnet-4-20250514
-          claude-opus-4-6
           claude-haiku-4-20250506
         ].freeze
 

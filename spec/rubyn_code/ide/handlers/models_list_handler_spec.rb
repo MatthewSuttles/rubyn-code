@@ -66,7 +66,7 @@ RSpec.describe RubynCode::IDE::Handlers::ModelsListHandler do
     it "reflects a manually set model_mode" do
       File.write(config_path, YAML.dump(
         "provider" => "anthropic",
-        "model" => "claude-opus-4-6",
+        "model" => "claude-opus-4-8",
         "model_mode" => "manual"
       ))
 
@@ -78,7 +78,7 @@ RSpec.describe RubynCode::IDE::Handlers::ModelsListHandler do
     it "skips providers without models hash" do
       File.write(config_path, YAML.dump(
         "provider" => "anthropic",
-        "model" => "claude-opus-4-6",
+        "model" => "claude-opus-4-8",
         "providers" => {
           "custom_provider" => { "base_url" => "https://example.com" },
           "openai" => {

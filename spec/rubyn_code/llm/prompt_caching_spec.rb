@@ -10,7 +10,7 @@ RSpec.describe RubynCode::LLM::Adapters::Anthropic, 'prompt caching' do
       messages: [{ role: 'user', content: 'hi' }],
       tools: nil,
       system: nil,
-      model: 'claude-opus-4-6',
+      model: 'claude-opus-4-8',
       max_tokens: 8000,
       stream: false
     }.merge(args))

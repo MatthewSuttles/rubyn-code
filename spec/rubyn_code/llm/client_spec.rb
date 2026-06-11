@@ -52,7 +52,7 @@ RSpec.describe RubynCode::LLM::Client do
     it 'resolves providers configured in config.yml' do
       settings = instance_double(
         RubynCode::Config::Settings,
-        model: 'claude-opus-4-6', provider: 'anthropic',
+        model: 'claude-opus-4-8', provider: 'anthropic',
         provider_config: { 'base_url' => 'https://api.groq.com/openai/v1' }
       )
       allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
@@ -65,11 +65,11 @@ RSpec.describe RubynCode::LLM::Client do
     it 'resolves anthropic-format providers to AnthropicCompatible adapter' do
       settings = instance_double(
         RubynCode::Config::Settings,
-        model: 'claude-opus-4-6', provider: 'anthropic',
+        model: 'claude-opus-4-8', provider: 'anthropic',
         provider_config: {
           'base_url' => 'https://proxy.example.com/v1',
           'api_format' => 'anthropic',
-          'models' => { 'top' => 'claude-opus-4-6' }
+          'models' => { 'top' => 'claude-opus-4-8' }
         }
       )
       allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
@@ -77,13 +77,13 @@ RSpec.describe RubynCode::LLM::Client do
       proxy_client = described_class.new(provider: 'proxy')
       expect(proxy_client.provider_name).to eq('proxy')
       expect(proxy_client.adapter).to be_a(RubynCode::LLM::Adapters::AnthropicCompatible)
-      expect(proxy_client.models).to eq(%w[claude-opus-4-6])
+      expect(proxy_client.models).to eq(%w[claude-opus-4-8])
     end
 
     it 'defaults to OpenAICompatible when api_format is not set' do
       settings = instance_double(
         RubynCode::Config::Settings,
-        model: 'claude-opus-4-6', provider: 'anthropic',
+        model: 'claude-opus-4-8', provider: 'anthropic',
         provider_config: {
           'base_url' => 'https://api.together.xyz/v1',
           'models' => %w[meta-llama/Llama-3-70b]
@@ -98,7 +98,7 @@ RSpec.describe RubynCode::LLM::Client do
     it 'raises ConfigError when provider has no config' do
       settings = instance_double(
         RubynCode::Config::Settings,
-        model: 'claude-opus-4-6', provider: 'anthropic',
+        model: 'claude-opus-4-8', provider: 'anthropic',
         provider_config: nil
       )
       allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)
@@ -110,7 +110,7 @@ RSpec.describe RubynCode::LLM::Client do
     it 'raises ConfigError when provider config has no base_url' do
       settings = instance_double(
         RubynCode::Config::Settings,
-        model: 'claude-opus-4-6', provider: 'anthropic',
+        model: 'claude-opus-4-8', provider: 'anthropic',
         provider_config: { 'models' => ['some-model'] }
       )
       allow(RubynCode::Config::Settings).to receive(:new).and_return(settings)

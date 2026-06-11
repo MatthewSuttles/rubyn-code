@@ -14,7 +14,7 @@ module RubynCode
     #       models:
     #         cheap: claude-haiku-4-5
     #         mid: claude-sonnet-4-6
-    #         top: claude-opus-4-6
+    #         top: claude-opus-4-8
     #     openai:
     #       env_key: OPENAI_API_KEY
     #       models:
@@ -50,7 +50,7 @@ module RubynCode
           %w[openai gpt-5.4-mini]
         ].freeze,
         top: [
-          %w[anthropic claude-opus-4-6],
+          %w[anthropic claude-opus-4-8],
           %w[openai gpt-5.4]
         ].freeze
       }.freeze
