@@ -11,6 +11,7 @@ module RubynCode
       class Anthropic < Base
         include JsonParsing
         include PromptCaching
+        include TokenCaching
 
         API_URL = 'https://api.anthropic.com/v1/messages'
         ANTHROPIC_VERSION = '2023-06-01'
@@ -51,26 +52,6 @@ module RubynCode
 
         def api_url
           API_URL
-        end
-
-        # -- Auth ---------------------------------------------------------
-
-        def oauth_token?
-          access_token.include?('sk-ant-oat')
-        end
-
-        def ensure_valid_token!
-          return if Auth::TokenStore.valid?
-
-          raise Client::AuthExpiredError,
-                'No valid authentication. Run `rubyn-code --auth` or set ANTHROPIC_API_KEY.'
-        end
-
-        def access_token
-          tokens = Auth::TokenStore.load
-          raise Client::AuthExpiredError, 'No stored access token' unless tokens&.dig(:access_token)
-
-          tokens[:access_token]
         end
 
         # -- Request execution --------------------------------------------
@@ -145,6 +126,7 @@ module RubynCode
 
           error_msg = extract_error_message(error_chunks.join)
 
+          invalidate_token_cache! if response.status == 401
           raise Client::AuthExpiredError, "Authentication expired: #{error_msg}" if response.status == 401
           raise Client::PromptTooLongError, "Prompt too long: #{error_msg}" if response.status == 413
 
@@ -228,6 +210,7 @@ module RubynCode
           error_type = body&.dig('error', 'type') || 'api_error'
 
           log_api_error(response)
+          invalidate_token_cache! if response.status == 401
           raise Client::AuthExpiredError, "Authentication expired: #{error_msg}" if response.status == 401
           raise Client::PromptTooLongError, "Prompt too long: #{error_msg}" if response.status == 413
 

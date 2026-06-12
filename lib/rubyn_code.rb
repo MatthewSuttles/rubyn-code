@@ -49,6 +49,7 @@ module RubynCode
       autoload :Base, 'rubyn_code/llm/adapters/base'
       autoload :JsonParsing, 'rubyn_code/llm/adapters/json_parsing'
       autoload :PromptCaching, 'rubyn_code/llm/adapters/prompt_caching'
+      autoload :TokenCaching, 'rubyn_code/llm/adapters/token_caching'
       autoload :Anthropic, 'rubyn_code/llm/adapters/anthropic'
       autoload :AnthropicCompatible, 'rubyn_code/llm/adapters/anthropic_compatible'
       autoload :AnthropicStreaming, 'rubyn_code/llm/adapters/anthropic_streaming'
