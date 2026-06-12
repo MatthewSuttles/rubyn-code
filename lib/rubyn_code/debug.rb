@@ -1,11 +1,7 @@
 # frozen_string_literal: true
 
-require 'pastel'
-
 module RubynCode
   module Debug
-    PASTEL = Pastel.new
-
     @enabled = false
     @output = $stderr
 
@@ -32,7 +28,7 @@ module RubynCode
         return unless enabled?
 
         timestamp = Time.now.strftime('%H:%M:%S.%L')
-        prefix = "#{PASTEL.dim("[#{timestamp}]")} #{PASTEL.send(color, "[#{tag}]")}"
+        prefix = "#{pastel.dim("[#{timestamp}]")} #{pastel.send(color, "[#{tag}]")}"
         @output.puts "#{prefix} #{message}"
       end
 
@@ -68,6 +64,16 @@ module RubynCode
 
       def error(message)
         log('error', message, color: :red)
+      end
+
+      private
+
+      # Lazy so boot never pays for pastel when debug output is off.
+      def pastel
+        @pastel ||= begin
+          require 'pastel'
+          Pastel.new
+        end
       end
     end
   end

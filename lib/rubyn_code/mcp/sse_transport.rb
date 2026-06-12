@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'faraday'
 require 'json'
 require 'uri'
 
@@ -111,6 +110,7 @@ module RubynCode
       end
 
       def connection
+        require 'faraday'
         @connection ||= Faraday.new(url: base_url) do |f|
           f.options.timeout = @timeout
           f.options.open_timeout = @timeout
@@ -165,6 +165,7 @@ module RubynCode
       end
 
       def build_sse_connection
+        require 'faraday'
         Faraday.new(url: base_url) do |f|
           f.options.timeout = nil
           f.options.open_timeout = @timeout

@@ -3,7 +3,6 @@
 require 'open3'
 require 'cgi'
 require 'json'
-require 'faraday'
 require_relative 'base'
 require_relative 'registry'
 
@@ -112,6 +111,7 @@ module RubynCode
       end
 
       def brave_request(query, num_results)
+        require 'faraday'
         Faraday.get('https://api.search.brave.com/res/v1/web/search') do |req|
           req.params['q'] = query
           req.params['count'] = num_results
@@ -135,6 +135,7 @@ module RubynCode
       end
 
       def tavily_request(query, num_results)
+        require 'faraday'
         Faraday.post('https://api.tavily.com/search') do |req|
           req.headers['Content-Type'] = 'application/json'
           req.body = JSON.generate(
@@ -156,6 +157,7 @@ module RubynCode
       end
 
       def serpapi_request(query, num_results)
+        require 'faraday'
         Faraday.get('https://serpapi.com/search.json') do |req|
           req.params['q'] = query
           req.params['num'] = num_results
@@ -175,6 +177,7 @@ module RubynCode
       end
 
       def google_request(query, num_results)
+        require 'faraday'
         Faraday.get('https://www.googleapis.com/customsearch/v1') do |req|
           req.params['q'] = query
           req.params['num'] = [num_results, 10].min

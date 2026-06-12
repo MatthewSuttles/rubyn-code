@@ -17,10 +17,12 @@ module RubynCode
   class UserDeniedError < Error; end
 
   # Infrastructure
-  autoload :Config, 'rubyn_code/config/settings'
-
   module Config
+    autoload :Settings, 'rubyn_code/config/settings'
+    autoload :Defaults, 'rubyn_code/config/defaults'
+    autoload :ProjectConfig, 'rubyn_code/config/project_config'
     autoload :ProjectProfile, 'rubyn_code/config/project_profile'
+    autoload :Validator, 'rubyn_code/config/validator'
   end
 
   # Database

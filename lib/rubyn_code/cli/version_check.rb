@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'faraday'
 require 'json'
 
 module RubynCode
@@ -60,6 +59,7 @@ module RubynCode
       end
 
       def fetch_latest_version
+        require 'faraday'
         conn = Faraday.new do |f|
           f.options.timeout = 5
           f.options.open_timeout = 3

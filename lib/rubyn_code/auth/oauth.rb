@@ -3,7 +3,6 @@
 require 'securerandom'
 require 'digest'
 require 'base64'
-require 'faraday'
 require 'json'
 
 module RubynCode
@@ -163,6 +162,7 @@ module RubynCode
       end
 
       def http_client
+        require 'faraday'
         @http_client ||= Faraday.new do |f|
           f.options.timeout = 30
           f.options.open_timeout = 10

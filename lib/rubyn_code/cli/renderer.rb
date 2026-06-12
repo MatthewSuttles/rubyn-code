@@ -1,14 +1,12 @@
 # frozen_string_literal: true
 
 require 'pastel'
-require 'rouge'
 
 module RubynCode
   module CLI
     class Renderer
       def initialize
         @pastel = Pastel.new
-        @rouge_formatter = Rouge::Formatters::Terminal256.new(theme: Rouge::Themes::Monokai.new)
       end
 
       attr_writer :yolo
@@ -177,6 +175,9 @@ module RubynCode
       end
 
       def render_code_block(code, lang)
+        # Lazy so REPL boot never pays for rouge until a code block is rendered.
+        require 'rouge'
+        @rouge_formatter ||= Rouge::Formatters::Terminal256.new(theme: Rouge::Themes::Monokai.new)
         lexer = Rouge::Lexer.find(lang) || Rouge::Lexers::PlainText.new
         highlighted = @rouge_formatter.format(lexer.lex(code))
         border = @pastel.dim('  │ ')
