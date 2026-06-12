@@ -28,6 +28,38 @@ RSpec.describe RubynCode::Context::Manager do
       expect(manager.estimated_tokens(messages)).to be_a(Integer)
       expect(manager.estimated_tokens(messages)).to be > 0
     end
+
+    context 'with a Conversation (incremental fast path)' do
+      let(:conversation) { RubynCode::Agent::Conversation.new }
+
+      it 'matches the full-recompute estimate from the raw messages array' do
+        conversation.add_user_message('a question with some length to it')
+        conversation.add_assistant_message(
+          'reply',
+          tool_calls: [{ type: 'tool_use', id: 't1', name: 'bash', input: { command: 'ls' } }]
+        )
+        conversation.add_tool_result('t1', 'bash', 'tool output ' * 10)
+
+        expect(manager.estimated_tokens(conversation))
+          .to eq(manager.estimated_tokens(conversation.messages))
+      end
+
+      it 'stays consistent after check_compaction! micro-compacts messages in place' do
+        mgr = described_class.new(threshold: 100)
+        conversation.add_user_message('hi')
+        3.times do |i|
+          conversation.add_assistant_message(
+            '', tool_calls: [{ type: 'tool_use', id: "t#{i}", name: 'bash', input: {} }]
+          )
+          conversation.add_tool_result("t#{i}", 'bash', 'x' * 300)
+        end
+
+        mgr.check_compaction!(conversation)
+
+        expect(manager.estimated_tokens(conversation))
+          .to eq(manager.estimated_tokens(conversation.messages))
+      end
+    end
   end
 
   describe '#needs_compaction?' do

@@ -6,14 +6,12 @@ RSpec.describe RubynCode::LLM::Adapters::Anthropic, 'prompt caching' do
   let(:adapter) { described_class.new }
 
   def build_body(**args)
-    adapter.send(:build_request_body, **{
-      messages: [{ role: 'user', content: 'hi' }],
-      tools: nil,
-      system: nil,
-      model: 'claude-opus-4-8',
-      max_tokens: 8000,
-      stream: false
-    }.merge(args))
+    adapter.send(:build_request_body, messages: [{ role: 'user', content: 'hi' }],
+                                      tools: nil,
+                                      system: nil,
+                                      model: 'claude-opus-4-8',
+                                      max_tokens: 8000,
+                                      stream: false, **args)
   end
 
   before do
@@ -65,6 +63,49 @@ RSpec.describe RubynCode::LLM::Adapters::Anthropic, 'prompt caching' do
     it 'does not add tools when empty' do
       body = build_body(tools: [])
       expect(body[:tools]).to be_nil
+    end
+  end
+
+  describe 'message cache breakpoint' do
+    it 'tags the last message content with cache_control' do
+      messages = [
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: [{ type: 'text', text: 'reply' }] }
+      ]
+      body = build_body(messages: messages)
+
+      expect(body[:messages].last[:content].last[:cache_control]).to eq({ type: 'ephemeral' })
+    end
+
+    it 'wraps string content of the last message in a tagged text block' do
+      body = build_body(messages: [{ role: 'user', content: 'hi' }])
+
+      expect(body[:messages].last[:content])
+        .to eq([{ type: 'text', text: 'hi', cache_control: { type: 'ephemeral' } }])
+    end
+
+    it 'does not mutate the original messages' do
+      messages = [
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: [{ type: 'text', text: 'reply' }] }
+      ]
+      build_body(messages: messages)
+
+      expect(messages[0]).to eq(role: 'user', content: 'first')
+      expect(messages[1][:content]).to eq([{ type: 'text', text: 'reply' }])
+    end
+
+    it 'only copies the last message, passing earlier ones through by reference' do
+      messages = [
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: [{ type: 'text', text: 'reply' }] },
+        { role: 'user', content: 'latest' }
+      ]
+      body = build_body(messages: messages)
+
+      expect(body[:messages][0]).to equal(messages[0])
+      expect(body[:messages][1]).to equal(messages[1])
+      expect(body[:messages][2]).not_to equal(messages[2])
     end
   end
 end

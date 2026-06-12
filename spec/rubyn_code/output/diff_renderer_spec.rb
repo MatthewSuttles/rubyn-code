@@ -158,12 +158,12 @@ RSpec.describe RubynCode::Output::DiffRenderer do
       it 'produces separate @@ hunk headers' do
         # Build a file with changes far apart (more than 2 * context_lines + 1 lines apart)
         lines = (1..20).map { |i| "line #{i}" }
-        old_text = lines.join("\n") + "\n"
+        old_text = "#{lines.join("\n")}\n"
 
         new_lines = lines.dup
         new_lines[1] = 'CHANGED 2'
         new_lines[18] = 'CHANGED 19'
-        new_text = new_lines.join("\n") + "\n"
+        new_text = "#{new_lines.join("\n")}\n"
 
         result = renderer.render(old_text, new_text)
         hunk_headers = result.scan(/^@@.*@@$/)
@@ -245,6 +245,98 @@ RSpec.describe RubynCode::Output::DiffRenderer do
     end
   end
 
+  describe 'prefix/suffix trimming' do
+    # Renders with the trimming optimization disabled: full LCS over all
+    # lines, exactly what compute_hunks did before common prefix/suffix
+    # lines were stripped. Used to prove the optimized output is identical.
+    def reference_render(old_text, new_text)
+      ref = described_class.new(enabled: false, context_lines: context_lines)
+      allow(ref).to receive(:build_diff_ops) do |old_lines, new_lines|
+        table = ref.send(:build_lcs_table, old_lines, new_lines)
+        ref.send(:backtrack_diff, table, old_lines, new_lines)
+      end
+      ref.render(old_text, new_text)
+    end
+
+    def expect_same_as_reference(old_text, new_text)
+      expect(renderer.render(old_text, new_text)).to eq(reference_render(old_text, new_text))
+    end
+
+    it 'produces identical output for a small change inside a long file' do
+      lines = (1..100).map { |i| "line #{i}" }
+      old_text = "#{lines.join("\n")}\n"
+      new_lines = lines.dup
+      new_lines[49] = 'CHANGED 50'
+      expect_same_as_reference(old_text, "#{new_lines.join("\n")}\n")
+    end
+
+    it 'produces identical output for a change on the first line' do
+      old_text = "alpha\nbeta\ngamma\ndelta\n"
+      new_text = "ALPHA\nbeta\ngamma\ndelta\n"
+      expect_same_as_reference(old_text, new_text)
+    end
+
+    it 'produces identical output for a change on the last line' do
+      old_text = "alpha\nbeta\ngamma\ndelta\n"
+      new_text = "alpha\nbeta\ngamma\nDELTA\n"
+      expect_same_as_reference(old_text, new_text)
+    end
+
+    it 'produces identical output for insertions and deletions in the middle' do
+      old_text = "a\nb\nc\nd\ne\nf\n"
+      new_text = "a\nb\nX\nY\nd\nf\n"
+      expect_same_as_reference(old_text, new_text)
+    end
+
+    it 'produces identical output for changes far apart (multiple hunks)' do
+      lines = (1..30).map { |i| "line #{i}" }
+      old_text = "#{lines.join("\n")}\n"
+      new_lines = lines.dup
+      new_lines[2] = 'CHANGED 3'
+      new_lines[27] = 'CHANGED 28'
+      expect_same_as_reference(old_text, "#{new_lines.join("\n")}\n")
+    end
+
+    it 'produces identical output for completely different texts' do
+      expect_same_as_reference("one\ntwo\nthree\n", "four\nfive\n")
+    end
+
+    it 'produces identical output for repeated lines around the change' do
+      old_text = "x\nx\na\nx\nx\n"
+      new_text = "x\nx\nb\nx\nx\n"
+      expect_same_as_reference(old_text, new_text)
+    end
+
+    it 'reports correct line numbers in the hunk header after trimming' do
+      lines = (1..20).map { |i| "line #{i}" }
+      old_text = "#{lines.join("\n")}\n"
+      new_lines = lines.dup
+      new_lines[9] = 'CHANGED 10'
+      result = renderer.render(old_text, "#{new_lines.join("\n")}\n")
+
+      expect(result).to include('@@ -7,7 +7,7 @@')
+    end
+  end
+
+  describe 'oversized diff fallback' do
+    before { stub_const("#{described_class}::MAX_LCS_CELLS", 4) }
+
+    it 'still renders all deletions and additions for the changed section' do
+      old_text = "same\none\ntwo\nthree\nsame end\n"
+      new_text = "same\nfour\nfive\nsix\nsame end\n"
+      result = renderer.render(old_text, new_text)
+
+      %w[one two three].each { |l| expect(result).to include("-#{l}") }
+      %w[four five six].each { |l| expect(result).to include("+#{l}") }
+      expect(result).to include(' same')
+    end
+
+    it 'still reports no differences for identical texts' do
+      text = "#{(1..10).map { |i| "line #{i}" }.join("\n")}\n"
+      expect(renderer.render(text, text)).to eq('No differences found.')
+    end
+  end
+
   describe '#initialize' do
     context 'with enabled: false' do
       it 'creates a Pastel instance with colors disabled' do
@@ -268,12 +360,12 @@ RSpec.describe RubynCode::Output::DiffRenderer do
         r = described_class.new(enabled: false, context_lines: 0)
 
         lines = (1..10).map { |i| "line #{i}" }
-        old_text = lines.join("\n") + "\n"
+        old_text = "#{lines.join("\n")}\n"
 
         new_lines = lines.dup
         new_lines[1] = 'CHANGED 2'
         new_lines[5] = 'CHANGED 6'
-        new_text = new_lines.join("\n") + "\n"
+        new_text = "#{new_lines.join("\n")}\n"
 
         result = r.render(old_text, new_text)
         hunk_headers = result.scan(/^@@.*@@$/)
@@ -286,12 +378,12 @@ RSpec.describe RubynCode::Output::DiffRenderer do
         r = described_class.new(enabled: false, context_lines: 10)
 
         lines = (1..10).map { |i| "line #{i}" }
-        old_text = lines.join("\n") + "\n"
+        old_text = "#{lines.join("\n")}\n"
 
         new_lines = lines.dup
         new_lines[1] = 'CHANGED 2'
         new_lines[5] = 'CHANGED 6'
-        new_text = new_lines.join("\n") + "\n"
+        new_text = "#{new_lines.join("\n")}\n"
 
         result = r.render(old_text, new_text)
         hunk_headers = result.scan(/^@@.*@@$/)

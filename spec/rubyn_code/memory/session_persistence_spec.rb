@@ -50,6 +50,86 @@ RSpec.describe RubynCode::Memory::SessionPersistence do
     end
   end
 
+  describe 'incremental saves' do
+    let(:messages) { [{ role: 'user', content: 'hello' }] }
+
+    def journal_rows(session_id)
+      db.query('SELECT * FROM messages WHERE session_id = ? ORDER BY id', [session_id]).to_a
+    end
+
+    it 'round-trips messages appended across consecutive saves' do
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+      messages << { role: 'assistant', content: [{ type: 'text', text: 'hi!' }] }
+      messages << { role: 'user', content: 'follow-up' }
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+
+      expect(persistence.load_session('sess-1')[:messages]).to eq(messages)
+    end
+
+    it 'journals appended messages instead of rewriting the blob' do
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+      messages << { role: 'assistant', content: [{ type: 'text', text: 'hi!' }] }
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+
+      blob = db.query('SELECT messages FROM sessions WHERE id = ?', ['sess-1']).first['messages']
+      expect(JSON.parse(blob).length).to eq(1) # blob still holds only the first snapshot
+      expect(journal_rows('sess-1').length).to eq(1)
+    end
+
+    it 'snapshots and clears the journal when history is rewritten' do
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+      messages << { role: 'assistant', content: [{ type: 'text', text: 'hi!' }] }
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+
+      compacted = [{ role: 'user', content: 'compacted summary' }]
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: compacted)
+
+      expect(journal_rows('sess-1')).to be_empty
+      expect(persistence.load_session('sess-1')[:messages]).to eq(compacted)
+    end
+
+    it 'consolidates the journal into the blob on the first save of a new instance' do
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+      messages << { role: 'user', content: 'journaled' }
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+
+      fresh = described_class.new(db)
+      fresh.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+
+      expect(journal_rows('sess-1')).to be_empty
+      expect(fresh.load_session('sess-1')[:messages]).to eq(messages)
+    end
+
+    it 'updates title and updated_at on append saves' do
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+      messages << { role: 'user', content: 'more' }
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages, title: 'Named')
+
+      expect(persistence.load_session('sess-1')[:title]).to eq('Named')
+    end
+
+    it 'clears the journal when update_session rewrites messages' do
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+      messages << { role: 'user', content: 'journaled' }
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+
+      persistence.update_session('sess-1', messages: [{ role: 'user', content: 'rewritten' }])
+
+      expect(journal_rows('sess-1')).to be_empty
+      expect(persistence.load_session('sess-1')[:messages]).to eq([{ role: 'user', content: 'rewritten' }])
+    end
+
+    it 'removes journal rows when the session is deleted' do
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+      messages << { role: 'user', content: 'journaled' }
+      persistence.save_session(session_id: 'sess-1', project_path: '/test', messages: messages)
+
+      persistence.delete_session('sess-1')
+
+      expect(journal_rows('sess-1')).to be_empty
+    end
+  end
+
   describe '#load_session' do
     it 'returns nil for nonexistent session' do
       expect(persistence.load_session('nope')).to be_nil

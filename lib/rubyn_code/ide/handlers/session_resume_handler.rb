@@ -30,7 +30,7 @@ module RubynCode
           prompt = @server.handler_instance(:prompt)
           if prompt
             conversation = Agent::Conversation.new
-            messages.each { |msg| conversation.messages << msg }
+            conversation.replace!(messages.dup)
             prompt.inject_conversation(session_id, conversation)
           end
 

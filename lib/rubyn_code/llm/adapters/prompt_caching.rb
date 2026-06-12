@@ -36,7 +36,11 @@ module RubynCode
         def add_message_cache_breakpoint(messages)
           return messages if messages.nil? || messages.empty?
 
-          tagged = messages.map(&:dup)
+          # Only the last message gets the cache_control tag, so only it
+          # needs to be duped — copying the whole history every call is
+          # wasted work on long conversations.
+          tagged = messages.dup
+          tagged[-1] = tagged[-1].dup
           tag_last_message_content(tagged.last)
           tagged
         end

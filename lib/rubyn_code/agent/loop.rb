@@ -243,15 +243,15 @@ module RubynCode
       # after text responses — mirrors Claude Code's "pause for compaction"
       # behavior that keeps context manageable in long sessions.
       def compact_if_needed
-        return unless @context_manager.needs_compaction?(@conversation.messages)
+        return unless @context_manager.needs_compaction?(@conversation)
 
-        est = @context_manager.estimated_tokens(@conversation.messages)
+        est = @context_manager.estimated_tokens(@conversation)
         RubynCode::Debug.token(
           "Context over threshold (#{est}) — running compaction"
         )
         @context_manager.check_compaction!(@conversation)
 
-        after = @context_manager.estimated_tokens(@conversation.messages)
+        after = @context_manager.estimated_tokens(@conversation)
         RubynCode::Debug.token("Compacted: #{est} → #{after} tokens")
       rescue StandardError => e
         RubynCode::Debug.warn("Compaction failed: #{e.message}")

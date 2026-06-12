@@ -4,9 +4,14 @@ require 'pastel'
 
 module RubynCode
   module Output
-    class DiffRenderer
+    class DiffRenderer # rubocop:disable Metrics/ClassLength -- LCS diff computation + hunk grouping + rendering
       # Immutable value object representing a single hunk in a unified diff.
       Hunk = Data.define(:old_start, :old_count, :new_start, :new_count, :lines)
+
+      # The LCS table is O(N×M) in time and memory. Beyond this many cells
+      # (after prefix/suffix trimming) the middle section is rendered as a
+      # plain delete-all/add-all block instead of a minimal diff.
+      MAX_LCS_CELLS = 1_000_000
 
       # Represents a single diff line with its type and content.
       DiffLine = Data.define(:type, :content) do
@@ -79,9 +84,57 @@ module RubynCode
 
       # Computes unified-diff hunks using the Myers diff algorithm (simple LCS approach).
       def compute_hunks(old_lines, new_lines)
-        lcs_table = build_lcs_table(old_lines, new_lines)
-        raw_diff = backtrack_diff(lcs_table, old_lines, new_lines)
+        raw_diff = build_diff_ops(old_lines, new_lines)
         group_into_hunks(raw_diff, old_lines, new_lines)
+      end
+
+      # Strips common prefix/suffix lines before running the quadratic LCS —
+      # for the typical "small edit in a large file" case this shrinks the
+      # table from O(file²) to O(change²) — then re-offsets the middle ops
+      # back to absolute line indices.
+      def build_diff_ops(old_lines, new_lines)
+        prefix = common_prefix_length(old_lines, new_lines)
+        suffix = common_suffix_length(old_lines, new_lines, prefix)
+
+        old_mid = old_lines[prefix...(old_lines.size - suffix)]
+        new_mid = new_lines[prefix...(new_lines.size - suffix)]
+
+        ops = Array.new(prefix) { |i| [:equal, i, i] }
+        middle_diff_ops(old_mid, new_mid).each do |op, old_idx, new_idx|
+          ops << [op, old_idx && (old_idx + prefix), new_idx && (new_idx + prefix)]
+        end
+        suffix.times do |i|
+          ops << [:equal, old_lines.size - suffix + i, new_lines.size - suffix + i]
+        end
+        ops
+      end
+
+      def middle_diff_ops(old_mid, new_mid)
+        return oversized_diff_ops(old_mid, new_mid) if old_mid.size * new_mid.size > MAX_LCS_CELLS
+
+        table = build_lcs_table(old_mid, new_mid)
+        backtrack_diff(table, old_mid, new_mid)
+      end
+
+      # Fallback for diffs too large for the LCS table: treat the whole
+      # middle section as replaced.
+      def oversized_diff_ops(old_mid, new_mid)
+        Array.new(old_mid.size) { |i| [:delete, i, nil] } +
+          Array.new(new_mid.size) { |i| [:add, nil, i] }
+      end
+
+      def common_prefix_length(old_lines, new_lines)
+        max = [old_lines.size, new_lines.size].min
+        count = 0
+        count += 1 while count < max && old_lines[count] == new_lines[count]
+        count
+      end
+
+      def common_suffix_length(old_lines, new_lines, prefix)
+        max = [old_lines.size, new_lines.size].min - prefix
+        count = 0
+        count += 1 while count < max && old_lines[-1 - count] == new_lines[-1 - count]
+        count
       end
 
       # Builds the LCS length table for two arrays of lines.
@@ -110,6 +163,8 @@ module RubynCode
 
       # Backtracks through the LCS table to produce a sequence of diff operations.
       # Returns an array of [:equal, :delete, :add] paired with line indices.
+      # Ops are collected in reverse (backtracking walks end-to-start) and
+      # flipped once at the end — unshift per op would be O(n²).
       def backtrack_diff(table, old_lines, new_lines)
         result = []
         old_idx = old_lines.size
@@ -119,18 +174,18 @@ module RubynCode
           old_idx, new_idx = backtrack_step(result, table, old_lines, new_lines, old_idx, new_idx)
         end
 
-        result
+        result.reverse!
       end
 
       def backtrack_step(result, table, old_lines, new_lines, old_idx, new_idx) # rubocop:disable Metrics/ParameterLists -- LCS backtrack step requires all state
         if lines_match?(old_lines, new_lines, old_idx, new_idx)
-          result.unshift([:equal, old_idx - 1, new_idx - 1])
+          result << [:equal, old_idx - 1, new_idx - 1]
           [old_idx - 1, new_idx - 1]
         elsif new_idx.positive? && (old_idx.zero? || table[old_idx][new_idx - 1] >= table[old_idx - 1][new_idx])
-          result.unshift([:add, nil, new_idx - 1])
+          result << [:add, nil, new_idx - 1]
           [old_idx, new_idx - 1]
         else
-          result.unshift([:delete, old_idx - 1, nil])
+          result << [:delete, old_idx - 1, nil]
           [old_idx - 1, new_idx]
         end
       end

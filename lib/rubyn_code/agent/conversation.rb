@@ -1,12 +1,15 @@
 # frozen_string_literal: true
 
+require 'json'
+
 module RubynCode
   module Agent
-    class Conversation
+    class Conversation # rubocop:disable Metrics/ClassLength -- message log + incremental token/tool-ID bookkeeping
       attr_reader :messages
 
       def initialize
         @messages = []
+        reset_derived_state!
       end
 
       # Append a user turn to the conversation.
@@ -16,6 +19,7 @@ module RubynCode
       def add_user_message(content)
         message = { role: 'user', content: content }
         @messages << message
+        track_added_message(message)
         message
       end
 
@@ -28,6 +32,7 @@ module RubynCode
         blocks = normalize_content(content, tool_calls)
         message = { role: 'assistant', content: blocks }
         @messages << message
+        track_added_message(message)
         message
       end
 
@@ -52,8 +57,11 @@ module RubynCode
         # tool results for the same assistant turn are batched together.
         if @messages.last && @messages.last[:role] == 'user' && tool_result_message?(@messages.last)
           @messages.last[:content] << result_block
+          track_appended_block(result_block)
         else
-          @messages << { role: 'user', content: [result_block] }
+          message = { role: 'user', content: [result_block] }
+          @messages << message
+          track_added_message(message)
         end
 
         result_block
@@ -79,6 +87,29 @@ module RubynCode
       # @return [void]
       def clear!
         @messages.clear
+        reset_derived_state!
+      end
+
+      # Character length of the JSON-serialized messages array, maintained
+      # incrementally on append so per-turn token estimation doesn't have to
+      # re-serialize the whole history. Matches JSON.generate(messages).length.
+      #
+      # @return [Integer]
+      def estimated_json_chars
+        @json_chars ||= @messages.sum { |msg| JSON.generate(msg).length }
+        return 2 if @messages.empty?
+
+        # "[" + per-message JSON joined by "," + "]"
+        @json_chars + @messages.length + 1
+      end
+
+      # Drops cached serialization/tool-ID bookkeeping. Must be called after
+      # messages are mutated in place from outside this class (e.g. by
+      # Context::MicroCompact); the caches rebuild lazily on next access.
+      #
+      # @return [void]
+      def refresh_derived_state!
+        reset_derived_state!
       end
 
       # Return the messages array formatted for the Claude API.
@@ -115,21 +146,76 @@ module RubynCode
           @messages.pop
           removed += 1
         end
+        reset_derived_state!
       end
 
       # Replace messages with a new array (used after compaction).
       def replace!(new_messages)
         @messages.replace(new_messages)
+        reset_derived_state!
       end
 
       private
+
+      # Derived bookkeeping kept in sync with @messages so hot paths stay
+      # cheap: per-message JSON char total (token estimation) and
+      # tool_use/tool_result ID sets (orphan repair). nil means "rebuild
+      # lazily from @messages on next access".
+      def reset_derived_state!
+        @json_chars = nil
+        @tool_use_ids = nil
+        @tool_result_ids = nil
+      end
+
+      def track_added_message(message)
+        register_tool_ids(message)
+        return if @json_chars.nil?
+
+        @json_chars += JSON.generate(message).length
+      rescue StandardError
+        @json_chars = nil
+      end
+
+      # A tool_result block appended to an existing user message grows that
+      # message's JSON by the block plus one separator comma.
+      def track_appended_block(result_block)
+        @tool_result_ids << result_block[:tool_use_id] if @tool_result_ids
+        return if @json_chars.nil?
+
+        @json_chars += JSON.generate(result_block).length + 1
+      rescue StandardError
+        @json_chars = nil
+      end
+
+      def register_tool_ids(message)
+        return unless @tool_use_ids && message[:content].is_a?(Array)
+
+        message[:content].each do |block|
+          next unless block.is_a?(Hash)
+
+          if message[:role] == 'assistant' && block_matches_type?(block, 'tool_use')
+            @tool_use_ids << (block[:id] || block['id'])
+          elsif message[:role] == 'user' && block_matches_type?(block, 'tool_result')
+            @tool_result_ids << (block[:tool_use_id] || block['tool_use_id'])
+          end
+        end
+      end
+
+      def rebuild_tool_id_sets!
+        @tool_use_ids = collect_tool_use_ids(@messages)
+        @tool_result_ids = collect_tool_result_ids(@messages)
+      end
 
       # Ensure every tool_use block has a matching tool_result.
       # If a tool_use is orphaned (e.g. from Ctrl-C interruption),
       # inject a synthetic tool_result immediately after the assistant
       # message that contains the orphaned tool_use.
+      #
+      # The ID sets are tracked incrementally as messages are appended, so
+      # the common no-orphan case skips the full-history scans.
       def repair_orphaned_tool_uses(formatted)
-        orphaned = collect_tool_use_ids(formatted) - collect_tool_result_ids(formatted)
+        rebuild_tool_id_sets! if @tool_use_ids.nil?
+        orphaned = @tool_use_ids - @tool_result_ids
         return formatted if orphaned.empty?
 
         insert_orphan_results(formatted, orphaned)

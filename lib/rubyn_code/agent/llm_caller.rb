@@ -114,7 +114,7 @@ module RubynCode
 
       def run_compaction
         before = @conversation.length
-        est = @context_manager.estimated_tokens(@conversation.messages)
+        est = @context_manager.estimated_tokens(@conversation)
         RubynCode::Debug.token(
           "context=#{est} tokens (~#{before} messages, " \
           "threshold=#{Config::Defaults::CONTEXT_THRESHOLD_TOKENS})"
@@ -130,7 +130,7 @@ module RubynCode
         after = @conversation.length
         return unless after < before
 
-        new_est = @context_manager.estimated_tokens(@conversation.messages)
+        new_est = @context_manager.estimated_tokens(@conversation)
         RubynCode::Debug.loop_tick(
           "Compacted: #{before} -> #{after} messages " \
           "(#{est} -> #{new_est} tokens)"
