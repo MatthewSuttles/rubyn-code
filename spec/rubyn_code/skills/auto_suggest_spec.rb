@@ -208,6 +208,126 @@ RSpec.describe RubynCode::Skills::AutoSuggest do
     end
   end
 
+  describe '#start / #pending_message' do
+    before do
+      write_gemfile("gem 'stripe'\n")
+
+      allow(registry_client).to receive(:fetch_suggestions)
+        .and_return([{ 'name' => 'stripe', 'reason' => 'stripe gem detected' }])
+    end
+
+    it 'runs the check in a background thread and surfaces the message when done' do
+      suggest.start
+      suggest.instance_variable_get(:@thread).join(5)
+
+      expect(suggest.pending_message).to include('stripe')
+    end
+
+    it 'returns the message only once' do
+      suggest.start
+      suggest.instance_variable_get(:@thread).join(5)
+
+      suggest.pending_message
+      expect(suggest.pending_message).to be_nil
+    end
+
+    it 'returns nil while the check is still running' do
+      allow(registry_client).to receive(:fetch_suggestions) do
+        sleep 10
+        []
+      end
+
+      suggest.start
+
+      expect(suggest.pending_message).to be_nil
+    ensure
+      suggest.instance_variable_get(:@thread)&.kill
+    end
+
+    it 'returns nil when start was never called' do
+      expect(suggest.pending_message).to be_nil
+    end
+  end
+
+  describe 'suggestions cache' do
+    def cache_file
+      File.join(tmpdir, '.rubyn-code', 'suggestions_cache.json')
+    end
+
+    before do
+      write_gemfile("gem 'stripe'\n")
+
+      allow(registry_client).to receive(:fetch_suggestions)
+        .and_return([{ 'name' => 'stripe', 'reason' => 'stripe gem detected' }])
+    end
+
+    it 'writes fetched suggestions to the cache file' do
+      suggest.check
+
+      cache = JSON.parse(File.read(cache_file))
+      expect(cache['suggestions']).to eq([{ 'name' => 'stripe', 'reason' => 'stripe gem detected' }])
+      expect(cache['gemfile_hash']).not_to be_empty
+      expect(cache['fetched_at']).to be_a(Integer)
+    end
+
+    it 'serves a fresh cache without hitting the registry' do
+      suggest.check
+
+      other = described_class.new(project_root: tmpdir, registry_client: registry_client)
+      other.check
+
+      expect(registry_client).to have_received(:fetch_suggestions).once
+    end
+
+    it 'still returns the suggestion message from cache for an unseen pack' do
+      suggest.check
+      FileUtils.rm(state_path) # forget that it was shown
+
+      other = described_class.new(project_root: tmpdir, registry_client: registry_client)
+
+      expect(other.check).to include('stripe')
+      expect(registry_client).to have_received(:fetch_suggestions).once
+    end
+
+    it 'refetches when the cache is older than the TTL' do
+      suggest.check
+
+      cache = JSON.parse(File.read(cache_file))
+      cache['fetched_at'] = Time.now.to_i - described_class::CACHE_TTL - 1
+      File.write(cache_file, JSON.pretty_generate(cache))
+
+      described_class.new(project_root: tmpdir, registry_client: registry_client).check
+
+      expect(registry_client).to have_received(:fetch_suggestions).twice
+    end
+
+    it 'refetches when the Gemfile gems change' do
+      suggest.check
+
+      write_gemfile("gem 'stripe'\ngem 'sidekiq'\n")
+      described_class.new(project_root: tmpdir, registry_client: registry_client).check
+
+      expect(registry_client).to have_received(:fetch_suggestions).twice
+    end
+
+    it 'ignores a corrupted cache file and refetches' do
+      FileUtils.mkdir_p(File.dirname(cache_file))
+      File.write(cache_file, 'not json')
+
+      expect(suggest.check).to include('stripe')
+      expect(registry_client).to have_received(:fetch_suggestions).once
+    end
+
+    it 'does not write a cache when the registry fails' do
+      allow(registry_client).to receive(:fetch_suggestions)
+        .and_raise(RubynCode::Skills::RegistryError, 'Connection refused')
+
+      suggest.check
+
+      expect(File.exist?(cache_file)).to be false
+    end
+  end
+
   describe '#mark_installed' do
     it 'records the pack as installed in state' do
       suggest.mark_installed('stripe')

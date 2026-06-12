@@ -16,6 +16,7 @@ module RubynCode
       def initialize(renderer:)
         @renderer = renderer
         @thread = nil
+        @notified = false
       end
 
       # Kicks off a background check. Call `notify` later to display results.
@@ -26,11 +27,17 @@ module RubynCode
         @thread.abort_on_exception = false
       end
 
-      # Waits briefly for the check to finish and prints a message if outdated.
-      def notify(timeout: 2)
+      # Prints a message if outdated. Non-blocking by default: if the check
+      # hasn't finished yet, returns immediately so it can be retried before
+      # the next prompt. Notifies at most once.
+      def notify(timeout: 0)
+        return if @notified
         return unless @thread
 
         @thread.join(timeout)
+        return if @thread.alive?
+
+        @notified = true
         return unless @result
 
         return unless newer?(@result, RubynCode::VERSION)

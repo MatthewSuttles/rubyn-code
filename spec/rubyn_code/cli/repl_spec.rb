@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
+require 'tmpdir'
 
 RSpec.describe RubynCode::CLI::REPL do
   # ── Shared stubs for expensive external boundaries ──────────────────
@@ -86,7 +87,7 @@ RSpec.describe RubynCode::CLI::REPL do
 
     # AutoSuggest — stub to prevent real HTTP calls during REPL startup
     allow(RubynCode::Skills::AutoSuggest).to receive(:new).and_return(
-      instance_double(RubynCode::Skills::AutoSuggest, check: nil)
+      instance_double(RubynCode::Skills::AutoSuggest, start: nil, pending_message: nil)
     )
 
     # Readline setup
@@ -485,6 +486,42 @@ RSpec.describe RubynCode::CLI::REPL do
 
       # The loop should have exited after two rapid interrupts
       expect(session_persistence).to have_received(:save_session)
+    end
+
+    it 'does not block the prompt when the suggestion network call is slow' do
+      Dir.mktmpdir('rubyn_repl_slow_test_') do |tmpdir|
+        File.write(File.join(tmpdir, 'Gemfile'), "gem 'stripe'\n")
+
+        slow_client = instance_double(RubynCode::Skills::RegistryClient)
+        allow(slow_client).to receive(:fetch_suggestions) do
+          sleep 10
+          []
+        end
+        suggest = RubynCode::Skills::AutoSuggest.new(
+          project_root: tmpdir, registry_client: slow_client
+        )
+        allow(RubynCode::Skills::AutoSuggest).to receive(:new).and_return(suggest)
+        allow(Reline).to receive(:readline).and_return(nil)
+
+        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        repl.run
+        elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+
+        expect(elapsed).to be < 2
+      ensure
+        suggest&.instance_variable_get(:@thread)&.kill
+      end
+    end
+
+    it 'surfaces a suggestion before the next prompt once the check finishes' do
+      suggest = instance_double(RubynCode::Skills::AutoSuggest, start: nil)
+      allow(suggest).to receive(:pending_message).and_return('Skill packs available: stripe')
+      allow(RubynCode::Skills::AutoSuggest).to receive(:new).and_return(suggest)
+      allow(Reline).to receive(:readline).and_return(nil)
+
+      repl.run
+
+      expect(renderer).to have_received(:info).with('Skill packs available: stripe')
     end
 
     it 'handles multiple inputs in sequence' do
