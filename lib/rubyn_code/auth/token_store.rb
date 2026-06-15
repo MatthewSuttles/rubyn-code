@@ -11,13 +11,27 @@ module RubynCode
       EXPIRY_BUFFER_SECONDS = 300 # 5 minutes
       KEYCHAIN_SERVICE = 'Claude Code-credentials'
 
+      # Strategy chain: each method returns a token hash or nil.
+      # First non-nil result wins. Adding a new auth source is a one-line entry.
+      LOAD_STRATEGIES = %i[
+        load_from_keychain
+        load_from_credentials_file
+        load_from_file
+        load_from_env
+      ].freeze
+
       class << self
         # Load tokens with fallback chain:
         # 1. macOS Keychain (Claude Code's OAuth token)
-        # 2. Local YAML file (~/.rubyn-code/tokens.yml)
-        # 3. ANTHROPIC_API_KEY environment variable
+        # 2. Claude Code credentials file (~/.claude/.credentials.json)
+        # 3. Local YAML file (~/.rubyn-code/tokens.yml)
+        # 4. ANTHROPIC_API_KEY environment variable
         def load
-          load_from_keychain || load_from_file || load_from_env
+          LOAD_STRATEGIES.each do |strategy|
+            result = send(strategy)
+            return result if result
+          end
+          nil
         end
 
         # Load API key for a given provider. Anthropic uses the full fallback chain.
@@ -88,6 +102,7 @@ module RubynCode
           default
         end
 
+        # macOS only: read from Keychain Services
         def load_from_keychain
           return nil unless RUBY_PLATFORM.include?('darwin')
 
@@ -95,6 +110,21 @@ module RubynCode
           return nil if output.empty?
 
           oauth = JSON.parse(output)['claudeAiOauth']
+          return nil unless oauth&.dig('accessToken')
+
+          build_keychain_tokens(oauth)
+        rescue StandardError
+          nil
+        end
+
+        # Linux/other: Claude Code stores OAuth in a plain JSON file
+        def load_from_credentials_file
+          path = Config::Defaults::CLAUDE_CREDENTIALS_FILE
+          return nil unless File.exist?(path)
+
+          warn_insecure_permissions(path)
+
+          oauth = JSON.parse(File.read(path))['claudeAiOauth']
           return nil unless oauth&.dig('accessToken')
 
           build_keychain_tokens(oauth)
@@ -135,6 +165,16 @@ module RubynCode
           return nil unless api_key && !api_key.empty?
 
           { access_token: api_key, refresh_token: nil, expires_at: nil, type: :api_key, source: :env }
+        end
+
+        # Warn when credentials file has loose permissions (no system ACLs on Linux)
+        def warn_insecure_permissions(path)
+          mode = File.stat(path).mode & 0o777
+          return if mode == 0o600
+
+          warn "[rubyn-code] WARNING: #{path} has mode #{format('%04o', mode)}, expected 0600"
+        rescue StandardError
+          nil # best-effort — don't fail a token load over a stat
         end
 
         def write_tokens_file(data)
