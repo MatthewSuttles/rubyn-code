@@ -62,6 +62,22 @@ RSpec.describe RubynCode::Memory::Search do
 
       expect(results.size).to eq(2)
     end
+
+    it 'updates access_count on returned records by default' do
+      results = search.recent(limit: 1)
+      record_id = results.first.id
+
+      row = db.query('SELECT access_count FROM memories WHERE id = ?', [record_id]).first
+      expect(row['access_count']).to eq(1)
+    end
+
+    it 'skips access tracking when touch is false' do
+      results = search.recent(limit: 3, touch: false)
+
+      expect(results.size).to eq(3)
+      rows = db.query('SELECT access_count FROM memories', [])
+      expect(rows.map { |r| r['access_count'] }).to all(eq(0))
+    end
   end
 
   describe '#by_category' do

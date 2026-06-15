@@ -6,9 +6,10 @@ require_relative 'models'
 module RubynCode
   module Memory
     # Searches memories using SQLite FTS5 full-text search and standard
-    # queries. Every search method automatically increments access_count
-    # and updates last_accessed_at on returned records, reinforcing
-    # frequently-accessed memories against decay.
+    # queries. Search methods automatically increment access_count and
+    # update last_accessed_at on returned records, reinforcing
+    # frequently-accessed memories against decay; #recent accepts
+    # touch: false to opt out for passive reads.
     class Search
       # @param db [DB::Connection] database connection
       # @param project_path [String] scoping path for searches
@@ -60,8 +61,11 @@ module RubynCode
       # Returns the most recently created memories.
       #
       # @param limit [Integer] maximum results (default 10)
+      # @param touch [Boolean] whether to record an access on returned
+      #   records; pass false for passive reads (e.g. prompt assembly)
+      #   that shouldn't reinforce memories or issue a write
       # @return [Array<MemoryRecord>]
-      def recent(limit: 10)
+      def recent(limit: 10, touch: true)
         rows = @db.query(<<~SQL, [@project_path, limit]).to_a
           SELECT id, project_path, tier, category, content,
                  relevance_score, access_count, last_accessed_at,
@@ -73,7 +77,7 @@ module RubynCode
         SQL
 
         records = rows.map { |row| build_record(row) }
-        touch_accessed(records)
+        touch_accessed(records) if touch
         records
       end
 
