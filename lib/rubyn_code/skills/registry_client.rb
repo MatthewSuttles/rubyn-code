@@ -17,8 +17,9 @@ module RubynCode
 
       attr_reader :base_url
 
-      def initialize(base_url: nil)
+      def initialize(base_url: nil, timeout: TIMEOUT_SECONDS)
         @base_url = base_url || ENV.fetch('RUBYN_REGISTRY_URL', DEFAULT_BASE_URL)
+        @timeout = timeout
       end
 
       # List all available packs (returns flat array for CLI commands).
@@ -138,8 +139,8 @@ module RubynCode
         @connection ||= Faraday.new(url: base_url) do |f|
           f.request :url_encoded
           f.response :raise_error
-          f.options.timeout = TIMEOUT_SECONDS
-          f.options.open_timeout = TIMEOUT_SECONDS
+          f.options.timeout = @timeout
+          f.options.open_timeout = @timeout
           f.headers['Accept'] = 'application/json'
           f.headers['User-Accept'] = USER_ACCEPT_HEADER
           f.headers['User-Agent'] = "rubyn-code/#{RubynCode::VERSION}"

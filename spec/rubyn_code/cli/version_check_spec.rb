@@ -92,6 +92,36 @@ RSpec.describe RubynCode::CLI::VersionCheck do
           "Update available: #{RubynCode::VERSION} -> 99.0.0  (gem install rubyn-code)"
         )
       end
+
+      it 'notifies at most once across repeated calls' do
+        version_check.start
+        version_check.notify(timeout: 2)
+        version_check.notify(timeout: 2)
+
+        expect(renderer).to have_received(:warning).once
+      end
+    end
+
+    context 'when the check is still running' do
+      before do
+        allow(File).to receive(:exist?).with(cache_file).and_return(false)
+        stub_request(:get, api_url).to_return do
+          sleep 1
+          { status: 200, body: '{"version":"99.0.0"}',
+            headers: { 'Content-Type' => 'application/json' } }
+        end
+      end
+
+      it 'returns without blocking or printing, then notifies once finished' do
+        version_check.start
+        version_check.notify
+        expect(renderer).not_to have_received(:warning)
+
+        version_check.instance_variable_get(:@thread).join(5)
+        version_check.notify
+
+        expect(renderer).to have_received(:warning).with(/Update available/)
+      end
     end
 
     context 'when remote version equals current version' do

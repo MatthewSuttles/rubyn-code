@@ -31,10 +31,10 @@ module RubynCode
       def run
         @version_check = VersionCheck.new(renderer: @renderer)
         @version_check.start
+        @auto_suggest = Skills::AutoSuggest.new(project_root: @project_root)
+        @auto_suggest.start
 
         @renderer.welcome
-        @version_check.notify
-        check_skill_suggestions!
 
         at_exit { shutdown! }
 
@@ -45,17 +45,20 @@ module RubynCode
 
       private
 
-      def check_skill_suggestions!
-        suggest = Skills::AutoSuggest.new(project_root: @project_root)
-        message = suggest.check
+      # Surface results of the background startup checks (version, skill
+      # suggestions) between prompts — never blocking input on the network.
+      def flush_startup_notices!
+        @version_check&.notify
+        message = @auto_suggest&.pending_message
         @renderer.info(message) if message
       rescue StandardError
-        # Never block session start on suggestion failure
+        # Never block the prompt on startup notices
       end
 
       def run_input_loop
         while @running
           begin
+            flush_startup_notices!
             input = read_input
             break if input.nil?
 
