@@ -140,7 +140,7 @@ module RubynCode
         path = resolve_cache_path(params)
         return unless path&.end_with?('.rb')
 
-        @codebase_index.update!
+        @codebase_index.update_file!(path)
       rescue StandardError => e
         RubynCode::Debug.warn("CodebaseIndex incremental update failed: #{e.message}")
       end
