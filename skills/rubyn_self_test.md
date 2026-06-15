@@ -63,30 +63,113 @@ Score: 18/22 (82%) — 4 failures
 #### File Cache
 - Read `lib/rubyn_code/version.rb` twice. PASS if both reads succeed (cache should serve the second).
 
-#### Output Compressor — Head/Tail Strategy
-- Run `bash` with `seq 1 5000` (generates 5,000 lines — well over the bash threshold of 4,000 chars). PASS if the result contains "lines omitted" or is significantly shorter than 5,000 lines. This proves the head_tail compressor is working.
+#### Output Compressor — All Strategies (direct)
 
-#### Output Compressor — Spec Summary Strategy
-- Run `bash` with `cd <project_root> && bundle exec rspec spec/rubyn_code/tools/base_spec.rb --format documentation 2>&1`. This produces multi-line RSpec output. PASS if the result you receive is shorter than the full verbose output — specifically check if passing specs got compressed to a summary line like "N examples, 0 failures" instead of listing every example.
+> **Why this is a direct call, not a tool observation.** Earlier versions of this
+> test ran `seq 1 5000`, a big `grep`, etc. through the agent's own tools and
+> hoped the compressor would visibly truncate the result. That is unreliable:
+> whether a given tool invocation is routed through the compressor gate (and at
+> what threshold) depends on the execution path, so the agent often received
+> already-handled output and scored a false FAIL even though the compressor was
+> fine. Instead, drive `OutputCompressor#compress(tool_name, raw_output)`
+> **directly** with inputs crafted to exceed each strategy's threshold, and
+> assert on the marker in the returned string. This is deterministic and matches
+> how the unit specs exercise it.
 
-#### Output Compressor — Grep Top Matches
-- Run `grep` searching for `def ` across all of `lib/`. This will match hundreds of method definitions. PASS if the result contains "matches omitted" or shows only a subset of results (the compressor limits to top N matches).
+- **All strategies**: `bash` with the script below. PASS for each strategy whose line says `PASS`. Report the final `COMPRESSION: N/5 strategies active` line in the scorecard.
 
-#### Output Compressor — Glob Tree Collapse
-- Run `glob` for `**/*.rb` across the entire project. With 170+ files this should exceed the glob threshold. PASS if the result shows directory summaries like `app/models/ (N files)` instead of listing every individual file path, OR if the result is significantly shorter than listing all 170+ paths individually.
+  ```bash
+  bundle exec ruby -e '
+    require_relative "lib/rubyn_code"
+    c = RubynCode::Tools::OutputCompressor
 
-#### Output Compressor — Diff Strategy
-- Run `bash` with `cd <project_root> && git log --oneline -1 --format=%H | xargs git diff HEAD~5..` (diff of last 5 commits). If the diff is large enough, the compressor should keep headers but truncate bodies. PASS if result contains diff headers. SKIP if diff is small enough to pass through uncompressed.
+    results = {}
 
-#### Compression Stats
-- After running the above tests, note whether any output you received contained truncation markers like "lines omitted", "matches omitted", or "files)". Count how many of the 5 compression strategies actually triggered. Report: "N/5 compression strategies verified active".
+    # head_tail (bash, 1000-token threshold): >10 lines, well over 4000 chars
+    big = (1..5000).map { |i| "line #{i}" }.join("\n")
+    results["head_tail"] = c.new.compress("bash", big).include?("lines omitted")
+
+    # spec_summary (run_specs, 500-token threshold): verbose passing output
+    # collapses to just the "N examples, 0 failures" summary line
+    spec_out = (Array.new(200) { |i| "  passing example #{i} runs and returns ok value" }.join("\n")) +
+               "\n\n42 examples, 0 failures\n"
+    results["spec_summary"] = (c.new.compress("run_specs", spec_out).strip == "42 examples, 0 failures")
+
+    # top_matches (grep, 1000-token threshold): keeps top N, marks the rest
+    grep_out = (1..500).map { |i| "lib/file#{i}.rb:#{i}:  def method_number_#{i}(arg)" }.join("\n")
+    results["top_matches"] = c.new.compress("grep", grep_out).include?("matches omitted")
+
+    # tree (glob, 500-token threshold): collapses paths to "dir/ (N files)"
+    glob_out = (1..500).map { |i| "lib/rubyn_code/subdir#{i % 25}/some_file_name_#{i}.rb" }.join("\n")
+    results["tree"] = c.new.compress("glob", glob_out).include?("files)")
+
+    # relevant_hunks (git_diff, 2000-token threshold): keeps headers, truncates bodies
+    hunk = ->(f) { "diff --git a/#{f} b/#{f}\nindex 000..111 100644\n--- a/#{f}\n+++ b/#{f}\n" +
+                   (Array.new(100) { |i| "+ added source line number #{i}" }.join("\n")) + "\n" }
+    diff_out = (1..10).map { |i| hunk.call("file#{i}.rb") }.join
+    results["relevant_hunks"] = c.new.compress("git_diff", diff_out).include?("lines in this file omitted")
+
+    results.each { |k, v| puts "STRATEGY #{k}: #{v ? "PASS" : "FAIL"}" }
+    puts "COMPRESSION: #{results.values.count(true)}/5 strategies active"
+  '
+  ```
+
+  Each strategy is scored independently (5 line items). A healthy build prints `COMPRESSION: 5/5 strategies active`.
 
 ### 7. Skills System
 - **load_skill**: Load any available skill (e.g., `classes`). PASS if content is returned.
 
 ### 8. Memory System
-- **memory_write**: Write a test memory: `category: "test", content: "self-test at #{Time.now}"`. PASS if no error.
-- **memory_search**: Search for `self-test`. PASS if the memory we just wrote is found.
+
+> **Use the real `Memory::Store` / `Memory::Search` API.** Both are constructed
+> as `.new(db, project_path:)` — the `project_path:` keyword is **required**, and
+> `db` must respond to `execute` / `query` / `transaction` (a raw
+> `SQLite3::Database` alone does **not** provide `query`, which `Search` needs).
+> The script below wraps an in-memory SQLite DB to satisfy that interface, exactly
+> as the specs' `setup_test_db` helper does. Writing the memory creates its own
+> table via `Store#ensure_tables`, so no migrations are needed.
+
+- **Round-trip**: `bash` with the script below. PASS if the final line is `MEMORY: PASS`.
+
+  ```bash
+  bundle exec ruby -e '
+    require_relative "lib/rubyn_code"
+    require "sqlite3"
+
+    # Minimal stand-in for RubynCode::DB::Connection (execute/query/transaction).
+    class SelfTestDB
+      def initialize(raw) = @raw = raw
+      def execute(sql, params = []) = @raw.execute(sql, params)
+      def query(sql, params = []) = @raw.execute(sql, params)
+      def transaction(&b) = @raw.transaction(&b)
+    end
+
+    raw = SQLite3::Database.new(":memory:")
+    raw.results_as_hash = true
+    db = SelfTestDB.new(raw)
+
+    project = "/self-test"
+    store  = RubynCode::Memory::Store.new(db, project_path: project)
+    search = RubynCode::Memory::Search.new(db, project_path: project)
+
+    token = "selftesttoken-marker-xyz"
+    store.write(content: "self-test memory #{token}")
+
+    found     = search.search(token).any? { |r| r.content.include?(token) }
+    recent_ok = search.recent(limit: 5).any? { |r| r.content.include?(token) }
+
+    if found && recent_ok
+      puts "MEMORY: PASS (write + search + recent all round-trip)"
+    elsif found
+      puts "MEMORY: PARTIAL (search works, recent did not return it)"
+    else
+      puts "MEMORY: FAIL (write succeeded but search did not return it)"
+    end
+  '
+  ```
+
+  The script writes a memory with a unique token, then confirms both
+  `Search#search` (LIKE query) and `Search#recent` return it.
 
 ### 9. Configuration
 - **bash**: Run `cat ~/.rubyn-code/config.yml`. PASS if file exists and contains `provider:`.
@@ -190,7 +273,7 @@ End-to-end exercise of the autoload pipeline against the real registry at `rubyn
   ```
   before the next response (the `📥` line appears only if the pack wasn't already installed). Do **not** count this as PASS/FAIL — just mention it in the scorecard so the user can verify the renderer side themselves.
 
-### 10. Teams System — Multi-Agent
+### 16. Teams System — Multi-Agent
 
 Run the following inline Ruby script with `bash`. It exercises the teammate manager, mailbox (including structured messaging), and agent registry in a single SQLite-backed round-trip. PASS if the final line is `ALL PASS`.
 
