@@ -466,46 +466,46 @@ RSpec.describe RubynCode::Tools::Executor do
       RubynCode::Tools::Registry.register(edit_tool)
     end
 
-    it 'calls update! on the codebase index after writing a .rb file' do
+    it 'calls update_file! on the codebase index after writing a .rb file' do
       with_temp_project do |dir|
         executor = described_class.new(project_root: dir)
         index = instance_double(RubynCode::Index::CodebaseIndex)
-        allow(index).to receive(:update!)
+        allow(index).to receive(:update_file!)
         executor.codebase_index = index
 
         rb_path = File.join(dir, 'test.rb')
         executor.execute('write_file', { 'path' => rb_path, 'content' => 'class Foo; end' })
-        expect(index).to have_received(:update!).once
+        expect(index).to have_received(:update_file!).with(rb_path).once
       end
     end
 
-    it 'calls update! on the codebase index after editing a .rb file' do
+    it 'calls update_file! on the codebase index after editing a .rb file' do
       with_temp_project do |dir|
         executor = described_class.new(project_root: dir)
         index = instance_double(RubynCode::Index::CodebaseIndex)
-        allow(index).to receive(:update!)
+        allow(index).to receive(:update_file!)
         executor.codebase_index = index
 
         rb_path = File.join(dir, 'test.rb')
         executor.execute('edit_file', { 'path' => rb_path })
-        expect(index).to have_received(:update!).once
+        expect(index).to have_received(:update_file!).with(rb_path).once
       end
     end
 
-    it 'does not call update! for non-Ruby files' do
+    it 'does not call update_file! for non-Ruby files' do
       with_temp_project do |dir|
         executor = described_class.new(project_root: dir)
         index = instance_double(RubynCode::Index::CodebaseIndex)
-        allow(index).to receive(:update!)
+        allow(index).to receive(:update_file!)
         executor.codebase_index = index
 
         txt_path = File.join(dir, 'readme.txt')
         executor.execute('write_file', { 'path' => txt_path, 'content' => 'hello' })
-        expect(index).not_to have_received(:update!)
+        expect(index).not_to have_received(:update_file!)
       end
     end
 
-    it 'does not call update! when no codebase index is set' do
+    it 'does not call update_file! when no codebase index is set' do
       with_temp_project do |dir|
         executor = described_class.new(project_root: dir)
         rb_path = File.join(dir, 'test.rb')
@@ -520,7 +520,7 @@ RSpec.describe RubynCode::Tools::Executor do
       with_temp_project do |dir|
         executor = described_class.new(project_root: dir)
         index = instance_double(RubynCode::Index::CodebaseIndex)
-        allow(index).to receive(:update!).and_raise(StandardError, 'index error')
+        allow(index).to receive(:update_file!).and_raise(StandardError, 'index error')
         executor.codebase_index = index
 
         debug_mod = Module.new do

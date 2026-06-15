@@ -128,6 +128,21 @@ RSpec.describe RubynCode::Index::CodebaseIndex do
       expect(fresh.load).to be_a(described_class)
     end
 
+    it 'deduplicates edges from older bloated index files' do
+      create_model_file('user', "class User\nend\n")
+      create_ruby_file('spec/models/user_spec.rb', "RSpec.describe User do\nend\n")
+      index.build!
+
+      data = JSON.parse(File.read(index.index_path))
+      data['edges'] += data['edges'] # simulate duplicates written by older versions
+      File.write(index.index_path, JSON.generate(data))
+
+      fresh = described_class.new(project_root: tmpdir)
+      fresh.load
+      expect(fresh.edges).to eq(fresh.edges.uniq)
+      expect(fresh.edges.count { |e| e['relationship'] == 'tests' }).to eq(1)
+    end
+
     it 'restores nodes and edges from disk' do
       create_model_file('user', <<~RUBY)
         class User < ApplicationRecord
@@ -352,6 +367,114 @@ RSpec.describe RubynCode::Index::CodebaseIndex do
       create_model_file('user', "class User\nend\n")
       index.build!
       expect(index.update!).to be_a(described_class)
+    end
+
+    it 'does not duplicate tests edges across repeated updates' do
+      create_model_file('user', "class User\nend\n")
+      create_ruby_file('spec/models/user_spec.rb', "RSpec.describe User do\nend\n")
+      index.build!
+
+      user_file = File.join(tmpdir, 'app', 'models', 'user.rb')
+      3.times do |i|
+        File.write(user_file, "class User\n  def version_#{i}\n  end\nend\n")
+        future_time = Time.now + (10 * (i + 1))
+        File.utime(future_time, future_time, user_file)
+        index.update!
+      end
+
+      tests_edges = index.edges.select { |e| e['relationship'] == 'tests' }
+      expect(tests_edges.size).to eq(1)
+    end
+  end
+
+  describe '#update_file!' do
+    it 're-indexes only the given file' do
+      create_model_file('user', "class User\nend\n")
+      create_model_file('post', "class Post\nend\n")
+      index.build!
+
+      user_file = File.join(tmpdir, 'app', 'models', 'user.rb')
+      post_file = File.join(tmpdir, 'app', 'models', 'post.rb')
+      File.write(user_file, "class User\n  def greet\n  end\nend\n")
+      File.write(post_file, "class Post\n  def stale\n  end\nend\n")
+
+      index.update_file!(user_file)
+
+      names = index.nodes.map { |n| n['name'] }
+      expect(names).to include('greet')
+      expect(names).not_to include('stale')
+    end
+
+    it 'preserves other files nodes and edges' do
+      create_model_file('user', "class User\nend\n")
+      create_model_file('post', "class Post\n  has_many :comments\nend\n")
+      index.build!
+
+      index.update_file!(File.join(tmpdir, 'app', 'models', 'user.rb'))
+
+      expect(index.nodes.map { |n| n['name'] }).to include('Post')
+      assoc = index.edges.select { |e| e['relationship'] == 'association' }
+      expect(assoc.map { |e| e['to'] }).to include('comments')
+    end
+
+    it 'removes nodes when the file was deleted' do
+      create_model_file('user', "class User\nend\n")
+      index.build!
+
+      user_file = File.join(tmpdir, 'app', 'models', 'user.rb')
+      File.delete(user_file)
+      index.update_file!(user_file)
+
+      expect(index.nodes.map { |n| n['name'] }).not_to include('User')
+    end
+
+    it 'does not duplicate tests edges across repeated calls' do
+      create_model_file('user', "class User\nend\n")
+      create_ruby_file('spec/models/user_spec.rb', "RSpec.describe User do\nend\n")
+      index.build!
+
+      user_file = File.join(tmpdir, 'app', 'models', 'user.rb')
+      3.times { index.update_file!(user_file) }
+
+      tests_edges = index.edges.select { |e| e['relationship'] == 'tests' }
+      expect(tests_edges.size).to eq(1)
+    end
+
+    it 'persists the update to disk' do
+      create_model_file('user', "class User\nend\n")
+      index.build!
+
+      user_file = File.join(tmpdir, 'app', 'models', 'user.rb')
+      File.write(user_file, "class User\n  def greet\n  end\nend\n")
+      index.update_file!(user_file)
+
+      fresh = described_class.new(project_root: tmpdir)
+      fresh.load
+      expect(fresh.nodes.map { |n| n['name'] }).to include('greet')
+    end
+
+    it 'ignores paths outside the project root' do
+      create_model_file('user', "class User\nend\n")
+      index.build!
+
+      expect { index.update_file!('/etc/hosts') }.not_to(change { index.nodes.size })
+    end
+  end
+
+  describe 'git-aware file discovery' do
+    it 'skips gitignored files when the project is a git repository' do
+      skip 'git not available' unless system('git --version', out: File::NULL, err: File::NULL)
+
+      create_model_file('user', "class User\nend\n")
+      create_ruby_file('tmp/junk.rb', "class Junk\nend\n")
+      File.write(File.join(tmpdir, '.gitignore'), "tmp/\n")
+      system('git', '-C', tmpdir, 'init', '-q', out: File::NULL, err: File::NULL)
+
+      index.build!
+
+      names = index.nodes.map { |n| n['name'] }
+      expect(names).to include('User')
+      expect(names).not_to include('Junk')
     end
   end
 end

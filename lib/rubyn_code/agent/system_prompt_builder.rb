@@ -19,6 +19,22 @@ module RubynCode
         parts << PLAN_MODE_PROMPT if @plan_mode
         parts << "Working directory: #{@project_root}" if @project_root
         append_response_mode(parts)
+        static = static_prompt_sections
+        parts << static unless static.empty?
+        parts.join("\n")
+      end
+
+      # The static sections hit SQLite (memories, instincts) and walk the
+      # filesystem (instruction files, profile), so they're assembled once
+      # per user turn instead of on every iteration of the tool loop. Only
+      # the plan-mode flag and response-mode line vary mid-turn, and those
+      # stay in build_system_prompt.
+      def static_prompt_sections
+        @static_prompt_sections ||= build_static_prompt_sections
+      end
+
+      def build_static_prompt_sections
+        parts = []
         append_project_profile(parts)
         append_codebase_index(parts)
         append_memories(parts)
@@ -27,6 +43,12 @@ module RubynCode
         append_skills(parts)
         append_deferred_tools(parts)
         parts.join("\n")
+      end
+
+      # Called at the start of each user turn so memory, instruction, and
+      # tool changes made between turns show up in the next prompt.
+      def reset_system_prompt_cache!
+        @static_prompt_sections = nil
       end
 
       def append_response_mode(parts)
@@ -182,7 +204,9 @@ module RubynCode
 
         db = DB::Connection.instance
         search = Memory::Search.new(db, project_path: @project_root)
-        recent = search.recent(limit: 20)
+        # touch: false — assembling the prompt is not a memory "access";
+        # touching here would issue a SQLite write and inflate access counts.
+        recent = search.recent(limit: 20, touch: false)
         return '' if recent.empty?
 
         recent.map { |m| format_memory(m) }.join("\n")

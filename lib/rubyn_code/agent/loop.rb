@@ -39,6 +39,7 @@ module RubynCode
         assign_dependencies(opts)
         assign_callbacks(opts)
         @plan_mode = false
+        @static_prompt_sections = nil
       end
 
       # @return [Boolean]
@@ -61,6 +62,7 @@ module RubynCode
         @skill_ttl&.tick!
         autoload_triggered_skills(user_input)
         @conversation.add_user_message(user_input)
+        reset_system_prompt_cache!
         reset_iteration_state
 
         MAX_ITERATIONS.times do |iteration|

@@ -2,6 +2,7 @@
 
 require 'json'
 require 'fileutils'
+require 'open3'
 
 module RubynCode
   module Index
@@ -42,7 +43,9 @@ module RubynCode
 
         data = JSON.parse(File.read(@index_path))
         @nodes = data['nodes'] || []
-        @edges = data['edges'] || []
+        # uniq drops duplicate edges accumulated by older versions, which
+        # appended tests edges on every update! without dedup.
+        @edges = (data['edges'] || []).uniq
         @file_mtimes = data['file_mtimes'] || {}
         self
       rescue StandardError
@@ -64,6 +67,19 @@ module RubynCode
           index_file(file) if File.exist?(file)
         end
 
+        extract_rails_edges
+        save!
+        self
+      end
+
+      # Incremental update for a single known-changed file (e.g. after a
+      # write_file/edit_file tool call). Avoids the full-tree scan in update!.
+      def update_file!(path)
+        absolute = File.expand_path(path, @project_root)
+        return self unless absolute.start_with?("#{@project_root}/")
+
+        remove_nodes_for(absolute)
+        index_file(absolute) if File.exist?(absolute)
         extract_rails_edges
         save!
         self
@@ -192,6 +208,26 @@ module RubynCode
       end
 
       def ruby_files
+        git_ruby_files || glob_ruby_files
+      end
+
+      # Prefer git's file list when available: it skips ignored dirs
+      # (tmp/, log/, coverage/, db/) the glob would index. --others picks up
+      # untracked-but-not-ignored files so freshly created ones still appear.
+      def git_ruby_files
+        return nil unless File.exist?(File.join(@project_root, '.git'))
+
+        stdout, status = Open3.capture2(
+          'git', '-C', @project_root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.rb'
+        )
+        return nil unless status.success?
+
+        stdout.split("\0").map { |f| File.join(@project_root, f) }.select { |f| File.file?(f) }
+      rescue StandardError
+        nil
+      end
+
+      def glob_ruby_files
         Dir.glob(File.join(@project_root, '**', '*.rb'))
            .reject { |f| f.include?('/vendor/') || f.include?('/node_modules/') }
       end
@@ -253,6 +289,8 @@ module RubynCode
       end
 
       def extract_rails_edges
+        # Rebuild tests edges from scratch so repeated updates stay idempotent.
+        @edges.reject! { |e| e['relationship'] == 'tests' }
         spec_files = @file_mtimes.keys.select { |f| f.include?('spec/') || f.include?('test/') }
         spec_files.each do |spec_file|
           source = spec_file.sub(%r{spec/}, 'app/').sub(/_spec\.rb$/, '.rb')

@@ -36,6 +36,9 @@ module RubynCode
       SESSION_BUDGET_USD = 5.00
       DAILY_BUDGET_USD = 10.00
 
+      # Claude Code's credentials file (Linux/other — no system keychain)
+      CLAUDE_CREDENTIALS_FILE = File.expand_path('~/.claude/.credentials.json')
+
       OAUTH_CLIENT_ID = 'rubyn-code'
       OAUTH_REDIRECT_URI = 'http://localhost:19275/callback'
       OAUTH_AUTHORIZE_URL = 'https://claude.ai/oauth/authorize'
