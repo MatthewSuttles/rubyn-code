@@ -58,6 +58,27 @@ RSpec.describe RubynCode::Auth::TokenStore do
     end
   end
 
+  describe ".valid_tokens?" do
+    it "returns true for a fresh oauth token" do
+      tokens = { access_token: "a", expires_at: Time.now + 3600, type: :oauth }
+      expect(described_class.valid_tokens?(tokens)).to be true
+    end
+
+    it "returns false for a token inside the expiry buffer" do
+      tokens = { access_token: "a", expires_at: Time.now + 60, type: :oauth }
+      expect(described_class.valid_tokens?(tokens)).to be false
+    end
+
+    it "returns true for an api key regardless of expiry" do
+      tokens = { access_token: "a", expires_at: nil, type: :api_key }
+      expect(described_class.valid_tokens?(tokens)).to be true
+    end
+
+    it "returns false for nil tokens" do
+      expect(described_class.valid_tokens?(nil)).to be false
+    end
+  end
+
   describe '.clear!' do
     it 'removes the tokens file' do
       described_class.save(access_token: 'a', refresh_token: 'r', expires_at: Time.now)

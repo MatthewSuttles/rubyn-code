@@ -82,7 +82,12 @@ module RubynCode
         end
 
         def valid?
-          tokens = self.load
+          valid_tokens?(self.load)
+        end
+
+        # Validate an already-loaded token hash without re-reading the
+        # keychain — lets callers cache the result of `load`.
+        def valid_tokens?(tokens)
           return false unless tokens&.fetch(:access_token, nil)
           return true if tokens[:type] == :api_key
           return true unless tokens[:expires_at]
