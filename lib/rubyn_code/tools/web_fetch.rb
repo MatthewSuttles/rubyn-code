@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'faraday'
 require_relative 'base'
 require_relative 'registry'
 
@@ -76,6 +75,7 @@ module RubynCode
       end
 
       def build_connection
+        require 'faraday'
         Faraday.new do |f|
           f.options.timeout = 30
           f.options.open_timeout = 10

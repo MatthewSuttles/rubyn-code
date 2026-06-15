@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'pastel'
-require 'rouge'
 
 module RubynCode
   module CLI
@@ -11,7 +10,6 @@ module RubynCode
     class StreamFormatter
       def initialize(_renderer = nil)
         @pastel = Pastel.new
-        @rouge_formatter = Rouge::Formatters::Terminal256.new(theme: Rouge::Themes::Monokai.new)
         @buffer = +''
         @in_code_block = false
         @code_lang = nil
@@ -98,6 +96,9 @@ module RubynCode
       end
 
       def output_highlighted_code
+        # Lazy so REPL boot never pays for rouge until a code block is rendered.
+        require 'rouge'
+        @rouge_formatter ||= Rouge::Formatters::Terminal256.new(theme: Rouge::Themes::Monokai.new)
         lexer = Rouge::Lexer.find(@code_lang || 'ruby') || Rouge::Lexers::PlainText.new
         highlighted = @rouge_formatter.format(lexer.lex(@code_buffer))
         border = @pastel.dim('  │ ')

@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'faraday'
 require 'json'
 require 'securerandom'
 require_relative '../message_builder'
@@ -150,6 +149,7 @@ module RubynCode
         end
 
         def build_faraday_connection
+          require 'faraday'
           Faraday.new do |f|
             f.options.timeout = 300
             f.options.open_timeout = 30
