@@ -162,6 +162,107 @@ RSpec.describe RubynCode::Agent::Conversation do
     end
   end
 
+  describe '#estimated_json_chars' do
+    def full_recompute
+      JSON.generate(conversation.messages).length
+    end
+
+    it 'matches a full JSON recompute for an empty conversation' do
+      expect(conversation.estimated_json_chars).to eq(full_recompute)
+    end
+
+    it 'stays consistent with a full recompute as messages are appended' do
+      conversation.add_user_message('hello there')
+      expect(conversation.estimated_json_chars).to eq(full_recompute)
+
+      conversation.add_assistant_message(
+        'thinking',
+        tool_calls: [{ type: 'tool_use', id: 't1', name: 'bash', input: { command: 'ls' } }]
+      )
+      expect(conversation.estimated_json_chars).to eq(full_recompute)
+
+      conversation.add_tool_result('t1', 'bash', 'output ' * 20)
+      expect(conversation.estimated_json_chars).to eq(full_recompute)
+    end
+
+    it 'stays consistent when tool results batch into an existing message' do
+      conversation.add_tool_result('t1', 'read_file', 'first output')
+      conversation.add_tool_result('t2', 'grep', 'second output', is_error: true)
+
+      expect(conversation.length).to eq(1)
+      expect(conversation.estimated_json_chars).to eq(full_recompute)
+    end
+
+    it 'stays consistent after undo_last!' do
+      conversation.add_user_message('q')
+      conversation.add_assistant_message('a')
+      conversation.estimated_json_chars
+      conversation.undo_last!
+
+      expect(conversation.estimated_json_chars).to eq(full_recompute)
+    end
+
+    it 'stays consistent after clear!' do
+      conversation.add_user_message('q')
+      conversation.estimated_json_chars
+      conversation.clear!
+
+      expect(conversation.estimated_json_chars).to eq(full_recompute)
+    end
+
+    it 'stays consistent after replace!' do
+      conversation.add_user_message('original')
+      conversation.estimated_json_chars
+      conversation.replace!([{ role: 'user', content: 'compacted summary' }])
+
+      expect(conversation.estimated_json_chars).to eq(full_recompute)
+    end
+
+    it 'recounts after refresh_derived_state! when messages were mutated in place' do
+      conversation.add_tool_result('t1', 'bash', 'x' * 500)
+      conversation.estimated_json_chars
+
+      # Simulate Context::MicroCompact rewriting old tool output in place
+      conversation.messages.last[:content].first[:content] = '[Previous: used bash]'
+      conversation.refresh_derived_state!
+
+      expect(conversation.estimated_json_chars).to eq(full_recompute)
+    end
+  end
+
+  describe 'orphan tracking across history rewrites' do
+    it 'repairs orphans present in messages installed via replace!' do
+      conversation.add_user_message('hi')
+      conversation.to_api_format # materialize the incremental ID sets
+
+      conversation.replace!(
+        [
+          { role: 'user', content: 'do something' },
+          { role: 'assistant',
+            content: [{ type: 'tool_use', id: 'toolu_replaced', name: 'bash', input: {} }] }
+        ]
+      )
+
+      formatted = conversation.to_api_format
+      result_block = formatted.last[:content].find { |b| b[:type] == 'tool_result' }
+      expect(result_block[:tool_use_id]).to eq('toolu_replaced')
+    end
+
+    it 'does not repair anything once a matching tool_result arrives' do
+      conversation.add_assistant_message(
+        'Calling...',
+        tool_calls: [{ type: 'tool_use', id: 't1', name: 'bash', input: {} }]
+      )
+      conversation.to_api_format # orphaned at this point
+      conversation.add_tool_result('t1', 'bash', 'done')
+
+      formatted = conversation.to_api_format
+      interrupted = formatted.flat_map { |m| Array(m[:content]) }
+                             .select { |b| b.is_a?(Hash) && b[:content].to_s.include?('[interrupted]') }
+      expect(interrupted).to be_empty
+    end
+  end
+
   describe '#replace!' do
     it 'replaces all messages with the new array' do
       conversation.add_user_message('old message')

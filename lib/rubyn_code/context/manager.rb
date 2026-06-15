@@ -39,24 +39,30 @@ module RubynCode
         @total_output_tokens += usage.output_tokens.to_i
       end
 
-      # Rough estimate of token count for a set of messages based on their
-      # JSON-serialized character length (~4 chars per token).
+      # Rough estimate of token count based on JSON-serialized character
+      # length (~4 chars per token). Accepts either a raw messages array or
+      # an object exposing #estimated_json_chars (e.g. Agent::Conversation),
+      # which avoids re-serializing the whole history on every call.
       #
-      # @param messages [Array<Hash>] conversation messages
+      # @param source [Array<Hash>, #estimated_json_chars] conversation messages
       # @return [Integer] estimated token count
-      def estimated_tokens(messages)
-        json = JSON.generate(messages)
-        (json.length.to_f / CHARS_PER_TOKEN).ceil
+      def estimated_tokens(source)
+        chars = if source.respond_to?(:estimated_json_chars)
+                  source.estimated_json_chars
+                else
+                  JSON.generate(source).length
+                end
+        (chars.to_f / CHARS_PER_TOKEN).ceil
       rescue JSON::GeneratorError
         0
       end
 
       # Returns true if the estimated token count exceeds the threshold.
       #
-      # @param messages [Array<Hash>] conversation messages
+      # @param source [Array<Hash>, #estimated_json_chars] conversation messages
       # @return [Boolean]
-      def needs_compaction?(messages)
-        estimated_tokens(messages) > @threshold
+      def needs_compaction?(source)
+        estimated_tokens(source) > @threshold
       end
 
       # Runs micro-compaction every turn and auto-compaction when the context
@@ -78,14 +84,17 @@ module RubynCode
         return if @last_compaction_turn == @current_turn
 
         messages = conversation.messages
+        estimate_source = conversation.respond_to?(:estimated_json_chars) ? conversation : messages
 
         # Step 1: Zero-cost micro-compact — but only when we're approaching
         # the compaction threshold. Running it every turn mutates old messages,
         # which invalidates the prompt cache prefix and wastes tokens.
-        est = estimated_tokens(messages)
-        MicroCompact.call(messages) if est > (@threshold * micro_compact_ratio)
+        est = estimated_tokens(estimate_source)
+        if est > (@threshold * micro_compact_ratio) && MicroCompact.call(messages).to_i.positive?
+          refresh_conversation_estimate(conversation)
+        end
 
-        return unless needs_compaction?(messages)
+        return unless needs_compaction?(estimate_source)
 
         # Step 2: Try context collapse (snip old messages, no LLM call)
         collapsed = ContextCollapse.call(messages, threshold: @threshold)
@@ -138,6 +147,14 @@ module RubynCode
         elsif conversation.respond_to?(:messages=)
           conversation.messages = new_messages
         end
+        refresh_conversation_estimate(conversation)
+      end
+
+      # MicroCompact and the compaction strategies mutate or replace messages
+      # outside the conversation's own append path, so its incremental token
+      # bookkeeping must be invalidated afterwards.
+      def refresh_conversation_estimate(conversation)
+        conversation.refresh_derived_state! if conversation.respond_to?(:refresh_derived_state!)
       end
     end
   end

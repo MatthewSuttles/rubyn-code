@@ -7,39 +7,41 @@ module RubynCode
   module Memory
     # Saves and restores full conversation sessions to SQLite, enabling
     # session continuity across process restarts and session browsing.
-    class SessionPersistence
+    class SessionPersistence # rubocop:disable Metrics/ClassLength -- session CRUD + incremental message journal
       # @param db [DB::Connection] database connection
       def initialize(db)
         @db = db
+        # Per-session journal bookkeeping: how many messages are already
+        # persisted and their object identities, so append-only saves can be
+        # detected without comparing message contents.
+        @journal_state = {}
         ensure_table
       end
 
       # Persists a complete session snapshot.
+      #
+      # Hot-path friendly: when the messages array has only grown since the
+      # last save for this session, the new messages are appended to the
+      # messages journal table instead of rewriting the whole JSON blob.
+      # The blob is only rewritten when history was replaced (compaction,
+      # undo, resume) or on the first save of a process.
       #
       # @param attrs [Hash] session attributes:
       #   :session_id, :project_path, :messages (required);
       #   :title, :model, :metadata (optional)
       # @return [void]
       def save_session(session_id:, project_path:, messages:, **opts)
-        now = Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
-        messages_json = JSON.generate(messages)
-        meta_json = JSON.generate(opts.fetch(:metadata, {}))
-        title = opts[:title]
-        model = opts[:model]
-
-        insert_params = [session_id, project_path, title, model, messages_json, 'active', meta_json, now, now]
-        update_params = [messages_json, title, model, meta_json, now]
-
-        @db.execute(<<~SQL, insert_params + update_params)
-          INSERT INTO sessions (id, project_path, title, model, messages, status, metadata, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET
-            messages = ?,
-            title = COALESCE(?, title),
-            model = COALESCE(?, model),
-            metadata = ?,
-            updated_at = ?
-        SQL
+        if appendable?(session_id, messages)
+          append_to_journal(session_id, messages, opts)
+        else
+          snapshot_session(session_id, project_path, messages, opts)
+        end
+        remember_journal_state(session_id, messages)
+      rescue StandardError
+        # Journal append can fail (e.g. role CHECK constraint on legacy
+        # schemas) — fall back to a full snapshot.
+        snapshot_session(session_id, project_path, messages, opts)
+        remember_journal_state(session_id, messages)
       end
 
       # Loads a session by ID.
@@ -54,8 +56,10 @@ module RubynCode
         return nil if rows.empty?
 
         row = rows.first
+        blob_messages = parse_json_array(row['messages'])
+        blob_messages += journal_messages(session_id) if blob_messages.is_a?(Array)
         {
-          messages: parse_json_array(row['messages']),
+          messages: blob_messages,
           metadata: parse_json_hash(row['metadata']),
           title: row['title'],
           model: row['model'],
@@ -103,6 +107,7 @@ module RubynCode
         params << session_id
 
         @db.execute("UPDATE sessions SET #{sets.join(', ')} WHERE id = ?", params)
+        clear_journal(session_id) if attrs.key?(:messages)
       end
 
       # Deletes a session permanently.
@@ -110,6 +115,7 @@ module RubynCode
       # @param session_id [String]
       # @return [void]
       def delete_session(session_id)
+        clear_journal(session_id)
         @db.execute('DELETE FROM sessions WHERE id = ?', [session_id])
       end
 
@@ -117,6 +123,109 @@ module RubynCode
       SIMPLE_ATTRS = %i[title status model].freeze
 
       private
+
+      # ── Incremental persistence ───────────────────────────────────────
+
+      # True when this process has already persisted a prefix of +messages+
+      # for the session and the prefix is unchanged, so only the tail needs
+      # to be written. Compares object identities — compaction/undo/resume
+      # replace message objects, which forces a snapshot.
+      def appendable?(session_id, messages)
+        state = @journal_state[session_id]
+        return false unless state
+        return false if messages.size < state[:count]
+
+        messages.first(state[:count]).map(&:object_id) == state[:ids]
+      end
+
+      def remember_journal_state(session_id, messages)
+        @journal_state[session_id] = {
+          count: messages.size,
+          ids: messages.map(&:object_id)
+        }
+      end
+
+      # Appends the not-yet-persisted tail of +messages+ to the journal
+      # table and touches the session row.
+      def append_to_journal(session_id, messages, opts)
+        new_messages = messages[@journal_state[session_id][:count]..] || []
+        now = Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
+
+        @db.transaction do
+          new_messages.each do |msg|
+            @db.execute(
+              'INSERT INTO messages (session_id, role, content, created_at) VALUES (?, ?, ?, ?)',
+              [session_id, msg[:role] || msg['role'], JSON.generate(msg), now]
+            )
+          end
+          touch_session(session_id, opts, now)
+        end
+      end
+
+      def touch_session(session_id, opts, now)
+        meta_json = opts.key?(:metadata) ? JSON.generate(opts[:metadata]) : nil
+        @db.execute(<<~SQL, [opts[:title], opts[:model], meta_json, now, session_id])
+          UPDATE sessions SET
+            title = COALESCE(?, title),
+            model = COALESCE(?, model),
+            metadata = COALESCE(?, metadata),
+            updated_at = ?
+          WHERE id = ?
+        SQL
+      end
+
+      # Writes the full messages blob and clears any journaled tail —
+      # the blob becomes the single source of truth again.
+      def snapshot_session(session_id, project_path, messages, opts)
+        now = Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
+        messages_json = JSON.generate(messages)
+        meta_json = JSON.generate(opts.fetch(:metadata, {}))
+        title = opts[:title]
+        model = opts[:model]
+
+        insert_params = [session_id, project_path, title, model, messages_json, 'active', meta_json, now, now]
+        update_params = [messages_json, title, model, meta_json, now]
+
+        @db.transaction do
+          @db.execute(<<~SQL, insert_params + update_params)
+            INSERT INTO sessions (id, project_path, title, model, messages, status, metadata, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              messages = ?,
+              title = COALESCE(?, title),
+              model = COALESCE(?, model),
+              metadata = ?,
+              updated_at = ?
+          SQL
+          @db.execute('DELETE FROM messages WHERE session_id = ?', [session_id])
+        end
+      end
+
+      # Journaled messages appended after the last blob snapshot, in insert order.
+      def journal_messages(session_id)
+        rows = @db.query(
+          'SELECT content FROM messages WHERE session_id = ? ORDER BY id',
+          [session_id]
+        ).to_a
+        rows.filter_map { |row| parse_journal_row(row['content']) }
+      rescue StandardError
+        []
+      end
+
+      def parse_journal_row(raw)
+        return nil unless raw.is_a?(String)
+
+        JSON.parse(raw, symbolize_names: true)
+      rescue JSON::ParserError
+        nil
+      end
+
+      def clear_journal(session_id)
+        @journal_state.delete(session_id)
+        @db.execute('DELETE FROM messages WHERE session_id = ?', [session_id])
+      rescue StandardError
+        nil
+      end
 
       def build_list_filters(project_path, status)
         conditions = []
@@ -161,6 +270,11 @@ module RubynCode
       end
 
       def ensure_table
+        ensure_sessions_table
+        ensure_messages_table
+      end
+
+      def ensure_sessions_table
         @db.execute(<<~SQL)
           CREATE TABLE IF NOT EXISTS sessions (
             id TEXT PRIMARY KEY,
@@ -180,6 +294,30 @@ module RubynCode
         @db.execute("ALTER TABLE sessions ADD COLUMN messages TEXT NOT NULL DEFAULT '[]'")
       rescue StandardError
         # Column already exists — safe to continue
+      end
+
+      # Journal table for incrementally persisted messages. Mirrors
+      # db/migrations/002_create_messages.sql for databases that predate it.
+      def ensure_messages_table
+        @db.execute(<<~SQL)
+          CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+            role TEXT NOT NULL CHECK(role IN ('system','user','assistant')),
+            content TEXT,
+            tool_calls TEXT,
+            tool_use_id TEXT,
+            tool_name TEXT,
+            token_count INTEGER,
+            is_compacted INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+          )
+        SQL
+        @db.execute('CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)')
+      rescue StandardError
+        # Table creation is best-effort — save_session falls back to
+        # full snapshots when the journal is unavailable.
+        nil
       end
 
       # @param raw [String, Array, nil]
