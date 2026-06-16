@@ -1,11 +1,44 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
+require 'rubyn_code/ide/client'
 
 RSpec.describe RubynCode::Tools::AskUser do
   let(:project_root) { '/tmp/test_project' }
 
   describe '#execute' do
+    context 'with an ide_client (IDE mode)' do
+      it 'rounds the question through ide/askUser and returns the answer' do
+        ide_client = instance_double(RubynCode::IDE::Client)
+        allow(ide_client).to receive(:request)
+          .with('ide/askUser', { question: 'Which pattern?' }, timeout: described_class::IDE_ASK_TIMEOUT)
+          .and_return({ 'answer' => 'Service objects' })
+
+        tool = described_class.new(project_root: project_root, ide_client: ide_client)
+
+        expect(tool.execute(question: 'Which pattern?')).to eq('Service objects')
+      end
+
+      it 'takes precedence over a prompt_callback' do
+        ide_client = instance_double(RubynCode::IDE::Client)
+        allow(ide_client).to receive(:request).and_return({ 'answer' => 'from IDE' })
+
+        tool = described_class.new(project_root: project_root, ide_client: ide_client)
+        tool.prompt_callback = ->(_q) { 'from callback' }
+
+        expect(tool.execute(question: 'Where from?')).to eq('from IDE')
+      end
+
+      it 'returns [no response] when the IDE answer is blank or missing' do
+        ide_client = instance_double(RubynCode::IDE::Client)
+        allow(ide_client).to receive(:request).and_return({ 'answer' => '' })
+
+        tool = described_class.new(project_root: project_root, ide_client: ide_client)
+
+        expect(tool.execute(question: 'Anything?')).to eq('[no response]')
+      end
+    end
+
     context 'with a prompt_callback injected' do
       it 'calls the callback with the question and returns the answer' do
         tool = described_class.new(project_root: project_root)

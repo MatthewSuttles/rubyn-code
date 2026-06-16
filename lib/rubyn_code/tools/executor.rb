@@ -56,8 +56,10 @@ module RubynCode
 
       def build_tool(tool_name)
         tool_class = Registry.get(tool_name)
-        # IDE-aware tools accept an ide_client parameter.
-        if @ide_client && tool_class.method(:new).parameters.any? { |_, name| name == :ide_client }
+        # IDE-aware tools accept an ide_client parameter. Inspect #initialize,
+        # not .method(:new) — the latter reports Class#new's own [[:rest]]
+        # signature and never forwards to the constructor.
+        if @ide_client && tool_class.instance_method(:initialize).parameters.any? { |_, name| name == :ide_client }
           tool = tool_class.new(project_root: project_root, ide_client: @ide_client)
         else
           tool = tool_class.new(project_root: project_root)
