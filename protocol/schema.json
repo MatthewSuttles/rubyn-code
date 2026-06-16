@@ -716,6 +716,22 @@
       "required": ["symbols"]
     },
 
+    "ide_ask_user_params": {
+      "type": "object",
+      "properties": {
+        "question": { "type": "string" }
+      },
+      "required": ["question"]
+    },
+
+    "ide_ask_user_result": {
+      "type": "object",
+      "properties": {
+        "answer": { "type": "string" }
+      },
+      "required": ["answer"]
+    },
+
     "method_registry": {
       "description": "Maps method names to their param/result schema refs.",
       "type": "object",
@@ -753,7 +769,8 @@
             "ide/navigateTo":            { "$ref": "#/$defs/_method_meta_ide_navigate_to" },
             "ide/getOpenTabs":           { "$ref": "#/$defs/_method_meta_ide_get_open_tabs" },
             "ide/getDiagnostics":        { "$ref": "#/$defs/_method_meta_ide_get_diagnostics" },
-            "ide/getWorkspaceSymbols":   { "$ref": "#/$defs/_method_meta_ide_get_workspace_symbols" }
+            "ide/getWorkspaceSymbols":   { "$ref": "#/$defs/_method_meta_ide_get_workspace_symbols" },
+            "ide/askUser":               { "$ref": "#/$defs/_method_meta_ide_ask_user" }
           }
         },
         "notifications": {
@@ -800,6 +817,7 @@
     "_method_meta_ide_get_open_tabs":        { "type": "object", "properties": { "result": { "$ref": "#/$defs/ide_get_open_tabs_result" } } },
     "_method_meta_ide_get_diagnostics":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/ide_get_diagnostics_params" },      "result": { "$ref": "#/$defs/ide_get_diagnostics_result" } } },
     "_method_meta_ide_get_workspace_symbols": { "type": "object", "properties": { "params": { "$ref": "#/$defs/ide_get_workspace_symbols_params" }, "result": { "$ref": "#/$defs/ide_get_workspace_symbols_result" } } },
+    "_method_meta_ide_ask_user":             { "type": "object", "properties": { "params": { "$ref": "#/$defs/ide_ask_user_params" },             "result": { "$ref": "#/$defs/ide_ask_user_result" } } },
 
     "_notif_meta_stream_text":      { "type": "object", "properties": { "params": { "$ref": "#/$defs/stream_text_params" } } },
     "_notif_meta_agent_status":     { "type": "object", "properties": { "params": { "$ref": "#/$defs/agent_status_params" } } },

@@ -85,6 +85,30 @@
         }
       },
       "validate_result": "ide_get_open_tabs_result"
+    },
+    {
+      "direction": "server_to_client",
+      "type": "request",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1004,
+        "method": "ide/askUser",
+        "params": {
+          "question": "Which authentication strategy should I use?"
+        }
+      }
+    },
+    {
+      "direction": "client_to_server",
+      "type": "response",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1004,
+        "result": {
+          "answer": "Use Devise with JWT"
+        }
+      },
+      "validate_result": "ide_ask_user_result"
     }
   ]
 }

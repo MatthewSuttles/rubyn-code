@@ -294,7 +294,52 @@ RSpec.describe RubynCode::Tools::Executor do
         expect(result).to eq('callback=true')
       end
     end
-    
+
+    it 'injects ide_client into tools whose constructor accepts it' do
+      ide_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'ide_aware_probe')
+        const_set(:DESCRIPTION, 'IDE-aware probe')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :read)
+
+        def initialize(project_root:, ide_client: nil)
+          super(project_root: project_root)
+          @ide_client = ide_client
+        end
+
+        def execute(**_params)
+          "ide_client=#{!@ide_client.nil?}"
+        end
+      end
+      RubynCode::Tools::Registry.register(ide_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir, ide_client: :fake_ide_client)
+
+        result = executor.execute('ide_aware_probe', {})
+        expect(result).to eq('ide_client=true')
+      end
+    end
+
+    it 'does not pass ide_client to ordinary tools' do
+      plain_tool = Class.new(RubynCode::Tools::Base) do
+        const_set(:TOOL_NAME, 'plain_probe')
+        const_set(:DESCRIPTION, 'Plain probe')
+        const_set(:PARAMETERS, {}.freeze)
+        const_set(:RISK_LEVEL, :read)
+
+        def execute(**_params)
+          'ok'
+        end
+      end
+      RubynCode::Tools::Registry.register(plain_tool)
+
+      with_temp_project do |dir|
+        executor = described_class.new(project_root: dir, ide_client: :fake_ide_client)
+        expect(executor.execute('plain_probe', {})).to eq('ok')
+      end
+    end
+
     it 'invalidates file cache entries when bash uses redirect operators' do
       bash_tool = Class.new(RubynCode::Tools::Base) do
         const_set(:TOOL_NAME, 'bash')
