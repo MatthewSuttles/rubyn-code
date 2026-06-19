@@ -244,6 +244,7 @@ module RubynCode
     autoload :InstinctMethods, 'rubyn_code/learning/instinct'
     autoload :Injector, 'rubyn_code/learning/injector'
     autoload :Shortcut, 'rubyn_code/learning/shortcut'
+    autoload :Porter, 'rubyn_code/learning/porter'
   end
 
   # IDE (VS Code extension server)
@@ -308,6 +309,7 @@ module RubynCode
       autoload :RemoveSkills, 'rubyn_code/cli/commands/remove_skills'
       autoload :Skills, 'rubyn_code/cli/commands/skills'
       autoload :Megaplan, 'rubyn_code/cli/commands/megaplan'
+      autoload :Learning, 'rubyn_code/cli/commands/learning'
     end
   end
 
