@@ -24,7 +24,7 @@ module RubynCode
           Commands::Model, Commands::NewSession, Commands::Mcp,
           Commands::Provider, Commands::InstallSkills,
           Commands::RemoveSkills, Commands::Skills,
-          Commands::Megaplan, Commands::Goal
+          Commands::Megaplan, Commands::Goal, Commands::Loop
         ].each { |cmd| @command_registry.register(cmd) }
       end
 
@@ -86,9 +86,62 @@ module RubynCode
           apply_provider(provider, rest[:model])
         in { action: :spawn_teammate, name: String => name, role: String => role }
           spawn_teammate(name, role)
+        in { action: :run_loop, interval:, max: Integer => max, payload: String => payload }
+          run_loop(interval, max, payload)
         else
           # Unknown result hash — ignore
         end
+      end
+
+      # Drive a /loop. Owned by the REPL so it runs on the main thread (Ctrl-C
+      # stops it) and can re-dispatch slash-command payloads.
+      def run_loop(interval, max, payload)
+        announce_loop(interval, max)
+        payload = decorate_self_paced(payload) unless interval
+        @current_loop = CLI::LoopRunner.new(
+          interval: interval, max_iterations: max,
+          runner: ->(_i) { run_loop_payload(payload) },
+          on_iteration: ->(n, total) { @renderer.system_message("🔁 loop #{n}/#{total}") }
+        )
+        completed = @current_loop.run
+        @renderer.info("🔁 Loop finished after #{completed} iteration#{'s' unless completed == 1}.")
+      rescue Interrupt
+        @renderer.warning('Loop interrupted.')
+      ensure
+        @current_loop = nil
+      end
+
+      def announce_loop(interval, max)
+        cadence = interval ? "every #{format_interval(interval)}" : 'self-paced'
+        @renderer.info("🔁 Looping #{cadence} (up to #{max}×). Press Ctrl-C to stop.")
+      end
+
+      # Execute one iteration. Slash-command payloads are re-dispatched; plain
+      # prompts go through the agent. Returns the agent's text so self-paced
+      # loops can detect the LOOP_DONE sentinel.
+      def run_loop_payload(payload)
+        if payload.start_with?('/')
+          name, *rest = payload.split
+          dispatch_slash_command(name, rest)
+          ''
+        else
+          handle_message(payload).to_s
+        end
+      end
+
+      def decorate_self_paced(payload)
+        return payload if payload.start_with?('/')
+
+        "#{payload}\n\n(You are in a self-paced loop. Keep handling this " \
+          'recurring task. When it no longer needs to run, end your reply ' \
+          "with #{CLI::LoopRunner::DONE_SENTINEL}.)"
+      end
+
+      def format_interval(seconds)
+        return "#{seconds / 3600}h" if (seconds % 3600).zero? && seconds >= 3600
+        return "#{seconds / 60}m" if (seconds % 60).zero? && seconds >= 60
+
+        "#{seconds}s"
       end
 
       def start_new_session(new_id)
