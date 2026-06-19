@@ -283,6 +283,7 @@ module RubynCode
     autoload :Setup, 'rubyn_code/cli/setup'
     autoload :FirstRun, 'rubyn_code/cli/first_run'
     autoload :DaemonRunner, 'rubyn_code/cli/daemon_runner'
+    autoload :LoopRunner, 'rubyn_code/cli/loop_runner'
     autoload :VersionCheck, 'rubyn_code/cli/version_check'
 
     # Slash Command System
@@ -317,6 +318,7 @@ module RubynCode
       autoload :Skills, 'rubyn_code/cli/commands/skills'
       autoload :Megaplan, 'rubyn_code/cli/commands/megaplan'
       autoload :Goal, 'rubyn_code/cli/commands/goal'
+      autoload :Loop, 'rubyn_code/cli/commands/loop'
       autoload :Agents, 'rubyn_code/cli/commands/agents'
     end
   end
