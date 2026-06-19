@@ -9,8 +9,9 @@ module RubynCode
       TOOL_NAME = 'spawn_agent'
       DESCRIPTION = 'Spawn an isolated sub-agent to handle a task. The sub-agent gets its own ' \
                     "fresh context, works independently, and returns only a summary. Use 'explore' " \
-                    "type for research/reading, 'worker' type for writing code/files. The sub-agent " \
-                    'shares the filesystem but not your conversation.'
+                    "type for research/reading, 'worker' type for writing code/files, or the name " \
+                    'of any custom agent defined in .rubyn-code/agents/. The sub-agent shares the ' \
+                    'filesystem but not your conversation.'
       PARAMETERS = {
         prompt: {
           type: :string,
@@ -19,76 +20,73 @@ module RubynCode
         },
         agent_type: {
           type: :string,
-          description: "Type of agent: 'explore' (read-only) or 'worker' (full write access). Default: explore",
-          required: false,
-          enum: %w[explore worker]
+          description: "Agent type: 'explore' (read-only), 'worker' (full write access), or a " \
+                       'custom agent name from .rubyn-code/agents/. Default: explore',
+          required: false
         }
       }.freeze
       RISK_LEVEL = :execute
+
+      READ_TOOLS = %w[read_file glob grep bash load_skill memory_search].freeze
+      BLOCKED_TOOLS = %w[spawn_agent send_message read_inbox compact memory_write].freeze
 
       # These get injected by the executor or the REPL
       attr_writer :llm_client, :on_status
 
       def execute(prompt:, agent_type: 'explore')
-        type = agent_type.to_sym
+        agent = resolve_agent(agent_type)
         callback = @on_status || method(:default_status)
         @tool_count = 0
 
-        callback.call(:started, "Spawning #{type} agent...")
+        callback.call(:started, "Spawning #{agent.name} agent...")
 
-        tools = tools_for_type(type)
-        result, hit_limit = run_sub_agent(
-          prompt: prompt, tools: tools, type: type, callback: callback
-        )
+        tools = tools_for(agent)
+        result, hit_limit = run_sub_agent(prompt: prompt, tools: tools, agent: agent, callback: callback)
 
         callback.call(:done, "Agent finished (#{@tool_count} tool calls).")
 
         summary = RubynCode::SubAgents::Summarizer.call(result, max_length: 3000)
-        format_agent_result(type, summary, hit_limit)
+        format_agent_result(agent.name, summary, hit_limit)
       end
 
       private
 
-      def format_agent_result(type, summary, hit_limit)
+      # Resolve the requested type via the catalog, falling back to explore
+      # for an unknown name so a typo degrades gracefully instead of erroring.
+      def resolve_agent(agent_type)
+        catalog = RubynCode::SubAgents::Catalog.new(project_root: project_root)
+        catalog.get(agent_type) || catalog.get('explore')
+      end
+
+      def format_agent_result(name, summary, hit_limit)
         if hit_limit
-          "## Sub-Agent Result (#{type}) — INCOMPLETE (reached #{@tool_count} tool calls)\n\n" \
+          "## Sub-Agent Result (#{name}) — INCOMPLETE (reached #{@tool_count} tool calls)\n\n" \
             'The sub-agent ran out of turns before finishing. Here is what it accomplished so far:' \
             "\n\n#{summary}"
         else
-          "## Sub-Agent Result (#{type})\n\n#{summary}"
-        end
-      end
-
-      def max_iterations_for(type)
-        if type == :explore
-          Config::Defaults::MAX_EXPLORE_AGENT_ITERATIONS
-        else
-          Config::Defaults::MAX_SUB_AGENT_ITERATIONS
+          "## Sub-Agent Result (#{name})\n\n#{summary}"
         end
       end
 
       # Returns [result_text, hit_limit] tuple
-      def run_sub_agent(prompt:, tools:, type:, callback:)
+      def run_sub_agent(prompt:, tools:, agent:, callback:)
         conversation = RubynCode::Agent::Conversation.new
         conversation.add_user_message(prompt)
 
-        max_iterations = max_iterations_for(type)
         iteration = 0
         last_text = nil
 
         loop do
-          return finish_at_limit(conversation, type, last_text) if iteration >= max_iterations
+          return finish_at_limit(conversation, agent, last_text) if iteration >= agent.max_iterations
 
-          last_text, done = process_iteration(
-            conversation, tools, type, callback, last_text
-          )
+          last_text, done = process_iteration(conversation, tools, agent, callback, last_text)
           return [last_text || '', false] if done
 
           iteration += 1
         end
       end
 
-      def finish_at_limit(conversation, type, last_text)
+      def finish_at_limit(conversation, agent, last_text)
         conversation.add_user_message(
           'You have reached your turn limit. Summarize everything you found or ' \
           'accomplished so far. Be thorough — this is your last chance to report back.'
@@ -96,17 +94,17 @@ module RubynCode
         response = @llm_client.chat(
           messages: conversation.to_api_format,
           tools: [],
-          system: sub_agent_system_prompt(type)
+          system: agent.system_prompt
         )
         summary = extract_text(response)
         [summary.empty? ? (last_text || '') : summary, true]
       end
 
-      def process_iteration(conversation, tools, type, callback, last_text)
+      def process_iteration(conversation, tools, agent, callback, last_text)
         response = @llm_client.chat(
           messages: conversation.to_api_format,
           tools: tools,
-          system: sub_agent_system_prompt(type)
+          system: agent.system_prompt
         )
 
         content = response_content(response)
@@ -117,22 +115,22 @@ module RubynCode
         conversation.add_assistant_message(content)
         return [last_text, true] if tool_calls.empty?
 
-        execute_sub_agent_tools(tool_calls, conversation, type, callback)
+        execute_sub_agent_tools(tool_calls, conversation, agent, callback)
         [last_text, false]
       end
 
-      def execute_sub_agent_tools(tool_calls, conversation, type, callback)
+      def execute_sub_agent_tools(tool_calls, conversation, agent, callback)
         tool_calls.each do |tc|
           name, input, id = extract_tool_call(tc)
           @tool_count += 1
           callback.call(:tool, name.to_s)
 
-          run_single_tool(name, input, id, conversation, type)
+          run_single_tool(name, input, id, conversation, agent)
         end
       end
 
-      def run_single_tool(name, input, id, conversation, type)
-        if %w[spawn_agent].include?(name)
+      def run_single_tool(name, input, id, conversation, agent)
+        if name == 'spawn_agent'
           conversation.add_tool_result(
             id, name, 'Error: Sub-agents cannot spawn other agents.', is_error: true
           )
@@ -140,9 +138,9 @@ module RubynCode
         end
 
         tool_class = RubynCode::Tools::Registry.get(name)
-        if type == :explore && tool_class.risk_level != :read
+        if agent.read_only? && tool_class.risk_level != :read
           conversation.add_tool_result(
-            id, name, 'Error: Explore agents can only use read-only tools.', is_error: true
+            id, name, "Error: #{agent.name} agents can only use read-only tools.", is_error: true
           )
           return
         end
@@ -154,31 +152,18 @@ module RubynCode
         conversation.add_tool_result(id, name, "Error: #{e.message}", is_error: true)
       end
 
-      def tools_for_type(type)
+      # The tool allowlist: explicit list from a custom agent, else the
+      # access-based default (read-only set or everything-minus-blocked).
+      def tools_for(agent)
         all_tools = RubynCode::Tools::Registry.tool_definitions
-        blocked = %w[spawn_agent send_message read_inbox compact memory_write]
 
-        if type == :explore
-          read_tools = %w[read_file glob grep bash load_skill memory_search]
-          all_tools.select { |t| read_tools.include?(t[:name]) }
+        if agent.tool_names && !agent.tool_names.empty?
+          allowed = agent.tool_names - BLOCKED_TOOLS
+          all_tools.select { |t| allowed.include?(t[:name]) }
+        elsif agent.read_only?
+          all_tools.select { |t| READ_TOOLS.include?(t[:name]) }
         else
-          all_tools.reject { |t| blocked.include?(t[:name]) }
-        end
-      end
-
-      def sub_agent_system_prompt(type)
-        base = 'You are a Rubyn sub-agent. Complete your task efficiently and ' \
-               'return a clear summary of what you found or did.'
-
-        case type
-        when :explore
-          "#{base}\nYou have read-only access. Search, read files, and analyze. " \
-          'Do NOT attempt to write or modify anything.'
-        when :worker
-          "#{base}\nYou have full read/write access. Make the changes needed, " \
-          'run tests if appropriate, and report what you did.'
-        else
-          base
+          all_tools.reject { |t| BLOCKED_TOOLS.include?(t[:name]) }
         end
       end
 

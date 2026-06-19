@@ -45,6 +45,7 @@ module RubynCode
         @skill_matcher = build_skill_matcher
         @web_skill_autoload = build_web_skill_autoload
         @session_persistence = Memory::SessionPersistence.new(@db)
+        @mention_expander = MentionExpander.new(project_root: @project_root)
       end
 
       def build_skill_matcher

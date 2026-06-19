@@ -13,14 +13,16 @@ module RubynCode
           @classes = []
         end
 
-        # Register a command class.
+        # Register a command. Accepts either a command class (built-ins, which
+        # are instantiated per dispatch) or a ready command instance
+        # (user-defined; see Commands::CustomCommand).
         #
-        # @param command_class [Class<Commands::Base>]
+        # @param command [Class<Commands::Base>, #execute]
         # @return [void]
-        def register(command_class)
-          @classes << command_class
-          command_class.all_names.each do |name|
-            @commands[name] = command_class
+        def register(command)
+          @classes << command
+          command.all_names.each do |name|
+            @commands[name] = command
           end
         end
 
@@ -31,10 +33,13 @@ module RubynCode
         # @param ctx [Commands::Context] shared context
         # @return [Symbol, nil] :quit if the command signals exit, nil otherwise
         def dispatch(name, args, ctx)
-          command_class = @commands[name]
-          return :unknown unless command_class
+          command = @commands[name]
+          return :unknown unless command
 
-          command_class.new.execute(args, ctx)
+          # Built-ins are registered as classes (instantiate per call);
+          # user-defined commands are registered as ready instances.
+          instance = command.respond_to?(:new) ? command.new : command
+          instance.execute(args, ctx)
         end
 
         # All registered command names (for tab completion).

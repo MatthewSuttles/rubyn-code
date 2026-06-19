@@ -30,14 +30,23 @@ module RubynCode
 
         def render_server(cfg)
           client = build_client(cfg)
-          status, tool_count = probe_server(client)
+          status, counts = probe_server(client)
           icon = status_icon(status)
-          tools_label = tool_count ? " (#{tool_count} tools)" : ''
 
-          puts "  #{icon} #{cfg[:name]} [#{status}]#{tools_label}"
+          puts "  #{icon} #{cfg[:name]} [#{status}]#{capability_label(counts)}"
           render_transport_info(cfg)
         ensure
           client&.disconnect! if client&.connected?
+        end
+
+        def capability_label(counts)
+          return '' unless counts
+
+          parts = []
+          parts << "#{counts[:tools]} tools"
+          parts << "#{counts[:resources]} resources" if counts[:resources].positive?
+          parts << "#{counts[:prompts]} prompts" if counts[:prompts].positive?
+          " (#{parts.join(', ')})"
         end
 
         def build_client(cfg)
@@ -46,8 +55,12 @@ module RubynCode
 
         def probe_server(client)
           client.connect!
-          tool_count = client.tools.size
-          [:connected, tool_count]
+          counts = {
+            tools: client.tools.size,
+            resources: client.resources.size,
+            prompts: client.prompts.size
+          }
+          [:connected, counts]
         rescue StandardError
           [:error, nil]
         end

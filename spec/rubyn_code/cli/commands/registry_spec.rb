@@ -41,6 +41,18 @@ RSpec.describe RubynCode::CLI::Commands::Registry do
       result = registry.dispatch('/nope', [], ctx)
       expect(result).to eq(:unknown)
     end
+
+    it 'dispatches a registered command instance directly (no instantiation)' do
+      instance = RubynCode::CLI::Commands::CustomCommand.new(
+        name: 'hi', description: 'say hi', body: 'Hello $1'
+      )
+      registry.register(instance)
+      allow(ctx).to receive(:send_message)
+
+      registry.dispatch('/hi', ['there'], ctx)
+
+      expect(ctx).to have_received(:send_message).with('Hello there')
+    end
   end
 
   describe '#completions' do

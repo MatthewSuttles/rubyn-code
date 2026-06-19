@@ -26,6 +26,50 @@ RSpec.describe RubynCode::MCP::Client do
 
   subject(:client) { described_class.new(name: 'test-server', transport: transport) }
 
+  describe 'resources and prompts' do
+    context 'when the server advertises the capabilities' do
+      let(:init_response) do
+        { 'serverInfo' => { 'name' => 'test' }, 'capabilities' => { 'resources' => {}, 'prompts' => {} } }
+      end
+
+      before do
+        allow(transport).to receive(:send_request).with('resources/list')
+                                                  .and_return({ 'resources' => [{ 'uri' => 'file:///a' }] })
+        allow(transport).to receive(:send_request).with('prompts/list')
+                                                  .and_return({ 'prompts' => [{ 'name' => 'greet' }] })
+        allow(transport).to receive(:send_request).with('resources/read', anything)
+                                                  .and_return({ 'contents' => [{ 'text' => 'body' }] })
+        allow(transport).to receive(:send_request).with('prompts/get', anything)
+                                                  .and_return({ 'messages' => [] })
+        client.connect!
+      end
+
+      it 'lists resources and prompts' do
+        expect(client.resources).to eq([{ 'uri' => 'file:///a' }])
+        expect(client.prompts).to eq([{ 'name' => 'greet' }])
+        expect(client).to be_supports_resources
+        expect(client).to be_supports_prompts
+      end
+
+      it 'reads a resource and fetches a prompt' do
+        expect(client.read_resource('file:///a')).to eq({ 'contents' => [{ 'text' => 'body' }] })
+        client.get_prompt('greet', { who: 'world' })
+        expect(transport).to have_received(:send_request)
+          .with('prompts/get', { name: 'greet', arguments: { who: 'world' } })
+      end
+    end
+
+    context 'when the server does not advertise them' do
+      before { client.connect! }
+
+      it 'returns empty lists without calling the server' do
+        expect(client.resources).to eq([])
+        expect(client.prompts).to eq([])
+        expect(transport).not_to have_received(:send_request).with('resources/list')
+      end
+    end
+  end
+
   describe '#initialize' do
     it 'sets name and transport' do
       expect(client.name).to eq('test-server')
@@ -50,13 +94,13 @@ RSpec.describe RubynCode::MCP::Client do
       client.connect!
 
       expect(transport).to have_received(:send_request).with('initialize', {
-        protocolVersion: '2024-11-05',
-        capabilities: { tools: {} },
-        clientInfo: {
-          name: 'rubyn-code',
-          version: RubynCode::VERSION
-        }
-      })
+                                                               protocolVersion: '2024-11-05',
+                                                               capabilities: { tools: {} },
+                                                               clientInfo: {
+                                                                 name: 'rubyn-code',
+                                                                 version: RubynCode::VERSION
+                                                               }
+                                                             })
     end
 
     it 'sends notifications/initialized notification after init' do
@@ -90,7 +134,7 @@ RSpec.describe RubynCode::MCP::Client do
     context 'when initialize request fails' do
       before do
         allow(transport).to receive(:send_request).with('initialize', anything)
-          .and_raise(StandardError, 'protocol error')
+                                                  .and_raise(StandardError, 'protocol error')
       end
 
       it 'stops transport and raises ClientError wrapping original error' do
@@ -141,9 +185,9 @@ RSpec.describe RubynCode::MCP::Client do
         result = client.call_tool('read_file', { path: '/tmp/test.rb' })
 
         expect(transport).to have_received(:send_request).with('tools/call', {
-          name: 'read_file',
-          arguments: { path: '/tmp/test.rb' }
-        })
+                                                                 name: 'read_file',
+                                                                 arguments: { path: '/tmp/test.rb' }
+                                                               })
         expect(result).to eq(call_tool_response)
       end
 
@@ -151,9 +195,9 @@ RSpec.describe RubynCode::MCP::Client do
         client.call_tool('read_file')
 
         expect(transport).to have_received(:send_request).with('tools/call', {
-          name: 'read_file',
-          arguments: {}
-        })
+                                                                 name: 'read_file',
+                                                                 arguments: {}
+                                                               })
       end
     end
 
