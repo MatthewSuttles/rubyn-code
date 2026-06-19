@@ -201,6 +201,11 @@ module RubynCode
 
         @conversation.add_assistant_message(response_content(response))
 
+        # Stop hook: a hook may block stopping (e.g. an active /goal). When
+        # blocked, the reason is injected as user feedback and the loop keeps
+        # iterating instead of returning the final text.
+        return nil if stop_blocked?(text)
+
         # Decision-based compaction (topic switch, milestone)
         @decision_compactor&.check!(@conversation)
 
@@ -208,6 +213,19 @@ module RubynCode
         compact_if_needed
 
         text
+      end
+
+      # Fires the :stop hook. If a hook blocks (returns { block: true }), the
+      # reason is appended as a user message so the next iteration acts on it.
+      #
+      # @return [Boolean] true if stopping was blocked (keep iterating)
+      def stop_blocked?(text)
+        decision = @hook_runner.fire(:stop, conversation: @conversation, response_text: text)
+        return false unless decision.is_a?(Hash) && decision[:block]
+
+        RubynCode::Debug.agent('Stop blocked by hook — continuing')
+        @conversation.add_user_message(decision[:reason])
+        true
       end
 
       # Empty LLM response (0 content blocks). Common after dispatching

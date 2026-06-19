@@ -24,7 +24,7 @@ module RubynCode
           Commands::Model, Commands::NewSession, Commands::Mcp,
           Commands::Provider, Commands::InstallSkills,
           Commands::RemoveSkills, Commands::Skills,
-          Commands::Megaplan, Commands::Rewind
+          Commands::Megaplan, Commands::Goal, Commands::Rewind
         ].each { |cmd| @command_registry.register(cmd) }
       end
 
@@ -68,6 +68,7 @@ module RubynCode
           permission_tier: @permission_tier,
           plan_mode: @plan_mode,
           message_handler: method(:handle_message),
+          hook_registry: @hook_registry,
           checkpoint_manager: @checkpoint_manager
         )
       end
