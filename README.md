@@ -478,6 +478,19 @@ Rubyn gets smarter with every session:
 3. **On next startup** — injects top instincts into the system prompt
 4. **Over time** — reinforced instincts strengthen, unused ones decay and get pruned
 
+### Take your learnings with you
+
+Instincts live in `~/.rubyn-code`. Move them to another machine with `/learning`:
+
+```
+rubyn > /learning                       # how many instincts you've accumulated
+rubyn > /learning export learnings.json # write them to a portable file
+# ...on the new machine...
+rubyn > /learning import learnings.json --here   # load them (--here = apply to this project)
+```
+
+Import regenerates ids and skips duplicates, so it's safe to run repeatedly.
+
 ## Streaming Output
 
 Real-time streaming with live syntax highlighting via Rouge/Monokai. Code blocks are buffered and highlighted when complete. No waiting for full responses.
