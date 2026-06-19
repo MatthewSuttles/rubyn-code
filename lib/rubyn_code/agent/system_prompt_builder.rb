@@ -10,7 +10,7 @@ module RubynCode
     module SystemPromptBuilder # rubocop:disable Metrics/ModuleLength -- heavily extracted, residual 3 lines over
       include Prompts
 
-      INSTRUCTION_FILES = %w[RUBYN.md CLAUDE.md AGENT.md].freeze
+      INSTRUCTION_FILES = %w[RUBYN.md CLAUDE.md AGENTS.md AGENT.md].freeze
 
       private
 

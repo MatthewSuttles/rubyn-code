@@ -119,6 +119,25 @@ module RubynCode
         response = @agent_loop.send_message(input)
 
         @spinner.stop
+        render_response(response)
+        save_session!
+        response
+      rescue Interrupt
+        @spinner.stop
+        puts
+        @renderer.warning('Interrupted — session state preserved')
+        @current_loop&.stop! # Ctrl-C during a /loop iteration stops the loop
+        save_session!
+        nil
+      rescue BudgetExceededError => e
+        @spinner.error
+        @renderer.error("Budget exceeded: #{e.message}")
+      rescue StandardError => e
+        @spinner.error
+        @renderer.error("Error: #{e.message}")
+      end
+
+      def render_response(response)
         if @streaming_first_chunk
           @renderer.display(response)
         else
@@ -126,19 +145,6 @@ module RubynCode
           @stream_formatter = nil
           puts
         end
-
-        save_session!
-      rescue Interrupt
-        @spinner.stop
-        puts
-        @renderer.warning('Interrupted — session state preserved')
-        save_session!
-      rescue BudgetExceededError => e
-        @spinner.error
-        @renderer.error("Budget exceeded: #{e.message}")
-      rescue StandardError => e
-        @spinner.error
-        @renderer.error("Error: #{e.message}")
       end
 
       # Expand @path file mentions into inline content before the agent sees

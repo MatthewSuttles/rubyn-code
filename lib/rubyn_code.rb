@@ -226,6 +226,12 @@ module RubynCode
     autoload :Runner, 'rubyn_code/hooks/runner'
     autoload :BuiltIn, 'rubyn_code/hooks/built_in'
     autoload :UserHooks, 'rubyn_code/hooks/user_hooks'
+    autoload :GoalHook, 'rubyn_code/hooks/goal_hook'
+  end
+
+  # Session goals (/goal)
+  module Goal
+    autoload :Evaluator, 'rubyn_code/goal/evaluator'
   end
 
   # Layer 15: MCP
@@ -275,6 +281,7 @@ module RubynCode
     autoload :Setup, 'rubyn_code/cli/setup'
     autoload :FirstRun, 'rubyn_code/cli/first_run'
     autoload :DaemonRunner, 'rubyn_code/cli/daemon_runner'
+    autoload :LoopRunner, 'rubyn_code/cli/loop_runner'
     autoload :MentionExpander, 'rubyn_code/cli/mention_expander'
     autoload :VersionCheck, 'rubyn_code/cli/version_check'
 
@@ -309,6 +316,8 @@ module RubynCode
       autoload :RemoveSkills, 'rubyn_code/cli/commands/remove_skills'
       autoload :Skills, 'rubyn_code/cli/commands/skills'
       autoload :Megaplan, 'rubyn_code/cli/commands/megaplan'
+      autoload :Goal, 'rubyn_code/cli/commands/goal'
+      autoload :Loop, 'rubyn_code/cli/commands/loop'
     end
   end
 
