@@ -61,6 +61,20 @@ RSpec.describe RubynCode::Agent::Loop, 'system prompt caching' do
     end
   end
 
+  describe 'project instruction files' do
+    it 'loads AGENTS.md (Codex convention) into the system prompt' do
+      Dir.mktmpdir do |root|
+        File.write(File.join(root, 'AGENTS.md'), 'AGENTS-MARKER')
+        agent_loop = build_loop(root)
+        stub_chat(text_response('Hi.'))
+
+        agent_loop.send_message('hello')
+
+        expect(system_prompts.first).to include('AGENTS-MARKER')
+      end
+    end
+  end
+
   describe 'per-turn caching of static sections' do
     it 'does not rebuild static sections between iterations of the same turn' do
       Dir.mktmpdir do |root|
