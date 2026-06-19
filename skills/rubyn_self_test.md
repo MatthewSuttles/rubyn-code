@@ -365,6 +365,90 @@ Run the following inline Ruby script with `bash`. It exercises the teammate mana
 
   PASS criteria: all 6 `STEP` lines say PASS and the final line is `ALL PASS`.
 
+### 17. Recent Additions — Claude Code / Codex Parity
+
+Each feature below ships as its own PR; a check FAILs cleanly if that PR has
+not yet merged into the branch under test. Run the grep/spec checks — they are
+fast and need no API calls.
+
+#### 17a. `/goal` — work until a goal is met
+- **grep**: `class GoalHook` in `lib/rubyn_code/hooks/goal_hook.rb`. PASS if found.
+- **grep**: `:stop` in `lib/rubyn_code/hooks/runner.rb`. PASS if found (stop-hook gating wired).
+- **run_specs**: `bundle exec rspec spec/rubyn_code/hooks/goal_hook_spec.rb spec/rubyn_code/cli/commands/goal_spec.rb --format progress`. PASS if `0 failures`.
+
+#### 17b. `/loop` — repeat a prompt/command on an interval
+- **grep**: `class LoopRunner` in `lib/rubyn_code/cli/loop_runner.rb`. PASS if found.
+- **run_specs**: `bundle exec rspec spec/rubyn_code/cli/loop_runner_spec.rb spec/rubyn_code/cli/commands/loop_spec.rb --format progress`. PASS if `0 failures`.
+- **bash** (behavior): `bundle exec ruby -Ilib -rrubyn_code -e 'puts RubynCode::CLI::LoopRunner.parse_interval("5m")'`. PASS if output is `300`.
+
+#### 17c. `AGENTS.md` project instructions
+- **grep**: `AGENTS.md` in `lib/rubyn_code/agent/system_prompt_builder.rb`. PASS if found.
+- **run_specs**: `bundle exec rspec spec/rubyn_code/agent/system_prompt_builder_spec.rb --format progress`. PASS if `0 failures`.
+
+#### 17d. `@`-file mentions
+- **grep**: `class MentionExpander` in `lib/rubyn_code/cli/mention_expander.rb`. PASS if found.
+- **run_specs**: `bundle exec rspec spec/rubyn_code/cli/mention_expander_spec.rb --format progress`. PASS if `0 failures`.
+
+#### 17e. User-defined slash commands
+- **grep**: `module CustomLoader` in `lib/rubyn_code/cli/commands/custom_loader.rb`. PASS if found.
+- **run_specs**: `bundle exec rspec spec/rubyn_code/cli/commands/custom_loader_spec.rb spec/rubyn_code/cli/commands/command_template_spec.rb --format progress`. PASS if `0 failures`.
+
+#### 17f. Custom sub-agents + `/agents`
+- **grep**: `class Catalog` in `lib/rubyn_code/sub_agents/catalog.rb`. PASS if found.
+- **run_specs**: `bundle exec rspec spec/rubyn_code/sub_agents/catalog_spec.rb spec/rubyn_code/tools/spawn_agent_spec.rb --format progress`. PASS if `0 failures` (spawn_agent must still pass after the refactor).
+
+#### 17g. MCP resources & prompts
+- **grep**: `def supports_resources?` in `lib/rubyn_code/mcp/client.rb`. PASS if found.
+- **run_specs**: `bundle exec rspec spec/rubyn_code/mcp/client_spec.rb spec/rubyn_code/mcp/tool_bridge_spec.rb --format progress`. PASS if `0 failures`.
+
+#### 17h. `/rewind` — checkpoint & restore
+- **grep**: `class Manager` in `lib/rubyn_code/checkpoint/manager.rb`. PASS if found.
+- **run_specs**: `bundle exec rspec spec/rubyn_code/checkpoint --format progress`. PASS if `0 failures`.
+
+#### 17i. Learning export/import
+- **grep**: `module Porter` in `lib/rubyn_code/learning/porter.rb`. PASS if found.
+- **run_specs**: `bundle exec rspec spec/rubyn_code/learning/porter_spec.rb --format progress`. PASS if `0 failures`.
+- **bash** (round-trip): the script below exports instincts to a temp file and re-imports them into a fresh in-memory DB. PASS if the final line is `LEARNING ROUNDTRIP: PASS`.
+
+  ```bash
+  bundle exec ruby -Ilib -rrubyn_code -rsqlite3 -rtmpdir -e '
+    def db_with_instincts
+      raw = SQLite3::Database.new(":memory:"); raw.results_as_hash = true
+      raw.execute(File.read("db/migrations/010_create_instincts.sql").split(";").first + ";")
+      wrap = Object.new
+      wrap.define_singleton_method(:execute) { |sql, p = []| raw.execute(sql, p) }
+      wrap.define_singleton_method(:query)   { |sql, p = []| raw.execute(sql, p) }
+      wrap
+    end
+    src = db_with_instincts
+    src.execute("INSERT INTO instincts (id,project_path,pattern,context_tags,confidence,decay_rate,times_applied,times_helpful,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                ["x","/p","prefer guard clauses","[]",0.8,0.05,1,1,"2026-01-01T00:00:00Z","2026-01-01T00:00:00Z"])
+    Dir.mktmpdir do |d|
+      f = File.join(d, "l.json")
+      RubynCode::Learning::Porter.export(db: src, path: f)
+      dst = db_with_instincts
+      res = RubynCode::Learning::Porter.import(db: dst, path: f)
+      ok = res[:imported] == 1 && dst.query("SELECT COUNT(*) AS n FROM instincts").first["n"] == 1
+      puts(ok ? "LEARNING ROUNDTRIP: PASS" : "LEARNING ROUNDTRIP: FAIL #{res.inspect}")
+    end
+  '
+  ```
+
+#### 17j. Command registry integrity (all new commands load + register)
+- **bash**: the script below boots the command registry exactly as the REPL does and asserts the new slash commands are present and unique. PASS if the final line is `COMMANDS: PASS`.
+
+  ```bash
+  bundle exec ruby -Ilib -rrubyn_code -e '
+    reg = RubynCode::CLI::Commands::Registry.new
+    [RubynCode::CLI::Commands::Goal, RubynCode::CLI::Commands::Loop,
+     RubynCode::CLI::Commands::Agents, RubynCode::CLI::Commands::Rewind,
+     RubynCode::CLI::Commands::Learning].each { |c| reg.register(c) }
+    want = %w[/goal /loop /agents /rewind /learning]
+    missing = want.reject { |n| reg.known?(n) }
+    puts(missing.empty? ? "COMMANDS: PASS" : "COMMANDS: FAIL missing #{missing.inspect}")
+  '
+  ```
+
 ## Scoring
 
 Count total PASS results out of total tests run. Report the percentage.
