@@ -112,6 +112,7 @@ module RubynCode
 
       # -- sequential steps with interrupt rescue
       def handle_message(input)
+        input = expand_mentions(input)
         @spinner.start
         @streaming_first_chunk = true
 
@@ -144,6 +145,16 @@ module RubynCode
           @stream_formatter = nil
           puts
         end
+      end
+
+      # Expand @path file mentions into inline content before the agent sees
+      # the message. Surfaces what was attached so the user knows.
+      def expand_mentions(input)
+        expanded, paths = @mention_expander.expand(input)
+        @renderer.info("📎 Attached: #{paths.join(', ')}") unless paths.empty?
+        expanded
+      rescue StandardError
+        input
       end
 
       def setup_readline!

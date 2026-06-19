@@ -138,6 +138,8 @@ rubyn-code -p "Refactor app/controllers/orders_controller.rb into service object
 rubyn-code --ide
 ```
 
+**Tip:** Reference files inline with `@` — `rubyn > explain @lib/foo.rb and @config/routes.rb`. Rubyn inlines their contents so you don't have to wait for it to read them.
+
 ## What Can Rubyn Do?
 
 ### Refactor code
@@ -563,6 +565,28 @@ access: read                         # read | write (default: write)
 ---
 You are a meticulous code reviewer. Find correctness bugs only.
 ```
+
+### Custom Slash Commands
+
+Drop a markdown file in `.rubyn-code/commands/` (project) or `~/.rubyn-code/commands/` (global) and it becomes a slash command — `deploy.md` → `/deploy`. Project commands override global ones; built-ins always win.
+
+```markdown
+---
+description: Open a PR for the current branch
+---
+Open a pull request for the current branch.
+Title: $ARGUMENTS
+Current diff:
+!`git diff main --stat`
+```
+
+Templating in the body:
+
+| Token | Expands to |
+|-------|-----------|
+| `$ARGUMENTS` | everything typed after the command |
+| `$1` … `$9` | individual positional arguments |
+| `` !`shell cmd` `` | the command's output, inlined |
 
 ## Authentication
 

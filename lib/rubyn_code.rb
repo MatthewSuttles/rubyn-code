@@ -284,6 +284,7 @@ module RubynCode
     autoload :FirstRun, 'rubyn_code/cli/first_run'
     autoload :DaemonRunner, 'rubyn_code/cli/daemon_runner'
     autoload :LoopRunner, 'rubyn_code/cli/loop_runner'
+    autoload :MentionExpander, 'rubyn_code/cli/mention_expander'
     autoload :VersionCheck, 'rubyn_code/cli/version_check'
 
     # Slash Command System
@@ -320,6 +321,9 @@ module RubynCode
       autoload :Goal, 'rubyn_code/cli/commands/goal'
       autoload :Loop, 'rubyn_code/cli/commands/loop'
       autoload :Agents, 'rubyn_code/cli/commands/agents'
+      autoload :CommandTemplate, 'rubyn_code/cli/commands/command_template'
+      autoload :CustomCommand, 'rubyn_code/cli/commands/custom_command'
+      autoload :CustomLoader, 'rubyn_code/cli/commands/custom_loader'
     end
   end
 
