@@ -3,7 +3,14 @@
 require 'spec_helper'
 
 RSpec.describe RubynCode::MCP::ToolBridge do
-  let(:mcp_client) { instance_double('RubynCode::MCP::Client') }
+  let(:mcp_client) { instance_double('RubynCode::MCP::Client', name: 'docs') }
+
+  # bridge() now also inspects resources/prompts; default them to empty so
+  # the tool-only examples behave exactly as before.
+  before do
+    allow(mcp_client).to receive(:resources).and_return([])
+    allow(mcp_client).to receive(:prompts).and_return([])
+  end
 
   after do
     RubynCode::Tools::Registry.instance_variable_get(:@tools)&.delete_if { |k, _| k.start_with?('mcp_') }
@@ -130,6 +137,59 @@ RSpec.describe RubynCode::MCP::ToolBridge do
         result = described_class.bridge(mcp_client)
         expect(result.first.parameters).to eq({})
       end
+    end
+  end
+
+  describe 'resource bridging' do
+    before do
+      allow(mcp_client).to receive(:tools).and_return([])
+      allow(mcp_client).to receive(:resources).and_return(
+        [{ 'uri' => 'file:///readme.md', 'name' => 'README' }]
+      )
+    end
+
+    it 'registers a read_resource tool listing available URIs' do
+      klasses = described_class.bridge(mcp_client)
+      tool = klasses.find { |k| k.tool_name == 'mcp_docs_read_resource' }
+      expect(tool).not_to be_nil
+      expect(tool.description).to include('file:///readme.md')
+      expect(tool.risk_level).to eq(:external)
+    end
+
+    it 'reads a resource and formats its text contents' do
+      allow(mcp_client).to receive(:read_resource).with('file:///readme.md')
+                                                  .and_return({ 'contents' => [{ 'text' => 'Hello docs' }] })
+
+      klass = described_class.bridge(mcp_client).find { |k| k.tool_name == 'mcp_docs_read_resource' }
+      tool = klass.new(project_root: Dir.tmpdir)
+      expect(tool.execute(uri: 'file:///readme.md')).to eq('Hello docs')
+    end
+  end
+
+  describe 'prompt bridging' do
+    before do
+      allow(mcp_client).to receive(:tools).and_return([])
+      allow(mcp_client).to receive(:prompts).and_return(
+        [{ 'name' => 'summarize', 'description' => 'Summarize text' }]
+      )
+    end
+
+    it 'registers a get_prompt tool listing available prompts' do
+      klass = described_class.bridge(mcp_client).find { |k| k.tool_name == 'mcp_docs_get_prompt' }
+      expect(klass).not_to be_nil
+      expect(klass.description).to include('summarize')
+    end
+
+    it 'fetches a prompt and renders its messages' do
+      allow(mcp_client).to receive(:get_prompt).with('summarize', {})
+                                               .and_return({ 'messages' => [
+                                                             { 'role' => 'user',
+                                                               'content' => { 'type' => 'text', 'text' => 'Do it' } }
+                                                           ] })
+
+      klass = described_class.bridge(mcp_client).find { |k| k.tool_name == 'mcp_docs_get_prompt' }
+      tool = klass.new(project_root: Dir.tmpdir)
+      expect(tool.execute(name: 'summarize')).to eq('user: Do it')
     end
   end
 

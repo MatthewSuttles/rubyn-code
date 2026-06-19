@@ -138,6 +138,8 @@ rubyn-code -p "Refactor app/controllers/orders_controller.rb into service object
 rubyn-code --ide
 ```
 
+**Tip:** Reference files inline with `@` — `rubyn > explain @lib/foo.rb and @config/routes.rb`. Rubyn inlines their contents so you don't have to wait for it to read them.
+
 ## What Can Rubyn Do?
 
 ### Refactor code
@@ -227,7 +229,7 @@ The extension communicates over 19 RPC methods: `initialize`, `prompt`, `cancel`
 
 ## MCP — External Tool Servers
 
-Connect external tool servers via the [Model Context Protocol](https://modelcontextprotocol.io). MCP tools are dynamically discovered and registered as native Rubyn tools, available in the REPL, IDE, and daemon.
+Connect external tool servers via the [Model Context Protocol](https://modelcontextprotocol.io). MCP tools are dynamically discovered and registered as native Rubyn tools, available in the REPL, IDE, and daemon. Servers that expose **resources** and **prompts** are also bridged — Rubyn registers per-server `read_resource` and `get_prompt` tools, and `/mcp` reports the counts.
 
 ### Configuration
 
@@ -476,6 +478,19 @@ Rubyn gets smarter with every session:
 3. **On next startup** — injects top instincts into the system prompt
 4. **Over time** — reinforced instincts strengthen, unused ones decay and get pruned
 
+### Take your learnings with you
+
+Instincts live in `~/.rubyn-code`. Move them to another machine with `/learning`:
+
+```
+rubyn > /learning                       # how many instincts you've accumulated
+rubyn > /learning export learnings.json # write them to a portable file
+# ...on the new machine...
+rubyn > /learning import learnings.json --here   # load them (--here = apply to this project)
+```
+
+Import regenerates ids and skips duplicates, so it's safe to run repeatedly.
+
 ## Streaming Output
 
 Real-time streaming with live syntax highlighting via Rouge/Monokai. Code blocks are buffered and highlighted when complete. No waiting for full responses.
@@ -549,7 +564,43 @@ rubyn-code daemon [OPTIONS]   # Run GOLEM autonomous daemon
 | `/model` | Show/switch model and provider |
 | `/doctor` | Run environment health checks |
 | `/mcp` | MCP server documentation and status |
+| `/agents` | List sub-agent types (built-in + custom) |
 | `/rewind [id] [code\|chat]` | Rewind code and/or conversation to a checkpoint |
+
+### Custom Sub-Agents
+
+Beyond the built-in `explore` (read-only) and `worker` (read/write) sub-agents, define your own in `.rubyn-code/agents/<name>.md` (project) or `~/.rubyn-code/agents/<name>.md` (global). `spawn_agent` can then target them by name, and `/agents` lists them.
+
+```markdown
+---
+description: Reviews a diff for bugs
+tools: read_file, grep, glob, bash   # optional — omit for the access default
+access: read                         # read | write (default: write)
+---
+You are a meticulous code reviewer. Find correctness bugs only.
+```
+
+### Custom Slash Commands
+
+Drop a markdown file in `.rubyn-code/commands/` (project) or `~/.rubyn-code/commands/` (global) and it becomes a slash command — `deploy.md` → `/deploy`. Project commands override global ones; built-ins always win.
+
+```markdown
+---
+description: Open a PR for the current branch
+---
+Open a pull request for the current branch.
+Title: $ARGUMENTS
+Current diff:
+!`git diff main --stat`
+```
+
+Templating in the body:
+
+| Token | Expands to |
+|-------|-----------|
+| `$ARGUMENTS` | everything typed after the command |
+| `$1` … `$9` | individual positional arguments |
+| `` !`shell cmd` `` | the command's output, inlined |
 
 ### Checkpoints & Rewind
 

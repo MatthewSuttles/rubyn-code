@@ -156,6 +156,8 @@ module RubynCode
   module SubAgents
     autoload :Runner, 'rubyn_code/sub_agents/runner'
     autoload :Summarizer, 'rubyn_code/sub_agents/summarizer'
+    autoload :AgentType, 'rubyn_code/sub_agents/agent_type'
+    autoload :Catalog, 'rubyn_code/sub_agents/catalog'
   end
 
   # Checkpoints (/rewind)
@@ -256,6 +258,7 @@ module RubynCode
     autoload :InstinctMethods, 'rubyn_code/learning/instinct'
     autoload :Injector, 'rubyn_code/learning/injector'
     autoload :Shortcut, 'rubyn_code/learning/shortcut'
+    autoload :Porter, 'rubyn_code/learning/porter'
   end
 
   # IDE (VS Code extension server)
@@ -288,6 +291,7 @@ module RubynCode
     autoload :FirstRun, 'rubyn_code/cli/first_run'
     autoload :DaemonRunner, 'rubyn_code/cli/daemon_runner'
     autoload :LoopRunner, 'rubyn_code/cli/loop_runner'
+    autoload :MentionExpander, 'rubyn_code/cli/mention_expander'
     autoload :VersionCheck, 'rubyn_code/cli/version_check'
 
     # Slash Command System
@@ -323,6 +327,11 @@ module RubynCode
       autoload :Megaplan, 'rubyn_code/cli/commands/megaplan'
       autoload :Goal, 'rubyn_code/cli/commands/goal'
       autoload :Loop, 'rubyn_code/cli/commands/loop'
+      autoload :Agents, 'rubyn_code/cli/commands/agents'
+      autoload :CommandTemplate, 'rubyn_code/cli/commands/command_template'
+      autoload :CustomCommand, 'rubyn_code/cli/commands/custom_command'
+      autoload :CustomLoader, 'rubyn_code/cli/commands/custom_loader'
+      autoload :Learning, 'rubyn_code/cli/commands/learning'
       autoload :Rewind, 'rubyn_code/cli/commands/rewind'
     end
   end

@@ -43,7 +43,10 @@ RSpec.describe RubynCode::CLI::Commands::Mcp do
       end
 
       let(:mock_client) do
-        instance_double(RubynCode::MCP::Client, connected?: true, tools: [{ 'name' => 'tool1' }])
+        instance_double(
+          RubynCode::MCP::Client,
+          connected?: true, tools: [{ 'name' => 'tool1' }], resources: [], prompts: []
+        )
       end
 
       before do
@@ -105,7 +108,7 @@ RSpec.describe RubynCode::CLI::Commands::Mcp do
       end
 
       let(:mock_client) do
-        instance_double(RubynCode::MCP::Client, connected?: true, tools: [])
+        instance_double(RubynCode::MCP::Client, connected?: true, tools: [], resources: [], prompts: [])
       end
 
       before do
