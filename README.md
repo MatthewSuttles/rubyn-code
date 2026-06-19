@@ -537,6 +537,7 @@ rubyn-code daemon [OPTIONS]   # Run GOLEM autonomous daemon
 | `/new` | Save session and start a fresh conversation |
 | `/review [base]` | PR review against best practices |
 | `/spawn name role` | Spawn a persistent teammate |
+| `/goal <condition>` | Set a goal Rubyn works toward until met (`/goal clear` to cancel) |
 | `/loop [xN] [interval] <prompt-or-/cmd>` | Repeat a prompt or command on an interval (Ctrl-C to stop) |
 | `/compact` | Compress conversation context |
 | `/cost` | Show token usage and costs |

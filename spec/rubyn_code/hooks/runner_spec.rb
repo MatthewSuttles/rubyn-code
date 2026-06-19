@@ -37,6 +37,27 @@ RSpec.describe RubynCode::Hooks::Runner do
     end
   end
 
+  describe "stop block gating" do
+    it "returns the block hash when a hook blocks stopping" do
+      registry.on(:stop) { |**_| { block: true, reason: "goal unmet" } }
+
+      result = runner.fire(:stop, conversation: nil)
+      expect(result).to eq({ block: true, reason: "goal unmet" })
+    end
+
+    it "supplies a default reason when none is given" do
+      registry.on(:stop) { |**_| { block: true } }
+
+      result = runner.fire(:stop, conversation: nil)
+      expect(result[:reason]).to be_a(String)
+    end
+
+    it "returns nil when no hook blocks" do
+      registry.on(:stop) { |**_| nil }
+      expect(runner.fire(:stop, conversation: nil)).to be_nil
+    end
+  end
+
   describe "post_tool_use output transform" do
     it "allows hooks to transform the output" do
       registry.on(:post_tool_use) do |result:, **_|
