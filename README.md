@@ -551,6 +551,20 @@ rubyn-code daemon [OPTIONS]   # Run GOLEM autonomous daemon
 | `/model` | Show/switch model and provider |
 | `/doctor` | Run environment health checks |
 | `/mcp` | MCP server documentation and status |
+| `/agents` | List sub-agent types (built-in + custom) |
+
+### Custom Sub-Agents
+
+Beyond the built-in `explore` (read-only) and `worker` (read/write) sub-agents, define your own in `.rubyn-code/agents/<name>.md` (project) or `~/.rubyn-code/agents/<name>.md` (global). `spawn_agent` can then target them by name, and `/agents` lists them.
+
+```markdown
+---
+description: Reviews a diff for bugs
+tools: read_file, grep, glob, bash   # optional — omit for the access default
+access: read                         # read | write (default: write)
+---
+You are a meticulous code reviewer. Find correctness bugs only.
+```
 
 ### Custom Slash Commands
 

@@ -156,6 +156,8 @@ module RubynCode
   module SubAgents
     autoload :Runner, 'rubyn_code/sub_agents/runner'
     autoload :Summarizer, 'rubyn_code/sub_agents/summarizer'
+    autoload :AgentType, 'rubyn_code/sub_agents/agent_type'
+    autoload :Catalog, 'rubyn_code/sub_agents/catalog'
   end
 
   # Layer 7: Tasks
@@ -318,6 +320,7 @@ module RubynCode
       autoload :Megaplan, 'rubyn_code/cli/commands/megaplan'
       autoload :Goal, 'rubyn_code/cli/commands/goal'
       autoload :Loop, 'rubyn_code/cli/commands/loop'
+      autoload :Agents, 'rubyn_code/cli/commands/agents'
       autoload :CommandTemplate, 'rubyn_code/cli/commands/command_template'
       autoload :CustomCommand, 'rubyn_code/cli/commands/custom_command'
       autoload :CustomLoader, 'rubyn_code/cli/commands/custom_loader'
