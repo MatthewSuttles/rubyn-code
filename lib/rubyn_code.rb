@@ -275,6 +275,7 @@ module RubynCode
     autoload :Setup, 'rubyn_code/cli/setup'
     autoload :FirstRun, 'rubyn_code/cli/first_run'
     autoload :DaemonRunner, 'rubyn_code/cli/daemon_runner'
+    autoload :MentionExpander, 'rubyn_code/cli/mention_expander'
     autoload :VersionCheck, 'rubyn_code/cli/version_check'
 
     # Slash Command System
