@@ -138,6 +138,8 @@ rubyn-code -p "Refactor app/controllers/orders_controller.rb into service object
 rubyn-code --ide
 ```
 
+**Tip:** Reference files inline with `@` — `rubyn > explain @lib/foo.rb and @config/routes.rb`. Rubyn inlines their contents so you don't have to wait for it to read them.
+
 ## What Can Rubyn Do?
 
 ### Refactor code
