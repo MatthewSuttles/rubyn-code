@@ -87,6 +87,44 @@ RSpec.describe RubynCode::Agent::Loop do
       end
     end
 
+    context 'stop hook blocking' do
+      # Block the first :stop, allow the second — independent of how many
+      # other (non-stop) events fire in between.
+      def block_stop_once(reason)
+        calls = 0
+        allow(hook_runner).to receive(:fire) do |event, **_kwargs|
+          next nil unless event == :stop
+
+          calls += 1
+          calls == 1 ? { block: true, reason: reason } : nil
+        end
+      end
+
+      it 'keeps iterating when a :stop hook blocks, then returns the final text' do
+        allow(llm_client).to receive(:chat)
+          .and_return(text_response('not done yet'), text_response('all done'))
+        block_stop_once('keep going')
+
+        result = agent_loop.send_message('do the task')
+
+        expect(result).to eq('all done')
+        expect(llm_client).to have_received(:chat).twice
+      end
+
+      it 'injects the block reason as user feedback for the next iteration' do
+        allow(llm_client).to receive(:chat)
+          .and_return(text_response('first pass'), text_response('finished'))
+        block_stop_once('GOAL: ship it')
+
+        agent_loop.send_message('go')
+
+        injected = conversation.messages.any? do |m|
+          m[:role] == 'user' && m[:content].to_s.include?('GOAL: ship it')
+        end
+        expect(injected).to be(true)
+      end
+    end
+
     context 'tool execution' do
       it 'executes tools and continues to the final text response' do
         tool_resp = tool_response('read_file', { path: 'x.rb' })
