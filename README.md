@@ -349,7 +349,7 @@ Rubyn automatically loads relevant context based on what you're working on:
 - **Controllers** → includes models, routes, request specs, services
 - **Models** → includes schema, associations, specs, factories
 - **Service objects** → includes referenced models and their specs
-- **Any file** → checks for `RUBYN.md`, `CLAUDE.md`, or `AGENT.md` instructions
+- **Any file** → checks for `RUBYN.md`, `CLAUDE.md`, `AGENTS.md`, or `AGENT.md` instructions
 
 The [codebase index](#codebase-indexing) enhances this with structural awareness — Rubyn knows which files depend on each other before it reads them.
 
@@ -367,7 +367,7 @@ Drop a `RUBYN.md` in your project root and Rubyn follows your conventions:
 - Run rubocop before committing
 ```
 
-Also reads `CLAUDE.md` and `AGENT.md` — no migration needed from other tools.
+Also reads `CLAUDE.md`, `AGENTS.md`, and `AGENT.md` — no migration needed from other tools.
 
 | Location | Scope |
 |----------|-------|
@@ -538,6 +538,7 @@ rubyn-code daemon [OPTIONS]   # Run GOLEM autonomous daemon
 | `/review [base]` | PR review against best practices |
 | `/spawn name role` | Spawn a persistent teammate |
 | `/goal <condition>` | Set a goal Rubyn works toward until met (`/goal clear` to cancel) |
+| `/loop [xN] [interval] <prompt-or-/cmd>` | Repeat a prompt or command on an interval (Ctrl-C to stop) |
 | `/compact` | Compress conversation context |
 | `/cost` | Show token usage and costs |
 | `/tasks` | List all tasks |
