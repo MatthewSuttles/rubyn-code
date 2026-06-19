@@ -160,6 +160,12 @@ module RubynCode
     autoload :Catalog, 'rubyn_code/sub_agents/catalog'
   end
 
+  # Checkpoints (/rewind)
+  module Checkpoint
+    autoload :Manager, 'rubyn_code/checkpoint/manager'
+    autoload :Hook, 'rubyn_code/checkpoint/hook'
+  end
+
   # Layer 7: Tasks
   module Tasks
     autoload :Manager, 'rubyn_code/tasks/manager'
@@ -326,6 +332,7 @@ module RubynCode
       autoload :CustomCommand, 'rubyn_code/cli/commands/custom_command'
       autoload :CustomLoader, 'rubyn_code/cli/commands/custom_loader'
       autoload :Learning, 'rubyn_code/cli/commands/learning'
+      autoload :Rewind, 'rubyn_code/cli/commands/rewind'
     end
   end
 

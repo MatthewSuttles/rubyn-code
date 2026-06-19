@@ -46,6 +46,7 @@ module RubynCode
         @web_skill_autoload = build_web_skill_autoload
         @session_persistence = Memory::SessionPersistence.new(@db)
         @mention_expander = MentionExpander.new(project_root: @project_root)
+        @checkpoint_manager = Checkpoint::Manager.new(project_root: @project_root)
       end
 
       def build_skill_matcher
@@ -128,6 +129,8 @@ module RubynCode
       def setup_hooks!
         Hooks::BuiltIn.register_all!(@hook_registry)
         Hooks::UserHooks.load!(@hook_registry, project_root: @project_root)
+        # Snapshot files before they are mutated so /rewind can restore them.
+        @hook_registry.on(:pre_tool_use, Checkpoint::Hook.new(manager: @checkpoint_manager), priority: 5)
       end
 
       def setup_agent_loop!

@@ -112,6 +112,9 @@ module RubynCode
 
       # -- sequential steps with interrupt rescue
       def handle_message(input)
+        # Checkpoint before the turn (raw input as label), then expand
+        # @-mentions so the agent sees referenced file contents.
+        @checkpoint_manager&.checkpoint!(label: input, conversation: @conversation)
         input = expand_mentions(input)
         @spinner.start
         @streaming_first_chunk = true

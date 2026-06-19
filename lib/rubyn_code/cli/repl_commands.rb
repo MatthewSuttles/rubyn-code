@@ -25,7 +25,7 @@ module RubynCode
           Commands::Provider, Commands::InstallSkills,
           Commands::RemoveSkills, Commands::Skills,
           Commands::Megaplan, Commands::Goal, Commands::Loop,
-          Commands::Agents, Commands::Learning
+          Commands::Agents, Commands::Learning, Commands::Rewind
         ].each { |cmd| @command_registry.register(cmd) }
         register_custom_commands!
       end
@@ -83,7 +83,8 @@ module RubynCode
           permission_tier: @permission_tier,
           plan_mode: @plan_mode,
           message_handler: method(:handle_message),
-          hook_registry: @hook_registry
+          hook_registry: @hook_registry,
+          checkpoint_manager: @checkpoint_manager
         )
       end
 
@@ -103,6 +104,8 @@ module RubynCode
           spawn_teammate(name, role)
         in { action: :run_loop, interval:, max: Integer => max, payload: String => payload }
           run_loop(interval, max, payload)
+        in { action: :rewound }
+          save_session!
         else
           # Unknown result hash — ignore
         end

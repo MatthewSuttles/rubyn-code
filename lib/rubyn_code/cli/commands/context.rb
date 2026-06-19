@@ -22,7 +22,8 @@ module RubynCode
         :permission_tier,
         :plan_mode,
         :message_handler,
-        :hook_registry
+        :hook_registry,
+        :checkpoint_manager
       ) do
         # Convenience: return a new Context with a message handler attached.
         # Used by commands like /review that delegate to the LLM.
