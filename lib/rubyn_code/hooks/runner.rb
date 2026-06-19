@@ -31,12 +31,28 @@ module RubynCode
           fire_pre_tool_use(hooks, context)
         when :post_tool_use
           fire_post_tool_use(hooks, context)
+        when :stop
+          fire_stop(hooks, context)
         else
           fire_generic(hooks, event, context)
         end
       end
 
       private
+
+      # For :stop, if any hook returns a hash with { block: true }, execution
+      # stops and the block result is returned — signalling the agent loop to
+      # keep working instead of finalizing (e.g. an active /goal).
+      def fire_stop(hooks, context)
+        hooks.each do |hook|
+          result = safe_call(hook, :stop, context)
+          next unless result.is_a?(Hash) && result[:block]
+
+          return { block: true, reason: result[:reason] || 'Stop blocked by hook' }
+        end
+
+        nil
+      end
 
       # For :pre_tool_use, if any hook returns a hash with { deny: true },
       # execution stops and the deny result is returned immediately.
