@@ -547,6 +547,11 @@ rubyn-code daemon [OPTIONS]   # Run GOLEM autonomous daemon
 | `/model` | Show/switch model and provider |
 | `/doctor` | Run environment health checks |
 | `/mcp` | MCP server documentation and status |
+| `/rewind [id] [code\|chat]` | Rewind code and/or conversation to a checkpoint |
+
+### Checkpoints & Rewind
+
+Rubyn snapshots a checkpoint at the start of every turn — capturing the conversation and the original contents of any files it changes that turn. `/rewind` lists them; `/rewind <id>` rolls back both code and conversation (or just one with `code`/`chat`). Note: rewind restores files edited via Rubyn's `write_file`/`edit_file`; it does not touch your git history.
 
 ## Authentication
 

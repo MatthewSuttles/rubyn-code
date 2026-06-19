@@ -158,6 +158,12 @@ module RubynCode
     autoload :Summarizer, 'rubyn_code/sub_agents/summarizer'
   end
 
+  # Checkpoints (/rewind)
+  module Checkpoint
+    autoload :Manager, 'rubyn_code/checkpoint/manager'
+    autoload :Hook, 'rubyn_code/checkpoint/hook'
+  end
+
   # Layer 7: Tasks
   module Tasks
     autoload :Manager, 'rubyn_code/tasks/manager'
@@ -308,6 +314,7 @@ module RubynCode
       autoload :RemoveSkills, 'rubyn_code/cli/commands/remove_skills'
       autoload :Skills, 'rubyn_code/cli/commands/skills'
       autoload :Megaplan, 'rubyn_code/cli/commands/megaplan'
+      autoload :Rewind, 'rubyn_code/cli/commands/rewind'
     end
   end
 

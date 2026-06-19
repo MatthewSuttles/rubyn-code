@@ -112,6 +112,7 @@ module RubynCode
 
       # -- sequential steps with interrupt rescue
       def handle_message(input)
+        @checkpoint_manager&.checkpoint!(label: input, conversation: @conversation)
         @spinner.start
         @streaming_first_chunk = true
 
