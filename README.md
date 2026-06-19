@@ -229,7 +229,7 @@ The extension communicates over 19 RPC methods: `initialize`, `prompt`, `cancel`
 
 ## MCP — External Tool Servers
 
-Connect external tool servers via the [Model Context Protocol](https://modelcontextprotocol.io). MCP tools are dynamically discovered and registered as native Rubyn tools, available in the REPL, IDE, and daemon.
+Connect external tool servers via the [Model Context Protocol](https://modelcontextprotocol.io). MCP tools are dynamically discovered and registered as native Rubyn tools, available in the REPL, IDE, and daemon. Servers that expose **resources** and **prompts** are also bridged — Rubyn registers per-server `read_resource` and `get_prompt` tools, and `/mcp` reports the counts.
 
 ### Configuration
 

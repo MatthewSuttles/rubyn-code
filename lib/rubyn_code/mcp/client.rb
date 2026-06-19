@@ -60,6 +60,63 @@ module RubynCode
                                 })
       end
 
+      # Returns the resources advertised by the server (empty unless the
+      # server declared the `resources` capability). Each entry is a Hash with
+      # "uri", "name", and optionally "description"/"mimeType".
+      #
+      # @return [Array<Hash>]
+      def resources
+        return [] unless supports_resources?
+
+        @resources ||= @transport.send_request('resources/list')&.fetch('resources', []) || []
+      rescue StandardError => e
+        RubynCode::Debug.warn("MCP '#{@name}' resources/list failed: #{e.message}")
+        []
+      end
+
+      # Reads a single resource by URI.
+      #
+      # @param uri [String]
+      # @return [Hash] result with a "contents" array
+      def read_resource(uri)
+        ensure_connected!
+        @transport.send_request('resources/read', { uri: uri })
+      end
+
+      # Returns the prompts advertised by the server (empty unless the server
+      # declared the `prompts` capability). Each entry has "name" and
+      # optionally "description"/"arguments".
+      #
+      # @return [Array<Hash>]
+      def prompts
+        return [] unless supports_prompts?
+
+        @prompts ||= @transport.send_request('prompts/list')&.fetch('prompts', []) || []
+      rescue StandardError => e
+        RubynCode::Debug.warn("MCP '#{@name}' prompts/list failed: #{e.message}")
+        []
+      end
+
+      # Fetches a prompt, expanding its template with the given arguments.
+      #
+      # @param name [String]
+      # @param arguments [Hash]
+      # @return [Hash] result with "messages" (and optionally "description")
+      def get_prompt(name, arguments = {})
+        ensure_connected!
+        @transport.send_request('prompts/get', { name: name, arguments: arguments })
+      end
+
+      # @return [Boolean] whether the server advertised the resources capability
+      def supports_resources?
+        @server_capabilities.is_a?(Hash) && @server_capabilities.key?('resources')
+      end
+
+      # @return [Boolean] whether the server advertised the prompts capability
+      def supports_prompts?
+        @server_capabilities.is_a?(Hash) && @server_capabilities.key?('prompts')
+      end
+
       # Gracefully disconnects from the MCP server.
       #
       # @return [void]
@@ -67,6 +124,8 @@ module RubynCode
         @transport.stop!
         @initialized = false
         @tools = nil
+        @resources = nil
+        @prompts = nil
       end
 
       # Returns whether the client is connected and the transport is alive.
