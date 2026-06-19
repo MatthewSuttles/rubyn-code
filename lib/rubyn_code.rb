@@ -308,6 +308,9 @@ module RubynCode
       autoload :RemoveSkills, 'rubyn_code/cli/commands/remove_skills'
       autoload :Skills, 'rubyn_code/cli/commands/skills'
       autoload :Megaplan, 'rubyn_code/cli/commands/megaplan'
+      autoload :CommandTemplate, 'rubyn_code/cli/commands/command_template'
+      autoload :CustomCommand, 'rubyn_code/cli/commands/custom_command'
+      autoload :CustomLoader, 'rubyn_code/cli/commands/custom_loader'
     end
   end
 
