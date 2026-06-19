@@ -24,7 +24,7 @@ module RubynCode
           Commands::Model, Commands::NewSession, Commands::Mcp,
           Commands::Provider, Commands::InstallSkills,
           Commands::RemoveSkills, Commands::Skills,
-          Commands::Megaplan
+          Commands::Megaplan, Commands::Agents
         ].each { |cmd| @command_registry.register(cmd) }
       end
 

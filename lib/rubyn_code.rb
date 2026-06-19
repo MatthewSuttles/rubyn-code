@@ -156,6 +156,8 @@ module RubynCode
   module SubAgents
     autoload :Runner, 'rubyn_code/sub_agents/runner'
     autoload :Summarizer, 'rubyn_code/sub_agents/summarizer'
+    autoload :AgentType, 'rubyn_code/sub_agents/agent_type'
+    autoload :Catalog, 'rubyn_code/sub_agents/catalog'
   end
 
   # Layer 7: Tasks
@@ -308,6 +310,7 @@ module RubynCode
       autoload :RemoveSkills, 'rubyn_code/cli/commands/remove_skills'
       autoload :Skills, 'rubyn_code/cli/commands/skills'
       autoload :Megaplan, 'rubyn_code/cli/commands/megaplan'
+      autoload :Agents, 'rubyn_code/cli/commands/agents'
     end
   end
 
