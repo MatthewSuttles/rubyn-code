@@ -26,6 +26,20 @@ module RubynCode
           Commands::RemoveSkills, Commands::Skills,
           Commands::Megaplan, Commands::Goal, Commands::Loop
         ].each { |cmd| @command_registry.register(cmd) }
+        register_custom_commands!
+      end
+
+      # Load user-defined slash commands from .rubyn-code/commands/*.md and
+      # ~/.rubyn-code/commands/*.md. Built-in commands always win — a custom
+      # file can't shadow /help, /quit, etc.
+      def register_custom_commands!
+        Commands::CustomLoader.load_all(project_root: @project_root).each do |cmd|
+          next if @command_registry.known?(cmd.command_name)
+
+          @command_registry.register(cmd)
+        end
+      rescue StandardError => e
+        RubynCode::Debug.warn("Custom command load failed: #{e.message}")
       end
 
       def handle_command(command)

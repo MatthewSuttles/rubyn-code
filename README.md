@@ -552,6 +552,28 @@ rubyn-code daemon [OPTIONS]   # Run GOLEM autonomous daemon
 | `/doctor` | Run environment health checks |
 | `/mcp` | MCP server documentation and status |
 
+### Custom Slash Commands
+
+Drop a markdown file in `.rubyn-code/commands/` (project) or `~/.rubyn-code/commands/` (global) and it becomes a slash command — `deploy.md` → `/deploy`. Project commands override global ones; built-ins always win.
+
+```markdown
+---
+description: Open a PR for the current branch
+---
+Open a pull request for the current branch.
+Title: $ARGUMENTS
+Current diff:
+!`git diff main --stat`
+```
+
+Templating in the body:
+
+| Token | Expands to |
+|-------|-----------|
+| `$ARGUMENTS` | everything typed after the command |
+| `$1` … `$9` | individual positional arguments |
+| `` !`shell cmd` `` | the command's output, inlined |
+
 ## Authentication
 
 ### Anthropic (default)

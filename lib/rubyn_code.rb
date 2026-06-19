@@ -318,6 +318,9 @@ module RubynCode
       autoload :Megaplan, 'rubyn_code/cli/commands/megaplan'
       autoload :Goal, 'rubyn_code/cli/commands/goal'
       autoload :Loop, 'rubyn_code/cli/commands/loop'
+      autoload :CommandTemplate, 'rubyn_code/cli/commands/command_template'
+      autoload :CustomCommand, 'rubyn_code/cli/commands/custom_command'
+      autoload :CustomLoader, 'rubyn_code/cli/commands/custom_loader'
     end
   end
 
