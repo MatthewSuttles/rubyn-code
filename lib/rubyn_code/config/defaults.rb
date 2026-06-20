@@ -14,6 +14,11 @@ module RubynCode
       DEFAULT_MODEL = 'claude-opus-4-8'
       MODEL_MODE = 'auto' # 'auto' or 'manual'
       MAX_ITERATIONS = 200
+      # Hard ceiling when a Stop hook (e.g. an active /goal) keeps the agent
+      # working past MAX_ITERATIONS. A goal can legitimately need more tool
+      # turns than a single request; the GoalHook's own max-attempts valve is
+      # the real terminator — this only guards against a runaway loop.
+      GOAL_MAX_ITERATIONS = 2_000
       MAX_SUB_AGENT_ITERATIONS = 200
       MAX_EXPLORE_AGENT_ITERATIONS = 200
 

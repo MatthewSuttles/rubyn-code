@@ -9,7 +9,7 @@ require_relative 'llm_caller'
 
 module RubynCode
   module Agent
-    class Loop
+    class Loop # rubocop:disable Metrics/ClassLength -- core agent loop: LLM calls, tool dispatch, recovery, hooks
       include SystemPromptBuilder
       include ResponseParser
       include ToolProcessor
@@ -18,6 +18,7 @@ module RubynCode
       include LlmCaller
 
       MAX_ITERATIONS = Config::Defaults::MAX_ITERATIONS
+      GOAL_MAX_ITERATIONS = Config::Defaults::GOAL_MAX_ITERATIONS
 
       # @param opts [Hash] keyword arguments for loop configuration
       # @option opts [LLM::Client]                    :llm_client
@@ -65,16 +66,32 @@ module RubynCode
         reset_system_prompt_cache!
         reset_iteration_state
 
-        MAX_ITERATIONS.times do |iteration|
+        iteration = 0
+        loop do
           result = run_iteration(iteration)
           return result if result
+
+          iteration += 1
+          break unless keep_iterating?(iteration)
         end
 
-        RubynCode::Debug.warn("Hit MAX_ITERATIONS (#{MAX_ITERATIONS})")
-        max_iterations_warning
+        RubynCode::Debug.warn("Hit iteration limit (#{iteration})")
+        max_iterations_warning(iteration)
       end
 
       private
+
+      # Decide whether the loop should run another iteration after `iteration`
+      # turns. Normally capped at MAX_ITERATIONS, but while a Stop hook (e.g. an
+      # active /goal) is keeping the agent alive we extend up to a hard ceiling
+      # — a goal can need more tool turns than a single request. The GoalHook's
+      # own max-attempts valve terminates an unsatisfiable goal; the ceiling is
+      # only a runaway guard.
+      def keep_iterating?(iteration)
+        return true if iteration < MAX_ITERATIONS
+
+        @stop_block_active && iteration < GOAL_MAX_ITERATIONS
+      end
 
       def assign_dependencies(opts)
         assign_required_deps(opts)
@@ -150,6 +167,7 @@ module RubynCode
         @max_tokens_override   = nil
         @output_recovery_count = 0
         @task_budget_remaining = nil
+        @stop_block_active     = false # true while a Stop hook keeps us going
       end
 
       def run_iteration(iteration)
@@ -203,8 +221,10 @@ module RubynCode
 
         # Stop hook: a hook may block stopping (e.g. an active /goal). When
         # blocked, the reason is injected as user feedback and the loop keeps
-        # iterating instead of returning the final text.
-        return nil if stop_blocked?(text)
+        # iterating instead of returning the final text. While blocked, the
+        # loop is allowed to run past MAX_ITERATIONS (see #keep_iterating?).
+        @stop_block_active = stop_blocked?(text)
+        return nil if @stop_block_active
 
         # Decision-based compaction (topic switch, milestone)
         @decision_compactor&.check!(@conversation)
@@ -286,8 +306,8 @@ module RubynCode
         @max_tokens_override = Config::Defaults::ESCALATED_MAX_OUTPUT_TOKENS
       end
 
-      def max_iterations_warning
-        warning = "Reached maximum iteration limit (#{MAX_ITERATIONS}). " \
+      def max_iterations_warning(limit = MAX_ITERATIONS)
+        warning = "Reached maximum iteration limit (#{limit}). " \
                   'The conversation may be incomplete. Please review the ' \
                   'current state and continue if needed.'
         @conversation.add_assistant_message([{ type: 'text', text: warning }])
