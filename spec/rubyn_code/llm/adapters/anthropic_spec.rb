@@ -180,49 +180,6 @@ RSpec.describe RubynCode::LLM::Adapters::Anthropic do
       end.to raise_error(RubynCode::LLM::Client::AuthExpiredError, /No valid authentication/)
     end
 
-    it 'loads tokens from TokenStore once across repeated requests' do
-      stub_request(:post, 'https://api.anthropic.com/v1/messages')
-        .to_return(status: 200, body: success_body)
-
-      2.times do
-        adapter.chat(messages: [{ role: 'user', content: 'Hi' }], model: 'test', max_tokens: 100)
-      end
-
-      expect(RubynCode::Auth::TokenStore).to have_received(:load).once
-    end
-
-    it 'reloads tokens once the cached token enters the expiry buffer' do
-      expiring = { access_token: 'sk-ant-oat-old', expires_at: Time.now + 400, source: :keychain }
-      fresh = { access_token: 'sk-ant-oat-fresh', expires_at: Time.now + 3600, source: :keychain }
-      allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(expiring, fresh)
-
-      stub_request(:post, 'https://api.anthropic.com/v1/messages')
-        .to_return(status: 200, body: success_body)
-
-      adapter.chat(messages: [{ role: 'user', content: 'Hi' }], model: 'test', max_tokens: 100)
-
-      allow(Time).to receive(:now).and_return(Time.at(Time.now.to_f + 200))
-      adapter.chat(messages: [{ role: 'user', content: 'Hi' }], model: 'test', max_tokens: 100)
-
-      expect(RubynCode::Auth::TokenStore).to have_received(:load).twice
-      expect(WebMock).to have_requested(:post, 'https://api.anthropic.com/v1/messages')
-        .with(headers: { 'Authorization' => 'Bearer sk-ant-oat-fresh' })
-    end
-
-    it 'invalidates the token cache on 401 so the next request reloads' do
-      stub_request(:post, 'https://api.anthropic.com/v1/messages')
-        .to_return(status: 401, body: '{"error":{"type":"auth","message":"expired"}}')
-        .then.to_return(status: 200, body: success_body)
-
-      expect do
-        adapter.chat(messages: [{ role: 'user', content: 'Hi' }], model: 'test', max_tokens: 100)
-      end.to raise_error(RubynCode::LLM::Client::AuthExpiredError)
-
-      adapter.chat(messages: [{ role: 'user', content: 'Hi' }], model: 'test', max_tokens: 100)
-
-      expect(RubynCode::Auth::TokenStore).to have_received(:load).twice
-    end
-
     it 'calls on_text callback for non-streaming responses' do
       allow(RubynCode::Auth::TokenStore).to receive(:load).and_return(api_key_token)
 

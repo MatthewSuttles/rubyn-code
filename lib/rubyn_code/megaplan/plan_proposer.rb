@@ -1,4 +1,4 @@
-  # frozen_string_literal: true
+# frozen_string_literal: true
 
 require 'json'
 require 'securerandom'
@@ -18,7 +18,7 @@ module RubynCode
       class InvalidProposalError < RubynCode::Error; end
 
       MAX_PHASES = 12
-      DEFAULT_SYSTEM_PROMPT = <<~PROMPT.freeze
+      DEFAULT_SYSTEM_PROMPT = <<~PROMPT
         You are a senior Ruby/Rails architect breaking a feature request into a megaplan.
 
         A megaplan is a multi-phase development plan where each phase is a
@@ -127,7 +127,7 @@ module RubynCode
         slug = slugify(feature) if slug.empty?
         phases = payload['phases'].each_with_index.map do |phase, idx|
           {
-            'number' => phase['number'] || idx + 1,
+            'number' => phase['number'] || (idx + 1),
             'slug' => (phase['slug'].to_s.strip.empty? ? slugify(phase['name']) : phase['slug']),
             'name' => phase['name'],
             'summary' => phase['summary'],

@@ -1,4 +1,4 @@
-  # frozen_string_literal: true
+# frozen_string_literal: true
 
 require 'json'
 require 'securerandom'
@@ -65,7 +65,7 @@ module RubynCode
       # The skill teaches *what* a megaplan is and *how* to interview; this
       # contract teaches the LLM the wire format the gem expects on every
       # turn AND that its tool palette is read-only.
-      JSON_OUTPUT_CONTRACT = <<~CONTRACT.freeze
+      JSON_OUTPUT_CONTRACT = <<~CONTRACT
         # Output contract (overrides any other formatting instinct)
 
         You are an interviewer, not a coding agent. You have a READ-ONLY

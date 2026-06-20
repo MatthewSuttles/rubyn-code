@@ -1,4 +1,4 @@
-  # frozen_string_literal: true
+# frozen_string_literal: true
 
 require 'securerandom'
 
@@ -87,7 +87,7 @@ module RubynCode
             llm_client = LLM::Client.new
             response = llm_client.chat(
               messages: [{ role: 'user', content: prompt }],
-              on_text: ->(text) {
+              on_text: lambda { |text|
                 @server.notify('stream/text', {
                                  'sessionId' => session_id,
                                  'text' => text,

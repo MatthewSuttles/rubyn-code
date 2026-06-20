@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'yaml'
+require 'tmpdir'
 require 'fileutils'
 require_relative 'defaults'
 
@@ -43,12 +44,24 @@ module RubynCode
       attr_reader :config_path, :data
 
       def initialize(config_path: Defaults::CONFIG_FILE)
+        # When tests run, isolate Settings from the developer's personal
+        # ~/.rubyn-code/config.yml so a stray `provider: minimax` can't
+        # shadow the test expectations.  The test config lives in
+        # tmpdir, is process-pid-scoped, and is harmless if it leaks.
+        config_path = self.class.test_config_path if config_path == Defaults::CONFIG_FILE && ENV['RUBYN_TESTING']
+
         @config_path = config_path
         @data = {}
         ensure_home_directory!
         seed_config! unless File.exist?(@config_path)
         load!
         backfill_provider_models!
+      end
+
+      # @return [String] a per-pid path under tmpdir used when
+      #   RUBYN_TESTING is set
+      def self.test_config_path
+        @test_config_path ||= File.join(Dir.tmpdir, "rubyn-test-config-#{Process.pid}.yml")
       end
 
       # Define accessor methods for each configurable key

@@ -1,4 +1,4 @@
-  # frozen_string_literal: true
+# frozen_string_literal: true
 
 module RubynCode
   module IDE
@@ -12,7 +12,7 @@ module RubynCode
 
         def initialize(server, factory: nil)
           @server = server
-          @factory = factory || ->(workspace_path:) {
+          @factory = factory || lambda { |workspace_path:|
             Megaplan::InterviewSession.new(workspace_path: workspace_path)
           }
         end
@@ -34,16 +34,16 @@ module RubynCode
         def emit_outcome(session, outcome)
           if outcome.is_a?(Megaplan::InterviewSession::Question)
             @server.notify('plan/interview/question', {
-              'sessionId' => session.session_id,
-              'questionId' => outcome.id,
-              'text' => outcome.text,
-              'options' => outcome.options
-            })
+                             'sessionId' => session.session_id,
+                             'questionId' => outcome.id,
+                             'text' => outcome.text,
+                             'options' => outcome.options
+                           })
           else
             @server.notify('plan/interview/done', {
-              'sessionId' => session.session_id,
-              'plan' => outcome
-            })
+                             'sessionId' => session.session_id,
+                             'plan' => outcome
+                           })
             @server.drop_interview_session(session.session_id)
           end
         end

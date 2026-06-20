@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+# Isolate Config::Settings from the developer's personal config during
+# tests so a stray `provider: minimax` in ~/.rubyn-code/config.yml can't
+# shadow the test expectations.  Must be set BEFORE rubyn_code is
+# required so the autoloaded Settings picks it up.
+ENV['RUBYN_TESTING'] = '1'
+
 require "simplecov"
 SimpleCov.start do
   add_filter "/spec/"

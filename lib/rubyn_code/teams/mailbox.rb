@@ -206,6 +206,14 @@ module RubynCode
           )
         SQL
 
+        # Self-heal: add the columns the original migration lacked so
+        # that test databases bootstrapped before the multi-agent
+        # upgrade don't end up with a half-built table.  Each ALTER
+        # is a no-op if the column already exists (SQLite returns an
+        # error which we swallow).
+        add_mailbox_column_if_missing('correlation_id')
+        add_mailbox_column_if_missing('data')
+
         @db.execute(<<~SQL)
           CREATE INDEX IF NOT EXISTS idx_mailbox_recipient_read
           ON mailbox_messages (recipient, read)
@@ -215,6 +223,14 @@ module RubynCode
           CREATE INDEX IF NOT EXISTS idx_mailbox_correlation
           ON mailbox_messages (correlation_id)
         SQL
+      end
+
+      # @return [Boolean] true if the column was added
+      def add_mailbox_column_if_missing(column)
+        @db.execute("ALTER TABLE mailbox_messages ADD COLUMN #{column} TEXT")
+        true
+      rescue SQLite3::SQLException
+        false
       end
     end
   end

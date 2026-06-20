@@ -1,4 +1,4 @@
-  # frozen_string_literal: true
+# frozen_string_literal: true
 
 module RubynCode
   module IDE
@@ -22,7 +22,7 @@ module RubynCode
           session = @server.lookup_interview_session(session_id)
           unless session
             raise Protocol::JsonRpcError.new(SESSION_NOT_FOUND_CODE,
-                                              "Unknown interview session: #{session_id}")
+                                             "Unknown interview session: #{session_id}")
           end
 
           outcome = session.answer(question_id, answer)
@@ -34,9 +34,9 @@ module RubynCode
                Megaplan::PlanProposer::InvalidProposalError => e
           warn "[PlanInterviewAnswerHandler] interview failed: #{e.message}"
           @server.notify('plan/interview/error', {
-            'sessionId' => params['sessionId'],
-            'message' => e.message
-          })
+                           'sessionId' => params['sessionId'],
+                           'message' => e.message
+                         })
           @server.drop_interview_session(params['sessionId'].to_s)
           raise Protocol::JsonRpcError.new(INVALID_INTERVIEW_CODE, e.message)
         end
@@ -46,16 +46,16 @@ module RubynCode
         def emit_outcome(session, outcome)
           if outcome.is_a?(Megaplan::InterviewSession::Question)
             @server.notify('plan/interview/question', {
-              'sessionId' => session.session_id,
-              'questionId' => outcome.id,
-              'text' => outcome.text,
-              'options' => outcome.options
-            })
+                             'sessionId' => session.session_id,
+                             'questionId' => outcome.id,
+                             'text' => outcome.text,
+                             'options' => outcome.options
+                           })
           else
             @server.notify('plan/interview/done', {
-              'sessionId' => session.session_id,
-              'plan' => outcome
-            })
+                             'sessionId' => session.session_id,
+                             'plan' => outcome
+                           })
             @server.drop_interview_session(session.session_id)
           end
         end
