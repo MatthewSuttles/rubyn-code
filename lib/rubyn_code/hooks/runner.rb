@@ -8,10 +8,18 @@ module RubynCode
     # caught and logged rather than allowed to crash the agent. Special
     # semantics apply to :pre_tool_use (deny gating) and :post_tool_use
     # (output transformation).
+    #
+    # The runner can also fan out to an external hook dispatcher (see
+    # ExternalDispatcher) which spawns Claude Code-style hook commands
+    # configured in settings.json. External hooks participate in the same
+    # deny/block decisions as in-process hooks.
     class Runner
       # @param registry [Hooks::Registry] the hook registry to draw from
-      def initialize(registry: Registry.new)
+      # @param external_dispatcher [Hooks::ExternalDispatcher, nil] optional
+      #   dispatcher for Claude Code-style external hook commands
+      def initialize(registry: Registry.new, external_dispatcher: nil)
         @registry = registry
+        @external_dispatcher = external_dispatcher
       end
 
       # Fires all hooks for the given event with the supplied context.
@@ -24,21 +32,55 @@ module RubynCode
       #   - all others => nil
       def fire(event, **context)
         hooks = @registry.hooks_for(event)
-        return if hooks.empty?
+        external_response = fire_external(event, **context)
 
         case event
         when :pre_tool_use
-          fire_pre_tool_use(hooks, context)
+          merge_pre_tool_use(fire_pre_tool_use(hooks, context), external_response)
         when :post_tool_use
+          # External hooks contribute additionalContext (read by the LLM
+          # caller) but do not transform tool output — that's a job for
+          # in-process hooks only.
           fire_post_tool_use(hooks, context)
         when :stop
-          fire_stop(hooks, context)
+          merge_stop(fire_stop(hooks, context), external_response)
         else
           fire_generic(hooks, event, context)
+          external_response&.additional_context
         end
       end
 
       private
+
+      # @return [Hooks::Response, nil] nil when no external dispatcher or
+      #   no hooks are configured for this event.
+      def fire_external(event, **context)
+        return nil unless @external_dispatcher
+
+        @external_dispatcher.fire(event, **context)
+      rescue StandardError => e
+        warn "[RubynCode::Hooks] External dispatcher error during #{event}: #{e.class}: #{e.message}"
+        nil
+      end
+
+      # In-process deny takes precedence over external block. Either way,
+      # if any source denies, return a deny hash.
+      def merge_pre_tool_use(in_process_result, external_response)
+        return in_process_result if in_process_result.is_a?(Hash) && in_process_result[:deny]
+
+        return nil unless external_response&.block?
+
+        { deny: true, reason: external_response.reason || 'Blocked by external hook' }
+      end
+
+      # Same precedence for stop: in-process block wins; external stop otherwise.
+      def merge_stop(in_process_result, external_response)
+        return in_process_result if in_process_result.is_a?(Hash) && in_process_result[:block]
+
+        return nil unless external_response&.stop?
+
+        { block: true, reason: external_response.stop_reason || 'Stopped by external hook' }
+      end
 
       # For :stop, if any hook returns a hash with { block: true }, execution
       # stops and the block result is returned — signalling the agent loop to

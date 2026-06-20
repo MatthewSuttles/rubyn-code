@@ -235,6 +235,11 @@ module RubynCode
     autoload :BuiltIn, 'rubyn_code/hooks/built_in'
     autoload :UserHooks, 'rubyn_code/hooks/user_hooks'
     autoload :GoalHook, 'rubyn_code/hooks/goal_hook'
+    autoload :EventMap, 'rubyn_code/hooks/event_map'
+    autoload :Response, 'rubyn_code/hooks/response'
+    autoload :SettingsJsonLoader, 'rubyn_code/hooks/settings_json_loader'
+    autoload :SubprocessExecutor, 'rubyn_code/hooks/subprocess_executor'
+    autoload :ExternalDispatcher, 'rubyn_code/hooks/external_dispatcher'
   end
 
   # Session goals (/goal)
