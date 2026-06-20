@@ -1,4 +1,4 @@
-  # frozen_string_literal: true
+# frozen_string_literal: true
 
 module RubynCode
   module Megaplan
@@ -17,7 +17,7 @@ module RubynCode
     class CiRecovery
       class RecoveryError < RubynCode::Error; end
 
-      SYSTEM_PROMPT = <<~PROMPT.freeze
+      SYSTEM_PROMPT = <<~PROMPT
         You are Rubyn doing CI auto-recovery on a megaplan PR.
 
         Read the failing job log, identify the root cause, push a fix
@@ -93,7 +93,7 @@ module RubynCode
         end
       end
 
-      def default_agent_invoker(prompt, _context)
+      def default_agent_invoker(_prompt, _context)
         # Stub for now — real wiring happens in RecoverCiHandler which has
         # an Agent::Loop on hand. The handler injects its own invoker via
         # the constructor.
