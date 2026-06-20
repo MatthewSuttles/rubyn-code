@@ -7,6 +7,7 @@ require_relative '../message_builder'
 module RubynCode
   module LLM
     module Adapters
+      # rubocop:disable Metrics/ClassLength -- auth helpers + streaming + finalize are all needed
       class Anthropic < Base
         include JsonParsing
         include PromptCaching
@@ -45,6 +46,69 @@ module RubynCode
           return stream_request(body, on_text) if use_streaming
 
           execute_with_retries(body, on_text)
+        end
+
+        # -- Auth helpers ----------------------------------------------
+
+        # Validate the active auth path before sending the request.
+        # Raises Client::AuthExpiredError with a clear message instead
+        # of letting the HTTP request fail with a 401.
+        def ensure_valid_token!
+          return if token_valid? && access_token && !access_token.empty?
+
+          return if !oauth_token? && api_key && !api_key.empty?
+
+          raise Client::AuthExpiredError, 'No valid authentication configured'
+        end
+
+        # @return [Boolean] true when using the OAuth token (vs API key).
+        #   A token from the keychain (or marked source: :keychain /
+        #   :oauth) is treated as OAuth; a token from :env or
+        #   :tokens_file is treated as a long-lived API key.
+        def oauth_token?
+          token = raw_access_token
+          return false unless token.is_a?(Hash)
+
+          source = token[:source] || token['source']
+          [:keychain, 'keychain', :oauth].include?(source)
+        end
+
+        # @return [String, nil] the access token in use.
+        #   Accepts either a raw String token or a Hash like
+        #   { access_token: "...", expires_at: ..., source: :keychain }.
+        #   Memoized per-instance so that repeated calls during one
+        #   request don't re-hit the token store.
+        def access_token
+          return @access_token if defined?(@access_token)
+
+          token = raw_access_token
+          @access_token =
+            case token
+            when nil    then nil
+            when String then token.empty? ? nil : token
+            when Hash   then token[:access_token] || token['access_token']
+            end
+        end
+
+        # @return [String, nil] the API key (ANTHROPIC_API_KEY), or nil
+        def api_key
+          ENV.fetch('ANTHROPIC_API_KEY', nil)
+        end
+
+        # @return [Boolean] true if the token store says the active
+        #   credential is still valid
+        def token_valid?
+          return true unless defined?(Auth::TokenStore)
+          return true unless Auth::TokenStore.respond_to?(:valid?)
+
+          Auth::TokenStore.valid?
+        end
+
+        def raw_access_token
+          return @raw_access_token if defined?(@raw_access_token)
+
+          @raw_access_token =
+            (Auth::TokenStore.load if defined?(Auth::TokenStore) && Auth::TokenStore.respond_to?(:load))
         end
 
         private
@@ -254,5 +318,6 @@ module RubynCode
         end
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

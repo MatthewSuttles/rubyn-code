@@ -227,6 +227,11 @@ module RubynCode
           )
         SQL
 
+        # Self-heal: add columns that later migrations added to legacy
+        # tables.  Same pattern as Mailbox#ensure_table!.
+        add_teammate_column_if_missing('parent_agent_id')
+        add_teammate_column_if_missing('metadata')
+
         @db.execute(<<~SQL)
           CREATE UNIQUE INDEX IF NOT EXISTS idx_teammates_name ON teammates (name)
         SQL
@@ -234,6 +239,14 @@ module RubynCode
         @db.execute(<<~SQL)
           CREATE INDEX IF NOT EXISTS idx_teammates_parent ON teammates (parent_agent_id)
         SQL
+      end
+
+      # @return [Boolean] true if the column was added
+      def add_teammate_column_if_missing(column)
+        @db.execute("ALTER TABLE teammates ADD COLUMN #{column} TEXT")
+        true
+      rescue SQLite3::SQLException
+        false
       end
     end
   end
