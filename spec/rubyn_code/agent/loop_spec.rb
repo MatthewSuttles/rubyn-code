@@ -123,6 +123,40 @@ RSpec.describe RubynCode::Agent::Loop do
         end
         expect(injected).to be(true)
       end
+
+      it 'runs past MAX_ITERATIONS while a stop hook keeps blocking' do
+        stub_const("#{described_class}::MAX_ITERATIONS", 2)
+        allow(llm_client).to receive(:chat).and_return(text_response('working'))
+
+        # Block the first 5 :stop fires (well past the cap of 2), then allow.
+        calls = 0
+        allow(hook_runner).to receive(:fire) do |event, **_kwargs|
+          next nil unless event == :stop
+
+          calls += 1
+          calls <= 5 ? { block: true, reason: 'keep going' } : nil
+        end
+
+        result = agent_loop.send_message('long goal')
+
+        expect(result).to eq('working')
+        expect(llm_client).to have_received(:chat).exactly(6).times
+      end
+
+      it 'still terminates at the hard ceiling if a goal never completes' do
+        stub_const("#{described_class}::MAX_ITERATIONS", 2)
+        stub_const("#{described_class}::GOAL_MAX_ITERATIONS", 5)
+        allow(llm_client).to receive(:chat).and_return(text_response('working'))
+        # Always block — simulates an unsatisfiable goal.
+        allow(hook_runner).to receive(:fire) do |event, **_kwargs|
+          event == :stop ? { block: true, reason: 'keep going' } : nil
+        end
+
+        result = agent_loop.send_message('impossible goal')
+
+        expect(result).to include('maximum iteration limit')
+        expect(llm_client).to have_received(:chat).exactly(5).times
+      end
     end
 
     context 'tool execution' do
