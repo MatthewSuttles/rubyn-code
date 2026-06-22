@@ -313,5 +313,18 @@ RSpec.describe RubynCode::Config::Settings do
 
       expect(settings.session_budget_usd).to eq(25.0)
     end
+
+    it 'defaults chisel_mode to off' do
+      expect(settings.chisel_mode).to eq(RubynCode::Config::Defaults::CHISEL_MODE)
+      expect(settings.chisel_mode).to eq('off')
+    end
+
+    it 'round-trips chisel_mode through save!/load!' do
+      settings.set('chisel_mode', 'full')
+      settings.save!
+
+      reloaded = described_class.new(config_path: settings.config_path)
+      expect(reloaded.get('chisel_mode')).to eq('full')
+    end
   end
 end

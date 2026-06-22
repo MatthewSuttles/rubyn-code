@@ -38,6 +38,10 @@ module RubynCode
 
       SKILLS_AUTOLOAD = true
 
+      # Chisel: opt-in "write the minimum that works" enforcement. Off by
+      # default — only changes agent behavior once the user turns it on.
+      CHISEL_MODE = 'off'
+
       SESSION_BUDGET_USD = 5.00
       DAILY_BUDGET_USD = 10.00
 

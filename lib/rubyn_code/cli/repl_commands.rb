@@ -25,7 +25,8 @@ module RubynCode
           Commands::Provider, Commands::InstallSkills,
           Commands::RemoveSkills, Commands::Skills,
           Commands::Megaplan, Commands::Goal, Commands::Loop,
-          Commands::Agents, Commands::Learning, Commands::Rewind
+          Commands::Agents, Commands::Learning, Commands::Rewind,
+          Commands::Chisel
         ].each { |cmd| @command_registry.register(cmd) }
         register_custom_commands!
       end
