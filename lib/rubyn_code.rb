@@ -16,6 +16,9 @@ module RubynCode
   # rather than a successful tool call returning a string like "denied".
   class UserDeniedError < Error; end
 
+  # Chisel — opt-in "write the minimum that works" enforcement (off by default)
+  autoload :Chisel, 'rubyn_code/chisel'
+
   # Infrastructure
   module Config
     autoload :Settings, 'rubyn_code/config/settings'
@@ -333,6 +336,7 @@ module RubynCode
       autoload :CustomLoader, 'rubyn_code/cli/commands/custom_loader'
       autoload :Learning, 'rubyn_code/cli/commands/learning'
       autoload :Rewind, 'rubyn_code/cli/commands/rewind'
+      autoload :Chisel, 'rubyn_code/cli/commands/chisel'
     end
   end
 

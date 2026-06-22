@@ -18,6 +18,7 @@ module RubynCode
         oauth_client_id oauth_redirect_uri oauth_authorize_url
         oauth_token_url oauth_scopes
         skills_autoload
+        chisel_mode
       ].freeze
 
       DEFAULT_MAP = {
@@ -38,7 +39,8 @@ module RubynCode
         oauth_authorize_url: Defaults::OAUTH_AUTHORIZE_URL,
         oauth_token_url: Defaults::OAUTH_TOKEN_URL,
         oauth_scopes: Defaults::OAUTH_SCOPES,
-        skills_autoload: Defaults::SKILLS_AUTOLOAD
+        skills_autoload: Defaults::SKILLS_AUTOLOAD,
+        chisel_mode: Defaults::CHISEL_MODE
       }.freeze
 
       attr_reader :config_path, :data

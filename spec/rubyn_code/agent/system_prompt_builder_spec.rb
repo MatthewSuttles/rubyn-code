@@ -61,6 +61,39 @@ RSpec.describe RubynCode::Agent::Loop, 'system prompt caching' do
     end
   end
 
+  describe 'Chisel ruleset injection' do
+    around do |example|
+      original = ENV.fetch('RUBYN_CHISEL_MODE', nil)
+      example.run
+    ensure
+      original.nil? ? ENV.delete('RUBYN_CHISEL_MODE') : ENV['RUBYN_CHISEL_MODE'] = original
+    end
+
+    it 'injects the ruleset when Chisel is turned on' do
+      Dir.mktmpdir do |root|
+        ENV['RUBYN_CHISEL_MODE'] = 'full'
+        agent_loop = build_loop(root)
+        stub_chat(text_response('Hi.'))
+
+        agent_loop.send_message('hello')
+
+        expect(system_prompts.first).to include('write the minimum that works')
+      end
+    end
+
+    it 'adds nothing when Chisel is off' do
+      Dir.mktmpdir do |root|
+        ENV['RUBYN_CHISEL_MODE'] = 'off'
+        agent_loop = build_loop(root)
+        stub_chat(text_response('Hi.'))
+
+        agent_loop.send_message('hello')
+
+        expect(system_prompts.first).not_to include('write the minimum that works')
+      end
+    end
+  end
+
   describe 'project instruction files' do
     it 'loads AGENTS.md (Codex convention) into the system prompt' do
       Dir.mktmpdir do |root|
