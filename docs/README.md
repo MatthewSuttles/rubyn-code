@@ -12,8 +12,8 @@ Check the box when a phase is fully merged.
 
 ## Phases
 
-- [ ] **[Phase 1 — Chisel Core](01-chisel-core/)** — opt-in `chisel.mode` flag, the decision-ladder ruleset at lite/full/ultra, the `/chisel` toggle command, and ruleset injection into the agent's system prompt when enabled.
-- [ ] **Phase 2 — Chisel Inspection** — `/chisel-review` (over-engineering in the git diff) and `/chisel-audit` (whole repo), sharing one detector that returns a ranked deletion list.
+- [x] **[Phase 1 — Chisel Core](01-chisel-core/)** — opt-in `chisel.mode` flag, the decision-ladder ruleset at lite/full/ultra, the `/chisel` toggle command, and ruleset injection into the agent's system prompt when enabled.
+- [ ] **[Phase 2 — Chisel Inspection](02-chisel-inspection/)** — `/chisel-review` (over-engineering in the git diff) and `/chisel-audit` (whole repo), sharing one detector that returns a ranked deletion list.
 - [ ] **Phase 3 — Chisel Ledger & Gain** — inline `chisel:` deferral markers harvested via `/chisel-debt`, and `/chisel-gain` savings stats.
 
 ## Conventions

@@ -413,6 +413,19 @@ handling, security, accessibility) is never on the chopping block.
 Set it permanently with `chisel_mode: full` in `~/.rubyn-code/config.yml`, or
 per-shell with `RUBYN_CHISEL_MODE=full`.
 
+**On-demand audits** (work whether or not the always-on mode is enabled):
+
+```
+rubyn > /chisel-review            # over-engineering in your diff vs main
+rubyn > /chisel-review develop    # ...vs a different base
+rubyn > /chisel-audit             # sweep the whole repo
+rubyn > /chisel-audit app/services  # ...scoped to a path
+```
+
+Both return a ranked deletion/simplification list — each item with a location, the
+ladder rung it skipped, and the concrete simpler form — and stay read-only (they
+report, they don't edit).
+
 ## Megaplan — Phased Planning
 
 For work too big for a single PR — rewrites, migrations, multi-feature initiatives — Rubyn ships a planning workflow that breaks the feature into vertical-slice phases before any code gets written.

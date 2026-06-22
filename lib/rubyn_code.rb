@@ -337,6 +337,8 @@ module RubynCode
       autoload :Learning, 'rubyn_code/cli/commands/learning'
       autoload :Rewind, 'rubyn_code/cli/commands/rewind'
       autoload :Chisel, 'rubyn_code/cli/commands/chisel'
+      autoload :ChiselReview, 'rubyn_code/cli/commands/chisel_review'
+      autoload :ChiselAudit, 'rubyn_code/cli/commands/chisel_audit'
     end
   end
 
