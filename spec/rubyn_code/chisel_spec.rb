@@ -54,6 +54,17 @@ RSpec.describe RubynCode::Chisel do
       allow(described_class).to receive(:configured_mode).and_return('banana')
       expect(described_class.mode).to eq('off')
     end
+
+    it 'normalizes case and surrounding whitespace from the env override' do
+      allow(described_class).to receive(:configured_mode).and_return(nil)
+      ENV['RUBYN_CHISEL_MODE'] = '  Full '
+      expect(described_class.mode).to eq('full')
+    end
+
+    it 'normalizes a hand-edited config value' do
+      allow(described_class).to receive(:configured_mode).and_return(' ULTRA ')
+      expect(described_class.mode).to eq('ultra')
+    end
   end
 
   describe '.enabled?' do

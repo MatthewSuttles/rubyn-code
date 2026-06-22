@@ -29,8 +29,8 @@ RSpec.describe RubynCode::CLI::Commands::Chisel do
     context 'without arguments' do
       it 'reports the current mode and the available modes' do
         command.execute([], ctx)
-        expect(renderer).to have_received(:info).with(/Chisel: off/)
-        expect(renderer).to have_received(:info).with(/off | lite | full | ultra/)
+        expect(renderer).to have_received(:info).with('Chisel: off')
+        expect(renderer).to have_received(:info).with('Modes: off | lite | full | ultra')
       end
     end
 

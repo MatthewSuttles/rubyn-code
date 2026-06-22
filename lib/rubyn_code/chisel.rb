@@ -62,18 +62,29 @@ module RubynCode
     end
 
     # Resolve the active mode: env override → persisted config → default.
-    # Any unrecognized value at either layer falls through to the default
-    # rather than raising, so a typo can never break a turn.
+    # Each layer is normalized (trimmed + downcased) the same way the
+    # `/chisel` command normalizes its argument, so `RUBYN_CHISEL_MODE=Full`
+    # and a hand-edited `chisel_mode: " Full "` both resolve cleanly. Any
+    # unrecognized value falls through rather than raising, so a typo can
+    # never break a turn.
     #
     # @return [String] one of MODES
     def mode
-      env = ENV.fetch(ENV_KEY, nil)
-      return env if valid?(env)
+      normalize(ENV.fetch(ENV_KEY, nil)) ||
+        normalize(configured_mode) ||
+        DEFAULT_MODE
+    end
 
-      configured = configured_mode
-      return configured if valid?(configured)
+    # Trim + downcase a candidate mode, returning it only if recognized,
+    # otherwise nil so the caller can fall through to the next layer.
+    #
+    # @param value [#to_s, nil]
+    # @return [String, nil]
+    def normalize(value)
+      return nil if value.nil?
 
-      DEFAULT_MODE
+      candidate = value.to_s.strip.downcase
+      valid?(candidate) ? candidate : nil
     end
 
     # @return [Boolean]
@@ -101,7 +112,9 @@ module RubynCode
     #
     # @return [String, nil]
     def configured_mode
-      Config::Settings.new.get(CONFIG_KEY, DEFAULT_MODE)
+      # No default needed — chisel_mode lives in Settings::DEFAULT_MAP, so an
+      # unset key already resolves to DEFAULT_MODE.
+      Config::Settings.new.get(CONFIG_KEY)
     rescue StandardError
       nil
     end
