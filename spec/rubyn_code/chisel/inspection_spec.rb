@@ -40,13 +40,20 @@ RSpec.describe RubynCode::Chisel::Inspection do
       end
     end
 
-    it 'is read-only and excludes the safety floor' do
+    it 'is read-only and reuses the shared safety floor verbatim' do
       %i[diff repo].each do |scope|
         out = described_class.prompt(scope: scope)
         expect(out).to include('READ-ONLY')
         expect(out).to include('do not edit')
-        expect(out).to match(/validation.*security.*accessibility/m)
+        # The exclusion list is the same constant the always-on ruleset injects,
+        # so it can never drift — assert the constant itself appears.
+        expect(out).to include(RubynCode::Chisel::SAFETY_FLOOR)
       end
+    end
+
+    it 'treats a blank target as the default' do
+      expect(described_class.prompt(scope: :diff, target: '  ')).to include('git diff main...')
+      expect(described_class.prompt(scope: :repo, target: '')).to include('whole repository')
     end
 
     it 'raises on an unknown scope' do

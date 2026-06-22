@@ -10,8 +10,8 @@ module RubynCode
         def self.description = 'Find over-engineering in the current diff (/chisel-review [base])'
 
         def execute(args, ctx)
-          base = args.fetch(0, 'main')
-          ctx.send_message(RubynCode::Chisel::Inspection.prompt(scope: :diff, target: base))
+          # Inspection owns the 'main' default so it lives in exactly one place.
+          ctx.send_message(RubynCode::Chisel::Inspection.prompt(scope: :diff, target: args.first))
         end
       end
     end

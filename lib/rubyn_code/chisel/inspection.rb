@@ -30,11 +30,7 @@ module RubynCode
         If nothing is over-engineered, say so plainly instead of inventing work.
       CONTRACT
 
-      GUARDRAILS = <<~GUARD.strip
-        This is a READ-ONLY review: report the list, do not edit any files.
-        Never flag the safety floor — leave validation, error and data-loss
-        handling, security, and accessibility alone even if they add code.
-      GUARD
+      READ_ONLY_NOTE = 'This is a READ-ONLY review: report the list, do not edit any files.'
 
       module_function
 
@@ -44,17 +40,33 @@ module RubynCode
       # @return [String] the full instruction to send to the agent
       # @raise [ArgumentError] on an unknown scope
       def prompt(scope:, target: nil)
-        [lead_in(scope, target), Chisel::LADDER, SMELLS, OUTPUT_CONTRACT, GUARDRAILS]
+        [lead_in(scope, target), Chisel::LADDER, SMELLS, OUTPUT_CONTRACT, guardrails]
           .join("\n\n")
+      end
+
+      # Read-only guard + the shared safety floor, reused verbatim from Chisel
+      # so the exclusion list can never drift from the always-on ruleset.
+      #
+      # @return [String]
+      def guardrails
+        "#{READ_ONLY_NOTE}\n\n#{Chisel::SAFETY_FLOOR}\n" \
+          'Those are never over-engineering — leave them even if they add code.'
       end
 
       # @return [String]
       def lead_in(scope, target)
         case scope
-        when :diff then diff_lead_in(target || 'main')
-        when :repo then repo_lead_in(target)
+        when :diff then diff_lead_in(presence(target) || 'main')
+        when :repo then repo_lead_in(presence(target))
         else raise ArgumentError, "unknown Chisel inspection scope: #{scope.inspect}"
         end
+      end
+
+      # @param value [#to_s, nil]
+      # @return [String, nil] the trimmed value, or nil if blank
+      def presence(value)
+        str = value.to_s.strip
+        str.empty? ? nil : str
       end
 
       def diff_lead_in(base)
