@@ -33,7 +33,11 @@ module RubynCode
         @tool_executor = Tools::Executor.new(project_root: @project_root)
         @context_manager = Context::Manager.new(llm_client: @llm_client)
         @hook_registry = Hooks::Registry.new
-        @hook_runner = Hooks::Runner.new(registry: @hook_registry)
+        @external_hook_dispatcher = Hooks::ExternalDispatcher.new(project_root: @project_root)
+        @hook_runner = Hooks::Runner.new(
+          registry: @hook_registry,
+          external_dispatcher: @external_hook_dispatcher
+        )
         @stall_detector = Agent::LoopDetector.new
       end
 
