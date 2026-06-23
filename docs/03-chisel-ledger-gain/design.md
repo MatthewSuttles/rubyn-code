@@ -28,9 +28,12 @@ them as structured items (relative path, 1-based line, note text).
 format and the scan in one place keeps them consistent.
 
 Details:
-- Marker regex: `/(?:#|\/\/)\s*chisel:\s*(\S.*)/i` — a `#` or `//` comment leader,
-  then `chisel:`, then the note. (The leader + whitespace-only gap means this
-  module's own regex literal doesn't match itself.)
+- Marker regex: `/\A\s*(?:#|\/\/)\s*chisel:\s*(\S.*)/` — anchored to line start
+  (after optional indentation): a `#`/`//` leader, the lowercase `chisel:` tag,
+  then the note. Anchoring means a `chisel:` substring inside a string literal or
+  a trailing code comment is not harvested — only a marker on its own comment line
+  is. Case-sensitive, so descriptive `Chisel:` comments (and this module's own
+  regex literal) don't self-match.
 - Scans source extensions only: `.rb .rake .erb .ru .gemspec`.
 - Skips `.git node_modules vendor coverage tmp log`.
 - `File.foreach` with a per-file `rescue` so an unreadable file is skipped, never

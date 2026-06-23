@@ -29,8 +29,8 @@ RSpec.describe RubynCode::Chisel::Debt do
       expect(items.first.note).to eq('inline this once there is a second caller')
     end
 
-    it 'matches // comment leaders too' do
-      write('app.rb', "x = 1 // chisel: drop this option\n")
+    it 'matches an indented // comment leader on its own line' do
+      write('app.rb', "  // chisel: drop this option\n")
       expect(described_class.scan(@root).first.note).to eq('drop this option')
     end
 
@@ -41,6 +41,16 @@ RSpec.describe RubynCode::Chisel::Debt do
 
     it 'is case-sensitive so descriptive "Chisel:" comments are not markers' do
       write('lib/d.rb', "# Chisel: this is a section heading, not a deferral marker\n")
+      expect(described_class.scan(@root)).to be_empty
+    end
+
+    it 'does not match a chisel: substring inside a string literal' do
+      write('lib/e.rb', %(log.info("# chisel: this is data, not a marker")\n))
+      expect(described_class.scan(@root)).to be_empty
+    end
+
+    it 'does not match a trailing comment after code (markers go on their own line)' do
+      write('lib/f.rb', "do_work # chisel: not harvested when trailing\n")
       expect(described_class.scan(@root)).to be_empty
     end
 

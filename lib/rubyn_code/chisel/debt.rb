@@ -12,12 +12,13 @@ module RubynCode
     module Debt
       Item = Data.define(:file, :line, :note)
 
-      # A `#` or `//` comment leader, then the lowercase tag, then the note.
-      # Case-sensitive on purpose: a descriptive comment that merely starts with
-      # "Chisel:" is not a marker, only the exact lowercase tag is. The
-      # whitespace-only gap (\s*) after the leader also means this module's own
-      # regex literal does not match itself when the repo is scanned.
-      MARKER = %r{(?:#|//)\s*chisel:\s*(\S.*)}
+      # The whole line must be a comment whose first token is the lowercase tag:
+      # optional indentation, a `#` or `//` leader, then `chisel:`, then the note.
+      # Anchoring to line-start means a `chisel:` substring inside a string
+      # literal or a trailing code comment is NOT harvested — only a marker on its
+      # own comment line is. Case-sensitive on purpose, so a descriptive comment
+      # that merely starts with "Chisel:" is not a marker.
+      MARKER = %r{\A\s*(?:#|//)\s*chisel:\s*(\S.*)}
 
       SCAN_EXTENSIONS = %w[.rb .rake .erb .ru .gemspec].freeze
       SKIP_DIRS = %w[.git node_modules vendor coverage tmp log].freeze
@@ -27,27 +28,29 @@ module RubynCode
       # @param root [String, nil] project root to scan
       # @return [Array<Item>] markers found, in file/line order
       def scan(root)
-        return [] unless root && Dir.exist?(root)
+        return [] unless root
 
-        source_files(root).flat_map { |path| scan_file(root, path) }
+        base = File.expand_path(root)
+        return [] unless Dir.exist?(base)
+
+        source_files(base).flat_map { |path| scan_file(base, path) }
       end
 
+      # @param base [String] expanded project root (no trailing slash)
       # @return [Array<String>] absolute paths of scannable source files
-      def source_files(root)
-        SCAN_EXTENSIONS
-          .flat_map { |ext| Dir.glob(File.join(root, '**', "*#{ext}")) }
-          .reject { |path| skip?(root, path) }
-          .sort
+      def source_files(base)
+        pattern = File.join(base, '**', "*{#{SCAN_EXTENSIONS.join(',')}}")
+        Dir.glob(pattern).reject { |path| skip?(base, path) }.sort
       end
 
-      def skip?(root, path)
-        rel = path.delete_prefix("#{root}/")
+      def skip?(base, path)
+        rel = path.delete_prefix("#{base}/")
         SKIP_DIRS.any? { |dir| rel == dir || rel.start_with?("#{dir}/") || rel.include?("/#{dir}/") }
       end
 
       # @return [Array<Item>] markers in a single file ([] if it can't be read)
-      def scan_file(root, path)
-        rel = path.delete_prefix("#{root}/")
+      def scan_file(base, path)
+        rel = path.delete_prefix("#{base}/")
         items = []
         File.foreach(path).with_index(1) do |line, number|
           match = MARKER.match(line)
