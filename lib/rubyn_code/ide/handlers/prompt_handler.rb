@@ -57,7 +57,15 @@ module RubynCode
           return unless thread&.alive?
 
           thread.raise(Interrupt)
-          thread.join(2) # give it a moment to clean up
+          begin
+            thread.join(2) # give it a moment to clean up
+          rescue Interrupt
+            # We asked the thread to stop, so its Interrupt is expected. If it
+            # lands before the agent installs its own rescue, Thread#join would
+            # otherwise re-raise it into the caller (the cancel path) and, in
+            # tests, escape the example and abort the whole run.
+            nil
+          end
         end
 
         private
