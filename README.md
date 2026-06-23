@@ -426,6 +426,14 @@ Both return a ranked deletion/simplification list — each item with a location,
 ladder rung it skipped, and the concrete simpler form — and stay read-only (they
 report, they don't edit).
 
+**Debt ledger & status.** Leave a `# chisel: …` comment when you consciously defer a
+simplification, then collect them later:
+
+```
+rubyn > /chisel-debt    # list every `# chisel:` deferral, with file:line and note
+rubyn > /chisel-gain    # current mode, outstanding debt count, and reference impact
+```
+
 ## Megaplan — Phased Planning
 
 For work too big for a single PR — rewrites, migrations, multi-feature initiatives — Rubyn ships a planning workflow that breaks the feature into vertical-slice phases before any code gets written.

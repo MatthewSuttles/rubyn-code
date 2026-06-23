@@ -339,6 +339,8 @@ module RubynCode
       autoload :Chisel, 'rubyn_code/cli/commands/chisel'
       autoload :ChiselReview, 'rubyn_code/cli/commands/chisel_review'
       autoload :ChiselAudit, 'rubyn_code/cli/commands/chisel_audit'
+      autoload :ChiselDebt, 'rubyn_code/cli/commands/chisel_debt'
+      autoload :ChiselGain, 'rubyn_code/cli/commands/chisel_gain'
     end
   end
 
