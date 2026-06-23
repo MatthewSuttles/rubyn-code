@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'erb'
+require 'faraday'
 require 'json'
 
 module RubynCode
@@ -135,7 +136,6 @@ module RubynCode
       private
 
       def connection
-        require 'faraday'
         @connection ||= Faraday.new(url: base_url) do |f|
           f.request :url_encoded
           f.response :raise_error
