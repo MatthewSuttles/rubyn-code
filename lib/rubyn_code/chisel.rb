@@ -16,6 +16,8 @@ module RubynCode
   module Chisel
     # On-demand over-engineering audit shared by /chisel-review and /chisel-audit.
     autoload :Inspection, 'rubyn_code/chisel/inspection'
+    # Harvests inline `chisel:` deferral markers for /chisel-debt and /chisel-gain.
+    autoload :Debt, 'rubyn_code/chisel/debt'
 
     MODES = %w[off lite full ultra].freeze
     DEFAULT_MODE = 'off'
