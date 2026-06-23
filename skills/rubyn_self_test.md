@@ -449,6 +449,55 @@ fast and need no API calls.
   '
   ```
 
+### 18. Chisel — Minimal-Code Enforcement (opt-in)
+
+Chisel is rubyn-code's "write the minimum that works" layer. It is **off by
+default** and only changes the agent once a user turns it on (`/chisel full` or
+`chisel_mode` in config). These checks prove the engine resolves modes, injects
+its ruleset only when enabled, never chisels away the safety floor, and that the
+debt scanner, inspection prompts, and all five slash commands are wired up — all
+deterministic, no API calls.
+
+The deterministic target is a committed, deliberately over-engineered fixture,
+`skills/self_test/fixtures/chisel_sample.rb`. Chisel scans it and must return the
+**same three `chisel:` markers every time** (and ignore the two decoys). That is
+what makes this check repeatable rather than a one-off tmpdir.
+
+- **grep** (prompt integration): `append_chisel_ruleset` in `lib/rubyn_code/agent/system_prompt_builder.rb`. PASS if found (confirms the ruleset reaches the system prompt).
+- **run_specs**: `bundle exec rspec spec/rubyn_code/chisel_spec.rb spec/rubyn_code/chisel spec/rubyn_code/cli/commands/chisel_spec.rb spec/rubyn_code/cli/commands/chisel_review_spec.rb spec/rubyn_code/cli/commands/chisel_audit_spec.rb spec/rubyn_code/cli/commands/chisel_debt_spec.rb spec/rubyn_code/cli/commands/chisel_gain_spec.rb --format progress`. PASS if output contains `0 failures`. (Includes `self_test_fixture_spec.rb`, which guards the fixture's exact scan result.)
+- **Smoke run against the fixture**: `bash` runs the committed runner — no inline script to keep in sync:
+
+  ```bash
+  bundle exec ruby skills/self_test/chisel_smoke.rb
+  ```
+
+  It scores four areas on their own line and exits non-zero on any failure:
+
+  ```
+  CHISEL debt: PASS
+  CHISEL engine: PASS
+  CHISEL inspection: PASS
+  CHISEL commands: PASS
+  CHISEL: PASS
+  ```
+
+  - **debt** — scanning the fixture returns exactly its three planted markers
+    (file/line/note), with the string-literal and trailing-comment decoys ignored.
+  - **engine** — `off` injects nothing; `lite`/`full`/`ultra` layer the right
+    addenda and always keep the safety floor; a garbage mode never crashes or
+    leaks through. Driven via `RUBYN_CHISEL_MODE`, independent of this machine's
+    `chisel_mode` config.
+  - **inspection** — `:diff` and `:repo` prompts assemble a String carrying the
+    ladder + safety floor; an unknown scope raises instead of emitting junk.
+  - **commands** — all five (`/chisel`, `/chisel-review`, `/chisel-audit`,
+    `/chisel-debt`, `/chisel-gain`) register and resolve.
+
+  Score each `CHISEL <area>` line independently (4 line items). PASS criteria:
+  all four areas PASS and the final line is `CHISEL: PASS`.
+
+  You can also point Chisel at the fixture by hand to see the consistent result
+  directly: `bundle exec ruby -Ilib -rrubyn_code -e 'RubynCode::Chisel::Debt.scan("skills/self_test/fixtures").each { |i| puts "#{i.file}:#{i.line} — #{i.note}" }'`.
+
 ## Scoring
 
 Count total PASS results out of total tests run. Report the percentage.
