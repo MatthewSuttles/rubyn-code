@@ -36,18 +36,34 @@ module RubynCode
         private
 
         def run_recovery(session_id, context)
-          @server.notify('agent/status', {
-                           'sessionId' => session_id,
-                           'status' => 'recovering',
-                           'phaseNumber' => context['phase_number'],
-                           'attemptNumber' => context['attempt_number']
-                         })
+          notify_recovering(session_id, context)
 
           recovery = @recovery || Megaplan::CiRecovery.new(
             agent_invoker: build_invoker(session_id)
           )
           outcome = recovery.recover(context)
 
+          notify_outcome(session_id, context, outcome)
+          @server.notify('agent/status', {
+                           'sessionId' => session_id,
+                           'status' => 'done',
+                           'summary' => outcome['summary']
+                         })
+        rescue StandardError => e
+          warn "[RecoverCiHandler] error: #{e.message}"
+          notify_error(session_id, context, e)
+        end
+
+        def notify_recovering(session_id, context)
+          @server.notify('agent/status', {
+                           'sessionId' => session_id,
+                           'status' => 'recovering',
+                           'phaseNumber' => context['phase_number'],
+                           'attemptNumber' => context['attempt_number']
+                         })
+        end
+
+        def notify_outcome(session_id, context, outcome)
           @server.notify('recovery/outcome', {
                            'sessionId' => session_id,
                            'planId' => context['plan_id'],
@@ -56,25 +72,20 @@ module RubynCode
                            'commitSha' => outcome['commit_sha'],
                            'summary' => outcome['summary']
                          })
+        end
 
-          @server.notify('agent/status', {
-                           'sessionId' => session_id,
-                           'status' => 'done',
-                           'summary' => outcome['summary']
-                         })
-        rescue StandardError => e
-          warn "[RecoverCiHandler] error: #{e.message}"
+        def notify_error(session_id, context, error)
           @server.notify('recovery/outcome', {
                            'sessionId' => session_id,
                            'planId' => context['plan_id'],
                            'phaseNumber' => context['phase_number'],
                            'kind' => 'errored',
-                           'summary' => e.message
+                           'summary' => error.message
                          })
           @server.notify('agent/status', {
                            'sessionId' => session_id,
                            'status' => 'error',
-                           'error' => e.message
+                           'error' => error.message
                          })
         end
 
