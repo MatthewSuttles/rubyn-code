@@ -41,8 +41,19 @@ module RubynCode
         append_project_instructions(parts)
         append_instincts(parts)
         append_skills(parts)
+        append_chisel_ruleset(parts)
         append_deferred_tools(parts)
         parts.join("\n")
+      end
+
+      # Chisel's "write the minimum that works" ruleset, injected only when the
+      # user has turned it on (chisel_mode != off). Guarded so a config or
+      # resolution error never breaks prompt assembly.
+      def append_chisel_ruleset(parts)
+        section = Chisel.prompt_section
+        parts << "\n#{section}" unless section.empty?
+      rescue StandardError
+        nil
       end
 
       # Called at the start of each user turn so memory, instruction, and

@@ -15,7 +15,11 @@ RSpec.describe RubynCode::LLM::Adapters::Anthropic, 'prompt caching' do
   end
 
   before do
-    allow(adapter).to receive(:access_token).and_return('sk-ant-oat-test-token')
+    # Establish OAuth auth explicitly via the lowest-level token method so these
+    # caching tests don't depend on the machine's keychain (absent on CI) or on
+    # test order. raw_access_token drives both access_token and oauth_token?.
+    allow(adapter).to receive(:raw_access_token)
+      .and_return({ access_token: 'sk-ant-oat-test-token', source: :keychain })
   end
 
   describe 'OAuth system prompt caching' do

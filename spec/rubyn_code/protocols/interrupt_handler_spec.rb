@@ -1,16 +1,22 @@
 # frozen_string_literal: true
 
-require "spec_helper"
+require 'spec_helper'
 
 RSpec.describe RubynCode::Protocols::InterruptHandler do
   before do
     # Suppress $stderr writes from signal handler output
     allow($stderr).to receive(:write)
+    # `.setup!` installs a global trap('INT'); capture the prior handler so the
+    # after hook can restore it. Otherwise this leaked SIGINT trap (and its
+    # handle_interrupt callback) survives into later specs and makes the suite
+    # order-dependent.
+    @original_int_trap = trap('INT', 'DEFAULT')
   end
 
   after do
     described_class.reset!
     described_class.clear_callbacks!
+    trap('INT', @original_int_trap || 'DEFAULT')
   end
 
   describe '.setup!' do

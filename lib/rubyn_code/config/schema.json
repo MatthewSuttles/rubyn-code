@@ -43,6 +43,10 @@
       "type": "number",
       "minimum": 0.5,
       "maximum": 500
+    },
+    "chisel_mode": {
+      "type": "string",
+      "enum": ["off", "lite", "full", "ultra"]
     }
   },
   "additionalProperties": true

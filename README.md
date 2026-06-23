@@ -392,6 +392,48 @@ Focus areas: `all`, `security`, `performance`, `style`, `testing`
 
 Severity ratings: **[critical]** **[warning]** **[suggestion]** **[nitpick]**
 
+## Chisel — Write the Minimum That Works
+
+Chisel is an opt-in mode that makes Rubyn think like the laziest senior dev in
+the room: the best code is the code you never wrote. It's **off by default** and
+only changes the agent's behavior once you turn it on.
+
+```
+rubyn > /chisel              # show current intensity
+rubyn > /chisel full         # turn it on
+rubyn > /chisel off          # back to normal
+```
+
+Intensities: `off` (default) · `lite` · `full` · `ultra`. When on, Rubyn walks a
+decision ladder before writing code — does this need to exist? does stdlib or an
+installed gem already do it? is it one line? — and only then writes the smallest
+change that solves the task. The safety floor (validation, error/data-loss
+handling, security, accessibility) is never on the chopping block.
+
+Set it permanently with `chisel_mode: full` in `~/.rubyn-code/config.yml`, or
+per-shell with `RUBYN_CHISEL_MODE=full`.
+
+**On-demand audits** (work whether or not the always-on mode is enabled):
+
+```
+rubyn > /chisel-review            # over-engineering in your diff vs main
+rubyn > /chisel-review develop    # ...vs a different base
+rubyn > /chisel-audit             # sweep the whole repo
+rubyn > /chisel-audit app/services  # ...scoped to a path
+```
+
+Both return a ranked deletion/simplification list — each item with a location, the
+ladder rung it skipped, and the concrete simpler form — and stay read-only (they
+report, they don't edit).
+
+**Debt ledger & status.** Leave a `# chisel: …` comment when you consciously defer a
+simplification, then collect them later:
+
+```
+rubyn > /chisel-debt    # list every `# chisel:` deferral, with file:line and note
+rubyn > /chisel-gain    # current mode, outstanding debt count, and reference impact
+```
+
 ## Megaplan — Phased Planning
 
 For work too big for a single PR — rewrites, migrations, multi-feature initiatives — Rubyn ships a planning workflow that breaks the feature into vertical-slice phases before any code gets written.

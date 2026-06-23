@@ -38,8 +38,12 @@ RSpec.describe 'DaemonRunner MCP integration' do
     allow(renderer).to receive(:success)
     allow(renderer).to receive(:error)
 
-    # Stub infrastructure
+    # Stub infrastructure. load_for_provider is what bootstrap!'s ensure_auth!
+    # consults; stub it truthy so the daemon doesn't exit(1) for "no auth" when
+    # there's no keychain (CI) — otherwise bootstrap! raises SystemExit.
     allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(true)
+    allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider)
+      .and_return({ access_token: 'sk-ant-oat-test', source: :keychain })
     allow(RubynCode::LLM::Client).to receive(:new).and_return(llm_client)
     allow(RubynCode::DB::Connection).to receive(:instance).and_return(db)
 
