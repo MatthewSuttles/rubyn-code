@@ -116,7 +116,9 @@ module RubynCode
 
       def execute_tool(tool_name, tool_input)
         discover_tool(tool_name)
-        @hook_runner.fire(:pre_tool_use, tool_name: tool_name, tool_input: tool_input)
+        pre_decision = @hook_runner.fire(:pre_tool_use, tool_name: tool_name, tool_input: tool_input)
+        raise RubynCode::UserDeniedError, pre_decision[:reason] if pre_decision.is_a?(Hash) && pre_decision[:deny]
+
         result = dispatch_tool(tool_name, tool_input)
         @hook_runner.fire(:post_tool_use, tool_name: tool_name, tool_input: tool_input, result: result)
         signal_decision_compactor(tool_name, tool_input, result)
