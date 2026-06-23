@@ -23,14 +23,23 @@ jobs:
           bundler-cache: true
 
       - name: Run specs
+        shell: bash
         run: |
-          set +e
+          set -o pipefail
+          # pipefail makes a non-zero rspec exit (failures, load errors) fail
+          # the step even though it's piped through tee.
           bundle exec rspec --format progress 2>&1 | tee /tmp/rspec.txt
-          set -e
-          # Check for actual test failures (not spec file load errors)
-          grep -q "0 failures" /tmp/rspec.txt
-          # Report coverage
           grep "Line Coverage" /tmp/rspec.txt || true
+          # Guard against a TRUNCATED run that still exits 0: a stray Interrupt
+          # can make RSpec quit early yet print "N examples, 0 failures" and
+          # exit 0, which the old grep-only gate accepted. Assert the suite
+          # actually ran to ~full size so an early abort can't pass as green.
+          count=$(grep -oE '[0-9]+ examples' /tmp/rspec.txt | tail -1 | grep -oE '[0-9]+')
+          echo "rspec reported ${count:-0} examples"
+          if [ "${count:-0}" -lt 2500 ]; then
+            echo "::error::Only ${count:-0} examples ran (expected >= 2500) — suite aborted early"
+            exit 1
+          fi
 
   lint:
     runs-on: ubuntu-latest
