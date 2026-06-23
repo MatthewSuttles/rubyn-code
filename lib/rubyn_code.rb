@@ -256,6 +256,7 @@ module RubynCode
     autoload :StdioTransport, 'rubyn_code/mcp/stdio_transport'
     autoload :SSETransport, 'rubyn_code/mcp/sse_transport'
     autoload :ToolBridge, 'rubyn_code/mcp/tool_bridge'
+    autoload :ServerExtrasBridge, 'rubyn_code/mcp/server_extras_bridge'
     autoload :Config, 'rubyn_code/mcp/config'
   end
 

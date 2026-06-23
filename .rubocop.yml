@@ -7,6 +7,9 @@ AllCops:
   Exclude:
     - 'spec/**/*'
     - 'vendor/**/*'
+    # Deliberately over-engineered fixture that Chisel runs against in the
+    # self-test — its smells are the point, so don't lint them away.
+    - 'skills/self_test/fixtures/**/*'
 
 Style/Documentation:
   Enabled: false

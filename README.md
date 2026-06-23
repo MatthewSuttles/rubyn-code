@@ -434,6 +434,23 @@ rubyn > /chisel-debt    # list every `# chisel:` deferral, with file:line and no
 rubyn > /chisel-gain    # current mode, outstanding debt count, and reference impact
 ```
 
+**Verifying Chisel.** A standalone smoke test runs the whole layer against a
+committed, deliberately over-engineered fixture and gives the same result every
+time — no LLM, no network:
+
+```
+$ bundle exec ruby skills/self_test/chisel_smoke.rb
+CHISEL debt: PASS         # scans the fixture → its exact planted `# chisel:` markers
+CHISEL engine: PASS       # off injects nothing; lite/full/ultra keep the safety floor
+CHISEL inspection: PASS   # review/audit prompts assemble; bad scope raises
+CHISEL commands: PASS     # all five slash commands register
+CHISEL: PASS
+```
+
+The fixture lives at `skills/self_test/fixtures/chisel_sample.rb`, the same check is
+Section 18 of the `/skill self-test` scorecard, and `spec/rubyn_code/chisel/self_test_fixture_spec.rb`
+guards the fixture's exact scan output so it can't silently drift.
+
 ## Megaplan — Phased Planning
 
 For work too big for a single PR — rewrites, migrations, multi-feature initiatives — Rubyn ships a planning workflow that breaks the feature into vertical-slice phases before any code gets written.

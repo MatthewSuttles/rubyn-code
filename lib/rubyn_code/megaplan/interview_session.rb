@@ -192,11 +192,16 @@ module RubynCode
           result = if INTERVIEW_TOOLS.include?(call.name.to_s)
                      @executor.execute(call.name, stringify_keys(call.input))
                    else
-                     "Tool '#{call.name}' is not available in interview mode (read-only palette: #{INTERVIEW_TOOLS.join(', ')})."
+                     unavailable_tool_message(call.name)
                    end
           { type: 'tool_result', tool_use_id: call.id, content: result.to_s }
         end
         { role: 'user', content: content }
+      end
+
+      def unavailable_tool_message(name)
+        "Tool '#{name}' is not available in interview mode " \
+          "(read-only palette: #{INTERVIEW_TOOLS.join(', ')})."
       end
 
       def stringify_keys(input)
