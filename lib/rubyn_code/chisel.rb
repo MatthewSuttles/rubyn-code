@@ -14,6 +14,9 @@ module RubynCode
   # rebuilt natively here; the safety floor (validation, error/data-loss
   # handling, security, accessibility) is never on the chopping block.
   module Chisel
+    # On-demand over-engineering audit shared by /chisel-review and /chisel-audit.
+    autoload :Inspection, 'rubyn_code/chisel/inspection'
+
     MODES = %w[off lite full ultra].freeze
     DEFAULT_MODE = 'off'
     ENV_KEY = 'RUBYN_CHISEL_MODE'
