@@ -30,6 +30,29 @@ end
 require "rubyn_code"
 require "webmock/rspec"
 
+# TEMP DIAGNOSTIC (remove once the CI truncation root cause is found): log a
+# backtrace whenever anything sets RSpec's wants_to_quit / wants_to_quit?, and a
+# note if the process receives a real SIGINT. On CI the suite ends early with a
+# clean summary and 0 failures; this reveals which code path triggers it.
+begin
+  diag = Module.new do
+    def wants_to_quit=(value)
+      Kernel.warn("[diag] wants_to_quit=#{value} set from:\n  #{caller.first(15).join("\n  ")}") if value
+      super
+    end
+  end
+  RSpec::Core::World.prepend(diag)
+rescue StandardError => e
+  warn "[diag] could not install wants_to_quit probe: #{e.class}: #{e.message}"
+end
+
+at_exit do
+  w = RSpec.world
+  ran = (w.reporter.examples.size rescue "?")
+  quit = (w.wants_to_quit rescue "?")
+  warn "[diag at_exit] ran=#{ran} wants_to_quit=#{quit}"
+end
+
 Dir[File.join(__dir__, "support", "**", "*.rb")].each { |f| require f }
 
 RSpec.configure do |config|
