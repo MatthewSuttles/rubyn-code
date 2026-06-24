@@ -27,8 +27,14 @@ RSpec.describe RubynCode::CLI::DaemonRunner do
     allow(renderer).to receive(:success)
     allow(renderer).to receive(:error)
 
-    # Stub infrastructure
+    # Stub infrastructure. ensure_auth! calls load_for_provider — stub it truthy
+    # so the daemon doesn't exit(1) for "no auth" when there's no keychain (CI).
+    # Without this, runner.run calls Kernel#exit, which RSpec does NOT rescue
+    # (SystemExit), terminating the whole suite mid-run. The "exits when auth is
+    # not valid" example overrides this with nil.
     allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(true)
+    allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider)
+      .and_return({ access_token: 'sk-ant-oat-test', source: :keychain })
     allow(RubynCode::LLM::Client).to receive(:new).and_return(llm_client)
     allow(RubynCode::DB::Connection).to receive(:instance).and_return(db)
 
