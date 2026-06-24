@@ -24,9 +24,6 @@ RSpec.describe RubynCode::IDE::Handlers::PromptHandler do
     it "cancels any running thread for that session before dropping state" do
       sessions = handler.instance_variable_get(:@sessions)
       sleeper = Thread.new { sleep 5 }
-      # cancel_session stops this thread by raising Interrupt in it; that's
-      # expected, so don't let Ruby print the "terminated with exception" noise.
-      sleeper.report_on_exception = false
       sessions["sess-2"] = sleeper
 
       handler.reset_session("sess-2")

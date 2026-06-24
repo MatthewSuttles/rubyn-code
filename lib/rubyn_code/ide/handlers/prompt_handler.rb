@@ -58,18 +58,12 @@ module RubynCode
 
           thread.raise(Interrupt)
           begin
-            # Force any interrupt to be delivered *synchronously* inside this
-            # block so the join re-raise (or a stray async Interrupt meant for
-            # the dying thread) is caught by the rescue below — not deferred to
-            # a later checkpoint in this (caller) thread. Without :immediate, a
-            # loaded box can defer delivery until after this method returns,
-            # where it lands in the RSpec runner and is mistaken for a Ctrl-C —
-            # quitting the suite early with a misleading "0 failures".
-            Thread.handle_interrupt(Interrupt => :immediate) do
-              thread.join(2) # give it a moment to clean up
-            end
+            thread.join(2) # give it a moment to clean up
           rescue Interrupt
-            # We asked the thread to stop, so its Interrupt is expected.
+            # We asked the thread to stop, so its Interrupt is expected. If it
+            # lands before the agent installs its own rescue, Thread#join would
+            # otherwise re-raise it into the caller (the cancel path) and, in
+            # tests, escape the example and abort the whole run.
             nil
           end
         end
