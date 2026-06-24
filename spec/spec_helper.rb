@@ -38,6 +38,7 @@ require "webmock/rspec"
 module Kernel
   alias_method :__diag_orig_exit, :exit
   alias_method :__diag_orig_exit_bang, :exit!
+  alias_method :__diag_orig_trap, :trap
 
   def exit(*args)
     Kernel.warn("[diag] EXIT args=#{args.inspect} from:\n  #{caller.first(25).join("\n  ")}")
@@ -47,6 +48,43 @@ module Kernel
   def exit!(*args)
     Kernel.warn("[diag] EXIT! args=#{args.inspect} from:\n  #{caller.first(25).join("\n  ")}")
     __diag_orig_exit_bang(*args)
+  end
+
+  def trap(signal, *args, &block)
+    Kernel.warn("[diag] Kernel#trap(#{signal.inspect}) installed at:\n    #{caller.first(6).join("\n    ")}")
+    if block
+      wrapped = lambda do |*a|
+        Kernel.warn("[diag] Kernel#trap handler FIRED for #{signal.inspect}")
+        block.call(*a)
+      end
+      __diag_orig_trap(signal, *args, &wrapped)
+    else
+      __diag_orig_trap(signal, *args)
+    end
+  end
+end
+
+# The exit(1) above is fired with an EMPTY caller backtrace → it's running inside
+# a signal-trap handler. Wrap trap installation so we can see (a) which signal's
+# handler is being installed and where, and (b) when that handler fires.
+module Signal
+  class << self
+    alias_method :__diag_orig_trap, :trap
+
+    def trap(signal, *args, &block)
+      where = caller.first(6).join("\n    ")
+      Kernel.warn("[diag] Signal.trap(#{signal.inspect}) installed at:\n    #{where}")
+      if block
+        wrapped = lambda do |*a|
+          Kernel.warn("[diag] Signal.trap handler FIRED for #{signal.inspect}")
+          block.call(*a)
+        end
+        __diag_orig_trap(signal, *args, &wrapped)
+      else
+        Kernel.warn("[diag] Signal.trap(#{signal.inspect}) set to non-block #{args.inspect}")
+        __diag_orig_trap(signal, *args)
+      end
+    end
   end
 end
 
