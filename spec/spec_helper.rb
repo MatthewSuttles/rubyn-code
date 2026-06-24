@@ -30,27 +30,18 @@ end
 require "rubyn_code"
 require "webmock/rspec"
 
-# TEMP DIAGNOSTIC (remove once the CI truncation root cause is found): log a
-# backtrace whenever anything sets RSpec's wants_to_quit / wants_to_quit?, and a
-# note if the process receives a real SIGINT. On CI the suite ends early with a
-# clean summary and 0 failures; this reveals which code path triggers it.
-begin
-  diag = Module.new do
-    def wants_to_quit=(value)
-      Kernel.warn("[diag] wants_to_quit=#{value} set from:\n  #{caller.first(15).join("\n  ")}") if value
-      super
-    end
-  end
-  RSpec::Core::World.prepend(diag)
-rescue StandardError => e
-  warn "[diag] could not install wants_to_quit probe: #{e.class}: #{e.message}"
-end
-
+# TEMP DIAGNOSTIC (remove once the CI truncation root cause is found). The CI
+# suite ends early with a clean summary, 0 failures, and wants_to_quit=false —
+# so the process is being terminated mid-run (likely a SystemExit/exit). At exit
+# capture the terminating exception ($!) and its backtrace, which names the
+# exact caller, plus a registered-count baseline from before(:suite).
 at_exit do
+  err = $! # rubocop:disable Style/SpecialGlobalVars
   w = RSpec.world
   ran = (w.reporter.examples.size rescue "?")
   quit = (w.wants_to_quit rescue "?")
-  warn "[diag at_exit] ran=#{ran} wants_to_quit=#{quit}"
+  Kernel.warn "[diag at_exit] ran=#{ran} wants_to_quit=#{quit} terminating=#{err.class}: #{err && err.message}"
+  Kernel.warn "[diag at_exit] backtrace:\n  #{(err.backtrace || []).first(25).join("\n  ")}" if err
 end
 
 Dir[File.join(__dir__, "support", "**", "*.rb")].each { |f| require f }
@@ -62,6 +53,11 @@ RSpec.configure do |config|
 
   config.mock_with :rspec do |mocks|
     mocks.verify_partial_doubles = true
+  end
+
+  config.before(:suite) do
+    n = (RSpec.world.example_groups.sum { |g| g.descendants.sum { |d| d.examples.size } } rescue -1)
+    Kernel.warn "[diag before_suite] registered_examples=#{n}"
   end
 
   config.shared_context_metadata_behavior = :apply_to_host_groups
