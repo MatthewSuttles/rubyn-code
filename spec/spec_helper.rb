@@ -41,7 +41,12 @@ module Kernel
   alias_method :__diag_orig_trap, :trap
 
   def exit(*args)
-    Kernel.warn("[diag] EXIT args=#{args.inspect} from:\n  #{caller.first(25).join("\n  ")}")
+    bt = begin
+      raise "diag"
+    rescue StandardError => e
+      e.backtrace
+    end
+    Kernel.warn("[diag] EXIT args=#{args.inspect} main_thread=#{Thread.current == Thread.main} thread=#{Thread.current}\n  #{(bt || []).first(30).join("\n  ")}")
     __diag_orig_exit(*args)
   end
 
