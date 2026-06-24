@@ -35,13 +35,27 @@ require "webmock/rspec"
 # so the process is being terminated mid-run (likely a SystemExit/exit). At exit
 # capture the terminating exception ($!) and its backtrace, which names the
 # exact caller, plus a registered-count baseline from before(:suite).
+module Kernel
+  alias_method :__diag_orig_exit, :exit
+  alias_method :__diag_orig_exit_bang, :exit!
+
+  def exit(*args)
+    Kernel.warn("[diag] EXIT args=#{args.inspect} from:\n  #{caller.first(25).join("\n  ")}")
+    __diag_orig_exit(*args)
+  end
+
+  def exit!(*args)
+    Kernel.warn("[diag] EXIT! args=#{args.inspect} from:\n  #{caller.first(25).join("\n  ")}")
+    __diag_orig_exit_bang(*args)
+  end
+end
+
 at_exit do
   err = $! # rubocop:disable Style/SpecialGlobalVars
   w = RSpec.world
   ran = (w.reporter.examples.size rescue "?")
   quit = (w.wants_to_quit rescue "?")
   Kernel.warn "[diag at_exit] ran=#{ran} wants_to_quit=#{quit} terminating=#{err.class}: #{err && err.message}"
-  Kernel.warn "[diag at_exit] backtrace:\n  #{(err.backtrace || []).first(25).join("\n  ")}" if err
 end
 
 Dir[File.join(__dir__, "support", "**", "*.rb")].each { |f| require f }
