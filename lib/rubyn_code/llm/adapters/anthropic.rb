@@ -11,7 +11,6 @@ module RubynCode
       class Anthropic < Base
         include JsonParsing
         include PromptCaching
-        include TokenCaching
 
         API_URL = 'https://api.anthropic.com/v1/messages'
         ANTHROPIC_VERSION = '2023-06-01'
@@ -189,7 +188,6 @@ module RubynCode
 
           error_msg = extract_error_message(error_chunks.join)
 
-          invalidate_token_cache! if response.status == 401
           raise Client::AuthExpiredError, "Authentication expired: #{error_msg}" if response.status == 401
           raise Client::PromptTooLongError, "Prompt too long: #{error_msg}" if response.status == 413
 
@@ -274,7 +272,6 @@ module RubynCode
           error_type = body&.dig('error', 'type') || 'api_error'
 
           log_api_error(response)
-          invalidate_token_cache! if response.status == 401
           raise Client::AuthExpiredError, "Authentication expired: #{error_msg}" if response.status == 401
           raise Client::PromptTooLongError, "Prompt too long: #{error_msg}" if response.status == 413
 

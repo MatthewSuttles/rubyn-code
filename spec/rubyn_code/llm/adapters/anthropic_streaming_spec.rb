@@ -144,10 +144,4 @@ RSpec.describe RubynCode::LLM::Adapters::AnthropicStreaming do
       end.to raise_error(described_class::ParseError, /Internal error/)
     end
   end
-
-  describe 'backward compatibility' do
-    it 'is aliased as LLM::Streaming' do
-      expect(RubynCode::LLM::Streaming).to eq(described_class)
-    end
-  end
 end

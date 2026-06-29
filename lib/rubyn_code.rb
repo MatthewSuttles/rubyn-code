@@ -54,7 +54,6 @@ module RubynCode
       autoload :Base, 'rubyn_code/llm/adapters/base'
       autoload :JsonParsing, 'rubyn_code/llm/adapters/json_parsing'
       autoload :PromptCaching, 'rubyn_code/llm/adapters/prompt_caching'
-      autoload :TokenCaching, 'rubyn_code/llm/adapters/token_caching'
       autoload :Anthropic, 'rubyn_code/llm/adapters/anthropic'
       autoload :AnthropicCompatible, 'rubyn_code/llm/adapters/anthropic_compatible'
       autoload :AnthropicStreaming, 'rubyn_code/llm/adapters/anthropic_streaming'
@@ -63,9 +62,6 @@ module RubynCode
       autoload :OpenAICompatible, 'rubyn_code/llm/adapters/openai_compatible'
       autoload :OpenAIMessageTranslator, 'rubyn_code/llm/adapters/openai_message_translator'
     end
-
-    # Backward-compat: LLM::Streaming → Adapters::AnthropicStreaming
-    autoload :Streaming, 'rubyn_code/llm/streaming'
   end
 
   # Layer 1: Agent Loop
@@ -133,8 +129,6 @@ module RubynCode
     autoload :AutoCompact, 'rubyn_code/context/auto_compact'
     autoload :ManualCompact, 'rubyn_code/context/manual_compact'
     autoload :ContextCollapse, 'rubyn_code/context/context_collapse'
-    autoload :ContextBudget, 'rubyn_code/context/context_budget'
-    autoload :SchemaFilter, 'rubyn_code/context/schema_filter'
     autoload :DecisionCompactor, 'rubyn_code/context/decision_compactor'
   end
 
@@ -201,7 +195,6 @@ module RubynCode
   # Layer 10: Protocols
   module Protocols
     autoload :ShutdownHandshake, 'rubyn_code/protocols/shutdown_handshake'
-    autoload :PlanApproval, 'rubyn_code/protocols/plan_approval'
     autoload :InterruptHandler, 'rubyn_code/protocols/interrupt_handler'
   end
 
@@ -266,7 +259,6 @@ module RubynCode
     autoload :Instinct, 'rubyn_code/learning/instinct'
     autoload :InstinctMethods, 'rubyn_code/learning/instinct'
     autoload :Injector, 'rubyn_code/learning/injector'
-    autoload :Shortcut, 'rubyn_code/learning/shortcut'
     autoload :Porter, 'rubyn_code/learning/porter'
   end
 
