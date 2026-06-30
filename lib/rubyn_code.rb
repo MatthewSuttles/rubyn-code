@@ -344,6 +344,7 @@ module RubynCode
       autoload :ChiselDebt, 'rubyn_code/cli/commands/chisel_debt'
       autoload :ChiselGain, 'rubyn_code/cli/commands/chisel_gain'
       autoload :Think, 'rubyn_code/cli/commands/think'
+      autoload :Export, 'rubyn_code/cli/commands/export'
     end
   end
 
