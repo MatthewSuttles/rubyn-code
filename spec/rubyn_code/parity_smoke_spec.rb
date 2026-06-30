@@ -75,9 +75,9 @@ RSpec.describe 'Feature parity smoke (6 gaps)' do
       store = RubynCode::Tools::TodoStore.new
       tool  = RubynCode::Tools::TodoWrite.new(project_root: Dir.pwd, store: store)
       out   = tool.execute(todos: [
-                            { 'content' => 'Add spec', 'status' => 'completed', 'active_form' => 'Adding' },
-                            { 'content' => 'Implement', 'status' => 'in_progress', 'active_form' => 'Doing' }
-                          ])
+                             { 'content' => 'Add spec', 'status' => 'completed', 'active_form' => 'Adding' },
+                             { 'content' => 'Implement', 'status' => 'in_progress', 'active_form' => 'Doing' }
+                           ])
       expect(out).to include('[x] Add spec')
       expect(out).to include('[~] Implement')
       expect(store.current.size).to eq(2)
@@ -133,7 +133,7 @@ RSpec.describe 'Feature parity smoke (6 gaps)' do
         entries = RubynCode::MCP::Discovery.discover(dir)
         names   = entries.map(&:name)
         expect(names).to include('u', 'p')
-        sources = entries.each_with_object({}) { |e, h| h[e.name] = e.source }
+        sources = entries.to_h { |e| [e.name, e.source] }
         expect(sources['u']).to eq(:user)
         expect(sources['p']).to eq(:project)
       end
@@ -155,13 +155,15 @@ RSpec.describe 'Feature parity smoke (6 gaps)' do
         msgs = [
           { role: 'user', content: 'hello' },
           { role: 'assistant', content: [
-              { type: 'thinking', text: 'hmm' },
-              { type: 'text', text: 'hi back' },
-              { type: 'tool_use', name: 'bash', input: { cmd: 'ls' } }
+            { type: 'thinking', text: 'hmm' },
+            { type: 'text', text: 'hi back' },
+            { type: 'tool_use', name: 'bash', input: { cmd: 'ls' } }
           ] }
         ]
-        conversation = double('Conversation'); allow(conversation).to receive(:to_a).and_return(msgs)
-        renderer = double(info: nil, warning: nil); allow(renderer).to receive(:ask).and_return(true)
+        conversation = double('Conversation')
+        allow(conversation).to receive(:to_a).and_return(msgs)
+        renderer = double(info: nil, warning: nil)
+        allow(renderer).to receive(:ask).and_return(true)
         ctx = instance_double(RubynCode::CLI::Commands::Context, conversation: conversation, renderer: renderer)
         RubynCode::CLI::Commands::Export.new.execute([path], ctx)
         body = File.read(path)
@@ -177,8 +179,10 @@ RSpec.describe 'Feature parity smoke (6 gaps)' do
       Dir.mktmpdir do |dir|
         path = File.join(dir, 'x.jsonl')
         msgs = [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'ok' }]
-        conversation = double('Conversation'); allow(conversation).to receive(:to_a).and_return(msgs)
-        renderer = double(info: nil, warning: nil); allow(renderer).to receive(:ask).and_return(true)
+        conversation = double('Conversation')
+        allow(conversation).to receive(:to_a).and_return(msgs)
+        renderer = double(info: nil, warning: nil)
+        allow(renderer).to receive(:ask).and_return(true)
         ctx = instance_double(RubynCode::CLI::Commands::Context, conversation: conversation, renderer: renderer)
         RubynCode::CLI::Commands::Export.new.execute([path, '--jsonl'], ctx)
         lines = File.read(path).split("\n").reject(&:empty?)

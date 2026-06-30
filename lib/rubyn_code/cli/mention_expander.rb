@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'rubyn_code/llm/image_reader'
-require 'base64'
 
 module RubynCode
   module CLI
