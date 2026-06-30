@@ -41,17 +41,31 @@ module RubynCode
         # @return [Boolean]
         def plan_mode? = plan_mode
 
-        # Restrict the tool set for a single agent invocation. The loop is
-        # expected to honor `tools:` in its next build_llm_opts call and
-        # restore the original set after the call returns.
-        def with_allowed_tools(_allowed = nil)
-          yield
-          # nothing to restore here; agent_loop captures snapshot
+        # Restrict the tool set for a single agent invocation. The next
+        # `send_message` call inside the block sees only the tools in
+        # `allowed`; the override is cleared after the call.
+        def with_allowed_tools(allowed = nil, &block)
+          apply_loop_override(:allowed_tools_override=, allowed, &block)
         end
 
         # Apply a one-shot model override for the duration of a block.
-        def with_optional_model(_model_name = nil)
+        def with_optional_model(model_name = nil, &block)
+          apply_loop_override(:model_override=, model_name, &block)
+        end
+
+        private
+
+        # Set an override on the agent loop (when one is wired in) for the
+        # duration of the block, then clear it. Custom commands without
+        # a loop (e.g. test doubles) fall through to a plain yield.
+        def apply_loop_override(method, value)
+          loop = agent_loop
+          return yield unless loop.respond_to?(method)
+
+          loop.public_send(method, value)
           yield
+        ensure
+          loop&.public_send(method, nil) if loop.respond_to?(method)
         end
       end
     end
