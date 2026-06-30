@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 
 module RubynCode
+  # Pulls in ImageBlock so the constant is loaded before ImageReader resolves it.
+  module LLM
+    autoload :ImageBlock, 'rubyn_code/llm/message_builder'
+  end
+
   module LLM
     # Reads image files from disk and returns image content blocks suitable for
     # sending to the LLM as part of a user turn. Supports common raster formats
