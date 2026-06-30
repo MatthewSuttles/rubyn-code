@@ -14,7 +14,10 @@ module RubynCode
 
       # Append a user turn to the conversation.
       #
-      # @param content [String]
+      # @param content [String, Array<Hash>] either a plain string or an
+      #   array of content blocks (text, image, etc.). Strings get wrapped
+      #   as `[{ type: 'text', text: content }]` only if there's a planned
+      #   Array; we keep raw String for backward compatibility with the API.
       # @return [Hash] the appended message
       def add_user_message(content)
         message = { role: 'user', content: content }

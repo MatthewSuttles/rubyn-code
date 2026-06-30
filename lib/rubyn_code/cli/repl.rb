@@ -115,11 +115,12 @@ module RubynCode
         # Checkpoint before the turn (raw input as label), then expand
         # @-mentions so the agent sees referenced file contents.
         @checkpoint_manager&.checkpoint!(label: input, conversation: @conversation)
+        image_blocks = expand_image_mentions(input)
         input = expand_mentions(input)
         @spinner.start
         @streaming_first_chunk = true
 
-        response = @agent_loop.send_message(input)
+        response = @agent_loop.send_message(input, blocks: image_blocks.empty? ? nil : image_blocks)
 
         @spinner.stop
         render_response(response)
@@ -158,6 +159,22 @@ module RubynCode
         expanded
       rescue StandardError
         input
+      end
+
+      # Collect image references from @path/to/image.png style mentions and
+      # return them as a list of LLM::ImageBlock hashes ready for the
+      # Agent::Loop. Falls back to [] when no images are attached.
+      def expand_image_mentions(input)
+        blocks = @mention_expander.expand_images(input)
+        if blocks.empty?
+          []
+        else
+          @renderer.info("🖼  Attached images: #{blocks.size}")
+          # Translate via MessageBuilder for adapter-aware shape
+          RubynCode::LLM::MessageBuilder.new.format_content_blocks(blocks)
+        end
+      rescue StandardError
+        []
       end
 
       def setup_readline!

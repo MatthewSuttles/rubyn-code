@@ -270,7 +270,7 @@ RSpec.describe RubynCode::CLI::REPL do
       repl.send(:handle_message, 'hello world')
 
       expect(spinner).to have_received(:start)
-      expect(agent_loop).to have_received(:send_message).with('hello world')
+      expect(agent_loop).to have_received(:send_message).with('hello world', blocks: nil)
       expect(spinner).to have_received(:stop)
       expect(session_persistence).to have_received(:save_session)
     end
@@ -457,7 +457,7 @@ RSpec.describe RubynCode::CLI::REPL do
 
       repl.run
 
-      expect(agent_loop).to have_received(:send_message).with('hello')
+      expect(agent_loop).to have_received(:send_message).with('hello', blocks: nil)
     end
 
     it 'shows hint on single Ctrl-C' do
