@@ -78,6 +78,7 @@ module RubynCode
   module Tools
     autoload :Base, 'rubyn_code/tools/base'
     autoload :Registry, 'rubyn_code/tools/registry'
+    autoload :TodoStore, 'rubyn_code/tools/todo_store'
     autoload :Schema, 'rubyn_code/tools/schema'
     autoload :Executor, 'rubyn_code/tools/executor'
     autoload :ReadFile, 'rubyn_code/tools/read_file'
@@ -92,6 +93,7 @@ module RubynCode
     autoload :BundleInstall, 'rubyn_code/tools/bundle_install'
     autoload :BundleAdd, 'rubyn_code/tools/bundle_add'
     autoload :Compact, 'rubyn_code/tools/compact'
+    autoload :TodoWrite, 'rubyn_code/tools/todo_write'
     autoload :LoadSkill, 'rubyn_code/tools/load_skill'
     autoload :Task, 'rubyn_code/tools/task'
     autoload :MemorySearch, 'rubyn_code/tools/memory_search'

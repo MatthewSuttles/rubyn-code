@@ -134,6 +134,8 @@ module RubynCode
         @tool_wrapper       = opts[:tool_wrapper]
         @decision_compactor = build_decision_compactor
         @skill_ttl          = Skills::TtlManager.new
+        @todo_store         = opts.fetch(:todo_store, Tools::TodoStore.new)
+        @tool_executor.todo_store = @todo_store
         @session_initialized = false
       end
 
@@ -148,10 +150,14 @@ module RubynCode
       def initialize_session!
         return if @session_initialized || !@project_root
 
+        @todo_store&.clear
         @session_initialized = true
         build_project_profile!
         build_codebase_index!
       end
+
+      # @return [Tools::TodoStore] shared checklist store, exposed for the REPL renderer
+      attr_reader :todo_store
 
       def build_project_profile!
         profile = Config::ProjectProfile.new(project_root: @project_root)

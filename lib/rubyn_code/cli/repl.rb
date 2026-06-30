@@ -97,7 +97,20 @@ module RubynCode
 
       def handle_on_tool_result(name, result)
         @renderer.tool_result(name, result)
+        render_todo_checklist
         @spinner.start
+      end
+
+      # Refresh the in-turn checklist above the spinner after every tool call.
+      # Only printed if the TodoWrite tool has been used in this turn.
+      def render_todo_checklist
+        return unless @agent_loop.respond_to?(:todo_store)
+
+        store = @agent_loop.todo_store
+        return if store.nil? || store.empty?
+        return if @spinner.done
+
+        @renderer.info("☐ Checklist:\n#{store.render}")
       end
 
       def handle_on_text(text)
