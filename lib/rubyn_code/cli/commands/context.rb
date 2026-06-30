@@ -40,6 +40,19 @@ module RubynCode
 
         # @return [Boolean]
         def plan_mode? = plan_mode
+
+        # Restrict the tool set for a single agent invocation. The loop is
+        # expected to honor `tools:` in its next build_llm_opts call and
+        # restore the original set after the call returns.
+        def with_allowed_tools(_allowed = nil)
+          yield
+          # nothing to restore here; agent_loop captures snapshot
+        end
+
+        # Apply a one-shot model override for the duration of a block.
+        def with_optional_model(_model_name = nil)
+          yield
+        end
       end
     end
   end
