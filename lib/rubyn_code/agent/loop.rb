@@ -94,7 +94,25 @@ module RubynCode
         end
       end
 
+      # @return [Tools::TodoStore] shared checklist store, exposed for the REPL renderer
+      attr_reader :todo_store
+
+      # Apply a one-shot model override for the duration of the next LLM call.
+      # Used by `Context#with_optional_model` for custom-command frontmatter.
+      def model_override=(model_name)
+        stripped = model_name.to_s.strip
+        @model_override = stripped.empty? ? nil : stripped
+      end
+
+      # Restrict the available tool set for the next LLM call only.
+      # @param allowed [Array<String>, nil] tool names, or nil to clear the override.
+      def allowed_tools_override=(allowed)
+        @allowed_tools_override = allowed.is_a?(Array) && !allowed.empty? ? allowed : nil
+      end
+
       private
+
+      # Overrides the region above. The internal helpers below are private.
 
       # Decide whether the loop should run another iteration after `iteration`
       # turns. Normally capped at MAX_ITERATIONS, but while a Stop hook (e.g. an
@@ -156,9 +174,6 @@ module RubynCode
         build_codebase_index!
       end
 
-      # @return [Tools::TodoStore] shared checklist store, exposed for the REPL renderer
-      attr_reader :todo_store
-
       def build_project_profile!
         profile = Config::ProjectProfile.new(project_root: @project_root)
         profile.load_or_detect!
@@ -189,6 +204,8 @@ module RubynCode
         @output_recovery_count = 0
         @task_budget_remaining = nil
         @stop_block_active     = false # true while a Stop hook keeps us going
+        @allowed_tools_override = nil   # set by Context#with_allowed_tools
+        @model_override         = nil   # set by Context#with_optional_model
       end
 
       def run_iteration(iteration)

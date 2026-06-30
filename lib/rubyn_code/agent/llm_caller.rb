@@ -25,7 +25,7 @@ module RubynCode
       def build_llm_opts
         opts = {
           messages: @conversation.to_api_format,
-          tools: @plan_mode ? read_only_tool_definitions : tool_definitions,
+          tools: filtered_tool_definitions,
           system: build_system_prompt,
           on_text: @on_text
         }
@@ -47,6 +47,8 @@ module RubynCode
       # Falls back to nil (use client's default) if routing fails.
       # -- guard clauses for provider/mode checks
       def routed_model
+        return @model_override if @model_override
+
         return nil if manual_model_mode?
 
         last_user = last_user_message_text

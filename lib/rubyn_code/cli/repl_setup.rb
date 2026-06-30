@@ -192,11 +192,11 @@ module RubynCode
 
       def setup_mcp_servers!
         @mcp_clients = []
-        server_configs = MCP::Config.load(@project_root)
-        return if server_configs.empty?
+        entries = MCP::Discovery.discover(@project_root)
+        return if entries.empty?
 
-        server_configs.each do |config|
-          connect_mcp_server(config)
+        entries.each do |entry|
+          connect_mcp_server(entry)
         end
 
         at_exit { disconnect_mcp_clients! unless defined?(RSpec) }
@@ -207,7 +207,8 @@ module RubynCode
         client.connect!
         MCP::ToolBridge.bridge(client)
         @mcp_clients << client
-        @renderer.info("MCP server '#{config[:name]}' connected (#{client.tools.size} tools)")
+        source_tag = config.respond_to?(:source) && config.source == :project ? ' [project]' : ' [user]'
+        @renderer.info("MCP server '#{config[:name]}' connected#{source_tag} (#{client.tools.size} tools)")
       rescue StandardError => e
         warn "[MCP] Failed to connect '#{config[:name]}': #{e.message}"
       end
