@@ -5,7 +5,7 @@ module RubynCode
     class Executor
       attr_reader :project_root, :output_compressor, :file_cache
       attr_accessor :llm_client, :background_worker, :on_agent_status, :db, :ask_user_callback,
-                    :codebase_index, :ide_client
+                    :codebase_index, :ide_client, :todo_store
 
       def initialize(project_root:, ide_client: nil)
         @project_root = File.expand_path(project_root)
@@ -63,6 +63,9 @@ module RubynCode
           tool = tool_class.new(project_root: project_root, ide_client: @ide_client)
         else
           tool = tool_class.new(project_root: project_root)
+        end
+        if @todo_store && tool_class.instance_method(:initialize).parameters.any? { |_, name| name == :store }
+          tool.instance_variable_set(:@store, @todo_store)
         end
         inject_dependencies(tool, tool_name)
         tool
