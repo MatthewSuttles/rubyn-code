@@ -19,6 +19,7 @@ RSpec.describe RubynCode::CLI::REPL do
     obj = Object.new
     obj.define_singleton_method(:chat) { |**_| nil }
     obj.define_singleton_method(:model=) { |_m| nil }
+    obj.define_singleton_method(:thinking_budget_tokens=) { |_b| nil }
     obj
   end
   let(:session_persistence) do
