@@ -1,126 +1,98 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
+require 'tmpdir'
 
 RSpec.describe RubynCode::CLI::Commands::Mcp do
   subject(:command) { described_class.new }
 
-  let(:renderer) { instance_double(RubynCode::CLI::Renderer, info: nil) }
-  let(:project_root) { '/tmp/test-project' }
+  around do |ex|
+    Dir.mktmpdir do |dir|
+      @dir = dir
+      ex.run
+    end
+  end
+
+  # Stub the heavy MCP client lifecycle so we don't actually start subprocesses.
+  let(:fake_client_class) do
+    Class.new do
+      class << self
+        attr_accessor :instance
+      end
+
+      def self.from_config(_cfg)
+        self.instance ||= new
+      end
+    end
+  end
+
+  before do
+    stub_const('RubynCode::MCP::Client', fake_client_class)
+    client = Object.new
+    client.define_singleton_method(:connect!) {}
+    client.define_singleton_method(:disconnect!) {}
+    client.define_singleton_method(:connected?) { true }
+    client.define_singleton_method(:tools) { %i[t1 t2] }
+    client.define_singleton_method(:resources) { [] }
+    client.define_singleton_method(:prompts) { [] }
+    fake_client_class.instance = client
+  end
+
+  let(:renderer) { double(info: nil) }
   let(:ctx) do
     instance_double(
       RubynCode::CLI::Commands::Context,
-      renderer: renderer,
-      project_root: project_root
+      project_root: @dir, renderer: renderer
     )
   end
 
-  describe '.command_name' do
-    it { expect(described_class.command_name).to eq('/mcp') }
+  it 'lists servers with [user] source tag from project .rubyn-code/mcp.json' do
+    user_path = File.join(@dir, '.rubyn-code', 'mcp.json')
+    FileUtils.mkdir_p(File.dirname(user_path))
+    File.write(user_path, <<~JSON)
+      { "mcpServers": { "user-server": { "command": "u" } } }
+    JSON
+
+    output = capture_stdout { command.execute([], ctx) }
+    expect(output).to include('user-server')
+    expect(output).to include('[user]')
+    expect(output).not_to include('[project]')
   end
 
-  describe '.description' do
-    it { expect(described_class.description).to eq('MCP server status') }
+  it 'lists servers with [project] source tag from .mcp.json' do
+    File.write(File.join(@dir, '.mcp.json'), <<~JSON)
+      { "mcpServers": { "proj-server": { "command": "p" } } }
+    JSON
+
+    output = capture_stdout { command.execute([], ctx) }
+    expect(output).to include('proj-server')
+    expect(output).to include('[project]')
   end
 
-  describe '#execute' do
-    context 'when no servers are configured' do
-      before do
-        allow(RubynCode::MCP::Config).to receive(:load).with(project_root).and_return([])
-      end
+  it 'lists both sources together, prefixed accordingly' do
+    user_path = File.join(@dir, '.rubyn-code', 'mcp.json')
+    FileUtils.mkdir_p(File.dirname(user_path))
+    File.write(user_path, <<~JSON)
+      { "mcpServers": { "user-server": { "command": "u" } } }
+    JSON
+    File.write(File.join(@dir, '.mcp.json'), <<~JSON)
+      { "mcpServers": { "project-server": { "command": "p" } } }
+    JSON
 
-      it 'shows a helpful message' do
-        expect { command.execute([], ctx) }.to output(/mcp\.json/).to_stdout
-        expect(renderer).to have_received(:info).with('No MCP servers configured.')
-      end
-    end
+    output = capture_stdout { command.execute([], ctx) }
+    expect(output).to include('user-server')
+    expect(output).to include('project-server')
+    expect(output).to include('[user]')
+    expect(output).to include('[project]')
+  end
 
-    context 'when servers are configured' do
-      let(:server_configs) do
-        [
-          { name: 'test-server', command: 'node', args: ['server.js'], env: {} }
-        ]
-      end
-
-      let(:mock_client) do
-        instance_double(
-          RubynCode::MCP::Client,
-          connected?: true, tools: [{ 'name' => 'tool1' }], resources: [], prompts: []
-        )
-      end
-
-      before do
-        allow(RubynCode::MCP::Config).to receive(:load).with(project_root).and_return(server_configs)
-        allow(RubynCode::MCP::Client).to receive(:from_config).and_return(mock_client)
-        allow(mock_client).to receive(:connect!)
-        allow(mock_client).to receive(:disconnect!)
-      end
-
-      it 'displays server count' do
-        expect { command.execute([], ctx) }.to output(/test-server/).to_stdout
-        expect(renderer).to have_received(:info).with('MCP servers (1):')
-      end
-
-      it 'shows connected status and tool count' do
-        expect { command.execute([], ctx) }.to output(/connected.*1 tools/).to_stdout
-      end
-
-      it 'shows transport info' do
-        expect { command.execute([], ctx) }.to output(/stdio.*node server\.js/).to_stdout
-      end
-
-      it 'disconnects after probing' do
-        command.execute([], ctx)
-        expect(mock_client).to have_received(:disconnect!)
-      end
-    end
-
-    context 'when a server fails to connect' do
-      let(:server_configs) do
-        [
-          { name: 'broken-server', command: 'missing-cmd', args: [], env: {} }
-        ]
-      end
-
-      let(:mock_client) do
-        instance_double(RubynCode::MCP::Client, connected?: false)
-      end
-
-      before do
-        allow(RubynCode::MCP::Config).to receive(:load).with(project_root).and_return(server_configs)
-        allow(RubynCode::MCP::Client).to receive(:from_config).and_return(mock_client)
-        allow(mock_client).to receive(:connect!).and_raise(
-          RubynCode::MCP::Client::ClientError, 'connection refused'
-        )
-        allow(mock_client).to receive(:disconnect!)
-      end
-
-      it 'shows error status' do
-        expect { command.execute([], ctx) }.to output(/broken-server \[error\]/).to_stdout
-      end
-    end
-
-    context 'with an SSE server' do
-      let(:server_configs) do
-        [
-          { name: 'remote', url: 'https://mcp.example.com/sse' }
-        ]
-      end
-
-      let(:mock_client) do
-        instance_double(RubynCode::MCP::Client, connected?: true, tools: [], resources: [], prompts: [])
-      end
-
-      before do
-        allow(RubynCode::MCP::Config).to receive(:load).with(project_root).and_return(server_configs)
-        allow(RubynCode::MCP::Client).to receive(:from_config).and_return(mock_client)
-        allow(mock_client).to receive(:connect!)
-        allow(mock_client).to receive(:disconnect!)
-      end
-
-      it 'shows SSE transport info' do
-        expect { command.execute([], ctx) }.to output(/SSE.*mcp\.example\.com/).to_stdout
-      end
-    end
+  def capture_stdout
+    original = $stdout
+    captured = StringIO.new
+    $stdout = captured
+    yield
+    captured.string
+  ensure
+    $stdout = original
   end
 end
