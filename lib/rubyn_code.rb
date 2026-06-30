@@ -254,6 +254,7 @@ module RubynCode
     autoload :ToolBridge, 'rubyn_code/mcp/tool_bridge'
     autoload :ServerExtrasBridge, 'rubyn_code/mcp/server_extras_bridge'
     autoload :Config, 'rubyn_code/mcp/config'
+    autoload :Discovery, 'rubyn_code/mcp/discovery'
   end
 
   # Layer 16: Learning
