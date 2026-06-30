@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require 'rubyn_code/llm/image_reader'
+require 'base64'
+
 module RubynCode
   module CLI
     # Expands `@path/to/file` mentions in user input into inline file content,
@@ -33,6 +36,23 @@ module RubynCode
 
         blocks = resolved.map { |rel, abs| file_block(rel, abs) }
         ["#{input}\n\n#{blocks.join("\n\n")}", resolved.map(&:first)]
+      end
+
+      # Extract image references from input and return them as a list of
+      # LLM::ImageBlock instances. Image files (.png/.jpg/.jpeg/.gif/.webp)
+      # are NOT included in `expand` because they're sent as image content
+      # blocks, not as text fances. Non-image files are returned as nil.
+      #
+      # @param input [String]
+      # @return [Array<LLM::ImageBlock>] resolved image blocks (in order)
+      def expand_images(input)
+        return [] unless input.is_a?(String) && input.include?('@')
+
+        scan(input).filter_map do |rel, abs|
+          next unless LLM::ImageReader.image_extension?(rel)
+
+          LLM::ImageReader.for_path(abs)
+        end
       end
 
       private

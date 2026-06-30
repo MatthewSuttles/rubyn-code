@@ -27,11 +27,32 @@ module RubynCode
           return translate_tool_results(content) if tool_results?(content)
           return translate_assistant_tool_use(content) if role == 'assistant' && tool_use_blocks?(content)
 
+          if content.is_a?(Array) && content.any? { |b| block_type(b) == 'image' }
+            return { role: role, content: translate_user_content_with_images(content) }
+          end
+
           { role: role, content: stringify_content(content) }
         end
 
         def tool_results?(content)
           content.is_a?(Array) && content.any? { |b| block_type(b) == 'tool_result' }
+        end
+
+        # Emit OpenAI multipart content: text blocks stay text, image blocks
+        # become {type: 'image_url', image_url: {url: 'data:<media>;base64,...'}}.
+        def translate_user_content_with_images(content)
+          content.map do |block|
+            case block_type(block)
+            when 'image'
+              source = block[:source] || block['source']
+              media = source[:media_type] || source['media_type']
+              data = source[:data] || source['data']
+              { type: 'image_url', image_url: { url: "data:#{media};base64,#{data}" } }
+            else
+              text = block[:text] || block['text'] || ''
+              { type: 'text', text: text }
+            end
+          end
         end
 
         def tool_use_blocks?(content)

@@ -53,8 +53,11 @@ module RubynCode
       # response is produced or the iteration limit is reached.
       #
       # @param user_input [String]
+      # @param blocks [Array<Hash>, nil] extra content blocks to attach to the
+      #   user message (e.g. image blocks from @-mentions). When non-empty the
+      #   user message is stored as a mixed content array instead of a string.
       # @return [String] the final assistant text response
-      def send_message(user_input)
+      def send_message(user_input, blocks: nil)
         initialize_session!
         check_user_feedback(user_input)
         drain_background_notifications
@@ -62,7 +65,7 @@ module RubynCode
         @decision_compactor&.detect_topic_switch(user_input)
         @skill_ttl&.tick!
         autoload_triggered_skills(user_input)
-        @conversation.add_user_message(user_input)
+        append_user_message(user_input, blocks)
         reset_system_prompt_cache!
         reset_iteration_state
 
@@ -77,6 +80,18 @@ module RubynCode
 
         RubynCode::Debug.warn("Hit iteration limit (#{iteration})")
         max_iterations_warning(iteration)
+      end
+
+      # Append the user turn to the conversation. If image blocks were passed
+      # via `blocks:`, the message is stored as a mixed content array with a
+      # leading text block and the image blocks appended in order.
+      def append_user_message(user_input, blocks)
+        if blocks.is_a?(Array) && !blocks.empty?
+          content = [{ type: 'text', text: user_input.to_s }, *blocks]
+          @conversation.add_user_message(content)
+        else
+          @conversation.add_user_message(user_input)
+        end
       end
 
       private
