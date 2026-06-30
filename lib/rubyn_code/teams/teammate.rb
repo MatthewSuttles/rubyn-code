@@ -21,21 +21,6 @@ module RubynCode
 
       # @return [Boolean] true if this teammate was not spawned by another agent
       def root? = parent_agent_id.nil?
-
-      # @return [Hash]
-      def to_h
-        {
-          id: id,
-          name: name,
-          role: role,
-          persona: persona,
-          model: model,
-          status: status,
-          parent_agent_id: parent_agent_id,
-          metadata: metadata,
-          created_at: created_at
-        }
-      end
     end
   end
 end
