@@ -36,6 +36,8 @@ module RubynCode
             total: UsageTracker::TASK_BUDGET_TOTAL, remaining: @task_budget_remaining
           }
         end
+        budget = @llm_client.respond_to?(:thinking_budget_tokens) ? @llm_client.thinking_budget_tokens.to_i : 0
+        opts[:thinking] = { budget_tokens: budget } if budget.positive?
         opts
       end
 

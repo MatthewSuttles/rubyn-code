@@ -15,20 +15,22 @@ module RubynCode
       class PromptTooLongError < RequestError; end
 
       attr_reader :adapter
-      attr_accessor :model
+      attr_accessor :model, :thinking_budget_tokens
 
       def initialize(model: nil, provider: nil, adapter: nil)
         settings = Config::Settings.new
         @model = model || settings.model
         @provider = provider || settings.provider
         @adapter = adapter || resolve_adapter(@provider)
+        @thinking_budget_tokens = 0
       end
 
       def chat(messages:, tools: nil, system: nil, model: nil, **opts)
         effective_model = model || @model
         max_tokens = opts[:max_tokens] || Config::Defaults::CAPPED_MAX_OUTPUT_TOKENS
+        effective_thinking = opts[:thinking] || current_thinking_hash
 
-        @adapter.chat(
+        kwargs = {
           messages: messages,
           tools: tools,
           system: system,
@@ -36,7 +38,17 @@ module RubynCode
           max_tokens: max_tokens,
           on_text: opts[:on_text],
           task_budget: opts[:task_budget]
-        )
+        }
+        kwargs[:thinking] = effective_thinking if effective_thinking
+
+        @adapter.chat(**kwargs)
+      end
+
+      def current_thinking_hash
+        budget = @thinking_budget_tokens.to_i
+        return nil unless budget.positive?
+
+        { budget_tokens: budget }
       end
 
       def stream(messages:, tools: nil, system: nil, model: nil,

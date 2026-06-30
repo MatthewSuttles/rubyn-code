@@ -6,6 +6,14 @@ module RubynCode
       def type = 'text'
     end
 
+    ThinkingBlock = Data.define(:text) do
+      def type = 'thinking'
+    end
+
+    ImageBlock = Data.define(:media_type, :data) do
+      def type = 'image'
+    end
+
     ToolUseBlock = Data.define(:id, :name, :input) do
       def type = 'tool_use'
     end
@@ -102,6 +110,10 @@ module RubynCode
           case block
           when TextBlock
             { type: 'text', text: block.text }
+          when ThinkingBlock
+            { type: 'thinking', text: block.text }
+          when ImageBlock
+            { type: 'image', source: { type: 'base64', media_type: block.media_type, data: block.data } }
           when ToolUseBlock
             { type: 'tool_use', id: block.id, name: block.name, input: block.input }
           when ToolResultBlock

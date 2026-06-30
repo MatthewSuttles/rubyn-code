@@ -35,6 +35,7 @@ module RubynCode
           @content_blocks = []
           @current_block_index = nil
           @current_text = +''
+          @current_thinking_text = +''
           @current_tool_input_json = +''
           @stop_reason = nil
           @usage = nil
@@ -107,6 +108,8 @@ module RubynCode
           case block['type']
           when 'text'
             @current_text = +(block['text'] || '')
+          when 'thinking'
+            @current_thinking_text = +(block['thinking'] || '')
           when 'tool_use'
             @current_tool_id = block['id']
             @current_tool_name = block['name']
@@ -124,6 +127,10 @@ module RubynCode
             text = delta['text'] || ''
             @current_text << text
             emit(:text_delta, { index: data['index'], text: text })
+          when 'thinking_delta'
+            text = delta['thinking'] || ''
+            @current_thinking_text << text
+            emit(:thinking_delta, { index: data['index'], text: text })
           when 'input_json_delta'
             json_chunk = delta['partial_json'] || ''
             @current_tool_input_json << json_chunk
@@ -167,6 +174,9 @@ module RubynCode
           elsif !@current_text.empty?
             @content_blocks[index] = TextBlock.new(text: @current_text.dup)
             @current_text = +''
+          elsif !@current_thinking_text.empty?
+            @content_blocks[index] = ThinkingBlock.new(text: @current_thinking_text.dup)
+            @current_thinking_text = +''
           end
         end
 

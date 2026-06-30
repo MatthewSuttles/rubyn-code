@@ -30,7 +30,7 @@ module RubynCode
           AVAILABLE_MODELS
         end
 
-        def chat(messages:, model:, max_tokens:, tools: nil, system: nil, on_text: nil, task_budget: nil) # rubocop:disable Metrics/ParameterLists, Lint/UnusedMethodArgument -- LLM adapter interface requires these params
+        def chat(messages:, model:, max_tokens:, tools: nil, system: nil, on_text: nil, task_budget: nil, thinking: nil) # rubocop:disable Metrics/ParameterLists, Lint/UnusedMethodArgument -- LLM adapter interface requires these params
           body = build_request_body(
             messages: messages, model: model, max_tokens: max_tokens,
             tools: tools, system: system

@@ -32,14 +32,15 @@ module RubynCode
           AVAILABLE_MODELS
         end
 
-        def chat(messages:, model:, max_tokens:, tools: nil, system: nil, on_text: nil, task_budget: nil) # rubocop:disable Metrics/ParameterLists -- mirrors LLM adapter interface
+        def chat(messages:, model:, max_tokens:, tools: nil, system: nil, on_text: nil, task_budget: nil, thinking: nil) # rubocop:disable Metrics/ParameterLists -- mirrors LLM adapter interface
           ensure_valid_token!
           use_streaming = on_text && oauth_token?
 
           body = build_request_body(
             messages: messages, tools: tools, system: system,
             model: model, max_tokens: max_tokens,
-            stream: use_streaming, task_budget: task_budget
+            stream: use_streaming, task_budget: task_budget,
+            thinking: thinking
           )
 
           return stream_request(body, on_text) if use_streaming
@@ -246,13 +247,32 @@ module RubynCode
 
         # -- Request body -------------------------------------------------
 
-        def build_request_body(messages:, tools:, system:, model:, max_tokens:, stream:, **_opts) # rubocop:disable Metrics/ParameterLists -- API request builder mirrors Claude API params
-          body = { model: model, max_tokens: max_tokens }
+        def build_request_body(messages:, tools:, system:, model:, max_tokens:, stream:, thinking: nil, **_opts) # rubocop:disable Metrics/ParameterLists -- API request builder mirrors Claude API params
+          body = { model: model, max_tokens: ensure_max_tokens_for_thinking(max_tokens, thinking) }
+          apply_thinking(body, thinking)
           apply_system_blocks(body, system)
           apply_tool_cache(body, tools)
           body[:messages] = add_message_cache_breakpoint(messages)
           body[:stream] = true if stream
           body
+        end
+
+        def apply_thinking(body, thinking)
+          return unless thinking.is_a?(Hash) && thinking[:budget_tokens].to_i.positive?
+
+          body[:thinking] = { type: 'enabled', budget_tokens: thinking[:budget_tokens].to_i }
+        end
+
+        # Anthropic requires max_tokens > budget_tokens. When thinking is on,
+        # raise max_tokens to budget + 1024 if not already large enough.
+        def ensure_max_tokens_for_thinking(max_tokens, thinking)
+          return max_tokens unless thinking.is_a?(Hash)
+
+          budget = thinking[:budget_tokens].to_i
+          return max_tokens if budget.zero?
+          return max_tokens if max_tokens >= budget + 1024
+
+          budget + 1024
         end
 
         # -- Response parsing ---------------------------------------------
@@ -297,6 +317,7 @@ module RubynCode
           (blocks || []).filter_map do |block|
             case block['type']
             when 'text' then TextBlock.new(text: block['text'])
+            when 'thinking' then ThinkingBlock.new(text: block['thinking'] || block['text'])
             when 'tool_use'
               ToolUseBlock.new(id: block['id'], name: block['name'], input: block['input'])
             end

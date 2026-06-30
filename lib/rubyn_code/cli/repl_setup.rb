@@ -29,6 +29,7 @@ module RubynCode
 
       def setup_core_services!
         @llm_client = LLM::Client.new
+        @llm_client.thinking_budget_tokens = Config::Settings.new.get('thinking_budget_tokens', 0).to_i
         @conversation = Agent::Conversation.new
         @tool_executor = Tools::Executor.new(project_root: @project_root)
         @context_manager = Context::Manager.new(llm_client: @llm_client)
