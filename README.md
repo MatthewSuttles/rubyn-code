@@ -69,6 +69,19 @@ Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code f
 - **IDE-ready** — works in the terminal and inside VS Code with full bidirectional communication
 - **Extensible** — connect external tool servers via MCP, add custom skills, or wire up your own providers
 
+## Claude Code Feature Parity
+
+Phase 4 ships six parity features with Claude Code:
+
+- **Extended thinking** — `/think <budget>` toggles a per-session reasoning budget; the Anthropic adapter emits `thinking: {type: 'enabled', budget_tokens}` on the wire.
+- **Image / vision input** — `@chart.png` (and `.jpg` / `.jpeg` / `.gif` / `.webp`) becomes a real image content block attached to the user turn; Anthropic and OpenAI each emit their native shape.
+- **TodoWrite live checklist** — `TodoWrite` tool; the checklist refreshes above the spinner on every tool result so you see in-turn progress at a glance.
+- **Custom-command frontmatter** — `argument-hint`, `allowed-tools`, and `model:` keys in `~/.rubyn-code/commands/*.md`; the loop honors the per-prompt tool restriction and model override.
+- **`.mcp.json` auto-discovery** — project-root MCP servers flow into the REPL automatically; `/mcp` shows entries prefixed `[project]` or `[user]`. OAuth for URL transports is still deferred.
+- **`/export` transcript** — `/export <path>` writes the conversation as Markdown (default) or `--jsonl` for tooling.
+
+See `docs/04-feature-parity/` for per-feature design + tasks docs.
+
 ## Install
 
 Requires **Ruby 4.0.2+**. Install with your latest Ruby, then pin it so it works in every project:
