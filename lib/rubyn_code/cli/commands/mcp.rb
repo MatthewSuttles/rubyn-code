@@ -8,35 +8,59 @@ module RubynCode
         def self.description = 'MCP server status'
 
         def execute(_args, ctx)
-          configs = load_configs(ctx.project_root)
+          entries = load_entries(ctx.project_root)
 
-          if configs.empty?
+          if entries.empty?
             ctx.renderer.info('No MCP servers configured.')
             puts '  Add servers to .rubyn-code/mcp.json — see docs/MCP.md for details.'
             return
           end
 
-          ctx.renderer.info("MCP servers (#{configs.size}):")
+          ctx.renderer.info("MCP servers (#{entries.size}):")
           puts
 
-          configs.each { |cfg| render_server(cfg) }
+          entries.each { |entry| render_server(entry) }
         end
 
         private
 
-        def load_configs(project_root)
-          MCP::Config.load(project_root)
+        # Load merged user + project entries via MCP::Discovery so the
+        # output can show which servers came from `~/.rubyn-code/mcp.json`
+        # vs the project-root `.mcp.json`.
+        def load_entries(project_root)
+          MCP::Discovery.discover(project_root)
         end
 
-        def render_server(cfg)
+        def source_label(source)
+          case source
+          when :project then '[project]'
+          when :user    then '[user]'
+          else               '[-]'
+          end
+        end
+
+        def render_server(entry)
+          cfg = entry_to_config(entry)
           client = build_client(cfg)
           status, counts = probe_server(client)
           icon = status_icon(status)
+          label = source_label(entry.respond_to?(:source) ? entry.source : :user)
 
-          puts "  #{icon} #{cfg[:name]} [#{status}]#{capability_label(counts)}"
+          puts "  #{icon} #{entry.name} #{label} [#{status}]#{capability_label(counts)}"
           render_transport_info(cfg)
         ensure
           client&.disconnect! if client&.connected?
+        end
+
+        # Discovery::Entry → Config hash shape so existing renderers work.
+        def entry_to_config(entry)
+          {
+            name: entry.name,
+            command: entry.command,
+            args: entry.args,
+            env: entry.env,
+            url: entry.url
+          }
         end
 
         def capability_label(counts)
