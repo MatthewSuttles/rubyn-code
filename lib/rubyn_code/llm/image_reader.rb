@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'base64'
+
 module RubynCode
   # Pulls in ImageBlock so the constant is loaded before ImageReader resolves it.
   module LLM

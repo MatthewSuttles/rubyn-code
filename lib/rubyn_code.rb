@@ -47,6 +47,10 @@ module RubynCode
   module LLM
     autoload :Client, 'rubyn_code/llm/client'
     autoload :MessageBuilder, 'rubyn_code/llm/message_builder'
+    autoload :TextBlock,     'rubyn_code/llm/message_builder'
+    autoload :ThinkingBlock, 'rubyn_code/llm/message_builder'
+    autoload :ImageBlock,    'rubyn_code/llm/message_builder'
+    autoload :ToolUseBlock,  'rubyn_code/llm/message_builder'
     autoload :ImageReader, 'rubyn_code/llm/image_reader'
     autoload :ModelRouter, 'rubyn_code/llm/model_router'
 
