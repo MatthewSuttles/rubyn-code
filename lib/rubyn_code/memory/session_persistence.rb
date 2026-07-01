@@ -303,7 +303,7 @@ module RubynCode
           CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-            role TEXT NOT NULL CHECK(role IN ('system','user','assistant')),
+            role TEXT NOT NULL CHECK(role IN ('system','user','assistant','tool','function')),
             content TEXT,
             tool_calls TEXT,
             tool_use_id TEXT,
