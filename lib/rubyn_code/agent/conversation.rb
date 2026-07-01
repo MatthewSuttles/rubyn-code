@@ -158,6 +158,13 @@ module RubynCode
         reset_derived_state!
       end
 
+      # Alias for `messages`. Common shorthand for callers that want to
+      # treat the conversation as an Array of message hashes.
+      def to_a
+        @messages
+      end
+      alias to_ary to_a
+
       private
 
       # Derived bookkeeping kept in sync with @messages so hot paths stay
