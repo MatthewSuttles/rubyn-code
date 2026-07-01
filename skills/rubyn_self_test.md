@@ -449,6 +449,146 @@ fast and need no API calls.
   '
   ```
 
+#### 17k. Extended thinking + `/think` toggle (PRs #132, #138)
+- **bash**: confirms `LLM::ThinkingBlock` is defined, the Anthropic adapter
+  translates `thinking: {budget_tokens}` into the request body, and `/think`
+  toggles state on `LLM::Client`. PASS if the final line is `THINKING: PASS`.
+
+  ```bash
+  bundle exec ruby -Ilib -rrubyn_code -rrubyn_code/llm/message_builder -e '
+    tb = RubynCode::LLM::ThinkingBlock.new(text: "plan")
+    adapter = RubynCode::LLM::Adapters::Anthropic.allocate
+    body = {}
+    adapter.send(:apply_thinking, body, budget_tokens: 4096)
+    client = RubynCode::LLM::Client.allocate
+    client.thinking_budget_tokens = 4096
+    ok = (tb.type == "thinking") &&
+         (body[:thinking] == { type: "enabled", budget_tokens: 4096 }) &&
+         (client.thinking_budget_tokens == 4096)
+    puts(ok ? "THINKING: PASS" : "THINKING: FAIL")
+  '
+  ```
+
+#### 17l. Image / vision input (`@image.png`) (PRs #133, #140, #141)
+- **bash**: confirms `LLM::ImageBlock`, `LLM::ImageReader`, and
+  `MentionExpander#expand_images` are wired and base64-encode PNGs.
+  PASS if the final line is `IMAGES: PASS`.
+
+  ```bash
+  bundle exec ruby -Ilib -rrubyn_code -rrubyn_code/llm/message_builder -e '
+    require "tmpdir"
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "p.png")
+      File.binwrite(path, "\x89PNG\r\n\x1a\n".dup)
+      block = RubynCode::LLM::ImageReader.for_path(path)
+      ex = RubynCode::CLI::MentionExpander.new(project_root: dir).expand_images("look @p.png")
+      ok = (block.is_a?(RubynCode::LLM::ImageBlock)) &&
+           (block.media_type == "image/png") &&
+           (ex.size == 1)
+      puts(ok ? "IMAGES: PASS" : "IMAGES: FAIL")
+    end
+  '
+  ```
+
+#### 17m. TodoWrite live checklist (PR #134)
+- **bash**: confirms `Tools::TodoWrite` is registered and mutates a shared
+  `Tools::TodoStore`. PASS if the final line is `TODOWRITE: PASS`.
+
+  ```bash
+  bundle exec ruby -Ilib -rrubyn_code -rrubyn_code/tools/todo_write -rrubyn_code/tools/todo_store -e '
+    store = RubynCode::Tools::TodoStore.new
+    tool  = RubynCode::Tools::TodoWrite.new(project_root: Dir.pwd, store: store)
+    out   = tool.execute(todos: [{ "content" => "a", "status" => "in_progress", "active_form" => "A" }])
+    ok = (out.include?("[~] a")) && (store.current.first[:status] == "in_progress") &&
+         (RubynCode::Tools::Registry.get("TodoWrite") == RubynCode::Tools::TodoWrite)
+    puts(ok ? "TODOWRITE: PASS" : "TODOWRITE: FAIL")
+  '
+  ```
+
+#### 17n. Custom-command frontmatter (argument-hint, allowed-tools, model:) (PRs #135, #138)
+- **bash**: confirms `CustomCommand` exposes all three frontmatter keys and
+  `Agent::Loop` honors the per-prompt override setters.
+  PASS if the final line is `FRONTMATTER: PASS`.
+
+  ```bash
+  bundle exec ruby -Ilib -rrubyn_code -rrubyn_code/agent/loop -e '
+    loop = RubynCode::Agent::Loop.allocate
+    loop.allowed_tools_override = %w[bash read]
+    loop.model_override = "claude-opus-4-8"
+    at = loop.instance_variable_get(:@allowed_tools_override)
+    mo = loop.instance_variable_get(:@model_override)
+    cmd = RubynCode::CLI::Commands::CustomCommand.new(
+      name: "d", description: "d", body: "b",
+      argument_hint: "[env]", allowed_tools: %w[bash read], model: "claude-opus-4-8"
+    )
+    ok = (at == %w[bash read]) && (mo == "claude-opus-4-8") &&
+         (cmd.argument_hint == "[env]") && (cmd.allowed_tools == %w[bash read]) &&
+         (cmd.model == "claude-opus-4-8")
+    puts(ok ? "FRONTMATTER: PASS" : "FRONTMATTER: FAIL")
+  '
+  ```
+
+#### 17o. `.mcp.json` auto-discovery (PRs #136, #138, #139)
+- **bash**: writes a project-root `.mcp.json`, calls `MCP::Discovery.discover`,
+  and asserts the entry is tagged `:project`.
+  PASS if the final line is `MCP-DISCOVERY: PASS`.
+
+  ```bash
+  bundle exec ruby -Ilib -rrubyn_code -rrubyn_code/mcp/discovery -e '
+    require "tmpdir"; require "json"
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, ".mcp.json"),
+                 JSON.generate(mcpServers: { "p" => { command: "p" } }))
+      entries = RubynCode::MCP::Discovery.discover(dir)
+      ok = (entries.any? { |e| e.name == "p" && e.source == :project })
+      puts(ok ? "MCP-DISCOVERY: PASS" : "MCP-DISCOVERY: FAIL")
+    end
+  '
+  ```
+
+#### 17p. `/export` transcript (markdown / jsonl) (PR #137)
+- **bash**: drives `Commands::Export` against a synthetic conversation with
+  a `thinking` block and a `tool_use`. Writes a markdown file and asserts
+  the file contains role sections, the thinking `<details>`, and the
+  fenced-JSON tool_use. PASS if the final line is `EXPORT: PASS`.
+
+  ```bash
+  bundle exec ruby -Ilib -rrubyn_code -rrubyn_code/cli/commands/export -e '
+    require "tmpdir"
+    Dir.mktmpdir do |dir|
+      msgs = [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: [
+          { type: "thinking", text: "plan" },
+          { type: "text",     text: "ok" },
+          { type: "tool_use", name: "bash", input: { cmd: "ls" } }
+        ] }
+      ]
+      conv = Object.new
+      conv.define_singleton_method(:to_a) { msgs }
+      renderer = Object.new
+      renderer.define_singleton_method(:info)    { |*_| nil }
+      renderer.define_singleton_method(:warning) { |*_| nil }
+      renderer.define_singleton_method(:ask)     { |*_| true }
+      ctx = RubynCode::CLI::Commands::Context.new(
+        renderer: renderer, conversation: conv, agent_loop: nil,
+        context_manager: nil, budget_enforcer: nil, llm_client: nil,
+        db: nil, session_id: nil, project_root: nil, skill_loader: nil,
+        session_persistence: nil, background_worker: nil, permission_tier: nil,
+        plan_mode: false, message_handler: nil, hook_registry: nil,
+        checkpoint_manager: nil
+      )
+      path = File.join(dir, "x.md")
+      RubynCode::CLI::Commands::Export.new.execute([path], ctx)
+      body = File.read(path)
+      ok = body.include?("## User") &&
+           body.include?("<details><summary>thinking</summary>") &&
+           body.include?("[tool: bash]")
+      puts(ok ? "EXPORT: PASS" : "EXPORT: FAIL")
+    end
+  '
+  ```
+
 ### 18. Chisel — Minimal-Code Enforcement (opt-in)
 
 Chisel is rubyn-code's "write the minimum that works" layer. It is **off by
