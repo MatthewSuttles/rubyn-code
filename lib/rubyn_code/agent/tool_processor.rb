@@ -52,6 +52,16 @@ module RubynCode
         Tools::Registry.all.select { |t| PLAN_MODE_RISK_LEVELS.include?(t::RISK_LEVEL) }.map(&:to_schema)
       end
 
+      # Tool definitions for the next LLM call: plan mode narrows to
+      # read-only tools; a per-turn allowed-tools override (custom-command
+      # frontmatter, set via Loop#allowed_tools_override=) narrows by name.
+      def filtered_tool_definitions
+        defs = @plan_mode ? read_only_tool_definitions : tool_definitions
+        return defs unless @allowed_tools_override
+
+        DynamicToolSchema.filter(defs, active_names: @allowed_tools_override)
+      end
+
       # -- tool dispatch with budget + signals
       def process_tool_calls(tool_calls)
         aggregate_chars = 0

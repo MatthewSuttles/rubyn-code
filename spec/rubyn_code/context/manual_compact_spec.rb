@@ -38,7 +38,7 @@ RSpec.describe RubynCode::Context::ManualCompact do
 
       expect(llm_client).to have_received(:chat).with(
         messages: [hash_including(content: a_string_including('context compaction assistant'))],
-        model: 'claude-sonnet-4-6'
+        model: 'claude-sonnet-5'
       )
     end
 
@@ -46,7 +46,7 @@ RSpec.describe RubynCode::Context::ManualCompact do
       described_class.call(messages, llm_client: llm_client)
 
       expect(llm_client).to have_received(:chat).with(
-        hash_including(model: 'claude-sonnet-4-6')
+        hash_including(model: 'claude-sonnet-5')
       )
       # Ensure the old date-stamped ID is not used
       expect(llm_client).not_to have_received(:chat).with(
@@ -59,7 +59,7 @@ RSpec.describe RubynCode::Context::ManualCompact do
 
       expect(llm_client).to have_received(:chat).with(
         messages: [hash_including(content: a_string_including('Focus on database changes'))],
-        model: 'claude-sonnet-4-6'
+        model: 'claude-sonnet-5'
       )
     end
 
@@ -68,7 +68,7 @@ RSpec.describe RubynCode::Context::ManualCompact do
 
       expect(llm_client).to have_received(:chat).with(
         messages: [hash_including(content: a_string_excluding('Additional focus'))],
-        model: 'claude-sonnet-4-6'
+        model: 'claude-sonnet-5'
       )
     end
 
@@ -77,7 +77,7 @@ RSpec.describe RubynCode::Context::ManualCompact do
 
       expect(llm_client).to have_received(:chat).with(
         messages: [hash_including(content: a_string_excluding('Additional focus'))],
-        model: 'claude-sonnet-4-6'
+        model: 'claude-sonnet-5'
       )
     end
 
