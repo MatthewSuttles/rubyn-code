@@ -27,7 +27,7 @@ module RubynCode
           Commands::Megaplan, Commands::Goal, Commands::Loop,
           Commands::Agents, Commands::Learning, Commands::Rewind,
           Commands::Chisel, Commands::ChiselReview, Commands::ChiselAudit,
-          Commands::ChiselDebt, Commands::ChiselGain, Commands::Think, Commands::Export
+          Commands::ChiselDebt, Commands::ChiselGain, Commands::Think, Commands::Effort, Commands::Export
         ].each { |cmd| @command_registry.register(cmd) }
         register_custom_commands!
       end
