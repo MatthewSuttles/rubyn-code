@@ -29,6 +29,18 @@ module LLMStubs
   def stub_claude_sequential_responses(*responses)
     allow(llm_client).to receive(:chat).and_return(*responses)
   end
+
+  def stub_claude_refusal_response(category: "cyber")
+    response = RubynCode::LLM::Response.new(
+      id: "msg_test_#{SecureRandom.hex(4)}",
+      content: [],
+      stop_reason: "refusal",
+      stop_details: { "category" => category },
+      usage: RubynCode::LLM::Usage.new(input_tokens: 100, output_tokens: 0)
+    )
+    allow(llm_client).to receive(:chat).and_return(response)
+    response
+  end
 end
 
 RSpec.configure do |config|

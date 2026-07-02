@@ -212,13 +212,29 @@ module RubynCode
         log_iteration(iteration)
         @context_manager.advance_turn!
         compact_if_needed # ensure context is under threshold before LLM call
-        response   = call_llm
+        response = call_llm
+        return handle_refusal(response) if extract_stop_reason(response) == 'refusal'
+
         tool_calls = extract_tool_calls(response)
         log_response(response, tool_calls)
 
         return handle_text_response(response) if tool_calls.empty?
 
         handle_tool_response(response, tool_calls, iteration)
+      end
+
+      # Claude's safety classifiers declined the request outright (HTTP 200,
+      # stop_reason: "refusal"). Surface a clear message instead of falling
+      # through to text/empty-response handling, which would misread the
+      # empty or partial content as "waiting on background jobs".
+      def handle_refusal(response)
+        details = extract_stop_details(response)
+        category = details.is_a?(Hash) ? (details['category'] || details[:category]) : nil
+        RubynCode::Debug.llm("Refusal: category=#{category || 'unknown'}")
+
+        message = "Claude's safety system declined this request (category: #{category || 'unknown'})."
+        @conversation.add_assistant_message([{ type: 'text', text: message }])
+        message
       end
 
       def log_iteration(iteration)

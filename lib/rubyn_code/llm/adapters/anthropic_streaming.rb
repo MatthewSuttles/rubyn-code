@@ -38,6 +38,7 @@ module RubynCode
           @current_thinking_text = +''
           @current_tool_input_json = +''
           @stop_reason = nil
+          @stop_details = nil
           @usage = nil
         end
 
@@ -52,6 +53,7 @@ module RubynCode
             id: @response_id,
             content: @content_blocks.compact,
             stop_reason: @stop_reason,
+            stop_details: @stop_details,
             usage: @usage
           )
         end
@@ -148,6 +150,7 @@ module RubynCode
         def handle_message_delta(data)
           delta = data['delta'] || {}
           @stop_reason = delta['stop_reason'] if delta['stop_reason']
+          @stop_details = delta['stop_details'] if delta['stop_details']
           update_output_tokens(data['usage']) if data['usage']
           emit(:message_delta, data)
         end

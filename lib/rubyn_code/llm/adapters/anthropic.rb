@@ -17,6 +17,13 @@ module RubynCode
         MAX_RETRIES = 3
         RETRY_DELAYS = [2, 5, 10].freeze
 
+        # Fable/Mythos models opt into a server-side Opus 4.8 fallback by
+        # default: a declined request is transparently re-served by the
+        # fallback model in the same call. No config toggle — hardcoded for
+        # this model family only.
+        FALLBACK_ELIGIBLE_MODELS = /\Aclaude-(fable|mythos)/
+        FALLBACK_BETA = 'server-side-fallback-2026-06-01'
+
         TASK_BUDGET_BETA = 'task-budgets-2026-03-13'
         TASK_BUDGET_MIN_TOKENS = 20_000 # API minimum; below this, task_budget is omitted entirely
         TASK_BUDGET_MODELS = /\Aclaude-(fable|mythos|sonnet-5|opus-4-[78])/
@@ -243,9 +250,11 @@ module RubynCode
 
         def apply_oauth_headers(req, body)
           req.headers['Authorization'] = "Bearer #{access_token}"
-          # The subscription-auth beta must stay present, so a task budget is appended rather than replacing it.
-          req.headers['anthropic-beta'] =
-            task_budget_on_wire?(body) ? "oauth-2025-04-20,#{TASK_BUDGET_BETA}" : 'oauth-2025-04-20'
+          # The subscription-auth beta must stay present, so feature betas append rather than replace.
+          betas = ['oauth-2025-04-20']
+          betas << TASK_BUDGET_BETA if task_budget_on_wire?(body)
+          betas << FALLBACK_BETA if body[:fallbacks]
+          req.headers['anthropic-beta'] = betas.join(',')
           req.headers['x-app'] = 'cli'
           req.headers['User-Agent'] = 'claude-code/2.1.79'
           req.headers['X-Claude-Code-Session-Id'] = session_id
@@ -254,7 +263,10 @@ module RubynCode
 
         def apply_api_key_headers(req, body)
           req.headers['x-api-key'] = access_token
-          req.headers['anthropic-beta'] = TASK_BUDGET_BETA if task_budget_on_wire?(body)
+          betas = []
+          betas << TASK_BUDGET_BETA if task_budget_on_wire?(body)
+          betas << FALLBACK_BETA if body[:fallbacks]
+          req.headers['anthropic-beta'] = betas.join(',') unless betas.empty?
         end
 
         def task_budget_on_wire?(body)
@@ -275,9 +287,16 @@ module RubynCode
           apply_task_budget(body, task_budget, model)
           apply_system_blocks(body, system)
           apply_tool_cache(body, tools)
+          apply_fallbacks(body, model)
           body[:messages] = add_message_cache_breakpoint(messages)
           body[:stream] = true if stream
           body
+        end
+
+        def apply_fallbacks(body, model)
+          return unless model.to_s.match?(FALLBACK_ELIGIBLE_MODELS)
+
+          body[:fallbacks] = [{ model: 'claude-opus-4-8' }]
         end
 
         # Advisory pacing signal only — Claude sees a running countdown and paces
@@ -359,7 +378,10 @@ module RubynCode
         def build_api_response(body)
           content = parse_content_blocks(body['content'])
           usage = parse_usage(body['usage'])
-          Response.new(id: body['id'], content: content, stop_reason: body['stop_reason'], usage: usage)
+          Response.new(
+            id: body['id'], content: content, stop_reason: body['stop_reason'],
+            stop_details: body['stop_details'], usage: usage
+          )
         end
 
         def parse_content_blocks(blocks)

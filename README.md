@@ -71,7 +71,7 @@ Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code f
 
 ## Claude Code Feature Parity
 
-Phase 4 ships eight parity features with Claude Code:
+Phase 4 ships nine parity features with Claude Code:
 
 - **Extended thinking** — `/think <budget>` toggles per-session reasoning; the Anthropic adapter emits `thinking: {type: 'adaptive'}` on Claude 4.6+ models (`{type: 'enabled', budget_tokens}` on older ones).
 - **Reasoning effort** — `/effort <low|medium|high|xhigh|max>` sets the request-level reasoning depth; the Anthropic adapter emits `output_config: {effort}` on the wire. GA on Claude 4.6+ (Opus 4.6/4.7/4.8, Sonnet 4.6/5, Fable 5); `xhigh` needs Opus 4.7+ / Sonnet 5 / Fable 5. Model default is `high`.
@@ -81,6 +81,7 @@ Phase 4 ships eight parity features with Claude Code:
 - **Custom-command frontmatter** — `argument-hint`, `allowed-tools`, and `model:` keys in `~/.rubyn-code/commands/*.md`; the loop honors the per-prompt tool restriction and model override.
 - **`.mcp.json` auto-discovery** — project-root MCP servers flow into the REPL automatically; `/mcp` shows entries prefixed `[project]` or `[user]`. OAuth for URL transports is still deferred.
 - **`/export` transcript** — `/export <path>` writes the conversation as Markdown (default) or `--jsonl` for tooling.
+- **Fable 5 refusal handling** — a declined request (`stop_reason: "refusal"`) surfaces a clear message instead of an empty turn; `claude-fable-5` / `claude-mythos-5` requests opt into a server-side Opus 4.8 fallback by default, so most refusals are transparently re-served in the same call.
 
 See `docs/04-feature-parity/` for per-feature design + tasks docs.
 

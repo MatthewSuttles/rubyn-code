@@ -32,7 +32,11 @@ module RubynCode
       end
     end
 
-    Response = Data.define(:id, :content, :stop_reason, :usage) do
+    Response = Data.define(:id, :content, :stop_reason, :stop_details, :usage) do
+      def initialize(id:, content:, stop_reason:, usage:, stop_details: nil)
+        super
+      end
+
       def text
         content.select { |b| b.type == 'text' }.map(&:text).join
       end
@@ -43,6 +47,10 @@ module RubynCode
 
       def tool_use?
         stop_reason == 'tool_use'
+      end
+
+      def refusal?
+        stop_reason == 'refusal'
       end
     end
 
