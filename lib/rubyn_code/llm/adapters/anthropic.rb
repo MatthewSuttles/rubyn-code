@@ -24,9 +24,17 @@ module RubynCode
         AVAILABLE_MODELS = %w[
           claude-fable-5
           claude-opus-4-8
-          claude-sonnet-4-20250514
-          claude-haiku-4-20250506
+          claude-opus-4-7
+          claude-opus-4-6
+          claude-sonnet-5
+          claude-sonnet-4-6
+          claude-haiku-4-5
         ].freeze
+
+        # Models on the adaptive-thinking API surface (Claude 4.6+).
+        # budget_tokens is removed there and returns a 400; older models
+        # (Haiku 4.5, Sonnet/Opus 4.5 and earlier) still take enabled + budget.
+        ADAPTIVE_THINKING_MODELS = /\Aclaude-(fable|mythos|opus-4-[678]|sonnet-5|sonnet-4-6)/
 
         def provider_name
           'anthropic'
@@ -36,7 +44,8 @@ module RubynCode
           AVAILABLE_MODELS
         end
 
-        def chat(messages:, model:, max_tokens:, tools: nil, system: nil, on_text: nil, task_budget: nil, thinking: nil) # rubocop:disable Metrics/ParameterLists -- mirrors LLM adapter interface
+        def chat(messages:, model:, max_tokens:, tools: nil, system: nil, on_text: nil, # rubocop:disable Metrics/ParameterLists -- mirrors LLM adapter interface
+                 task_budget: nil, thinking: nil, effort: nil)
           ensure_valid_token!
           use_streaming = on_text && oauth_token?
 
@@ -44,7 +53,7 @@ module RubynCode
             messages: messages, tools: tools, system: system,
             model: model, max_tokens: max_tokens,
             stream: use_streaming, task_budget: task_budget,
-            thinking: thinking
+            thinking: thinking, effort: effort
           )
 
           return stream_request(body, on_text) if use_streaming
@@ -259,9 +268,10 @@ module RubynCode
         # -- Request body -------------------------------------------------
 
         def build_request_body(messages:, tools:, system:, model:, max_tokens:, stream:, # rubocop:disable Metrics/ParameterLists -- API request builder mirrors Claude API params
-                               thinking: nil, task_budget: nil, **_opts)
+                               thinking: nil, effort: nil, task_budget: nil, **_opts)
           body = { model: model, max_tokens: ensure_max_tokens_for_thinking(max_tokens, thinking) }
           apply_thinking(body, thinking)
+          apply_effort(body, effort)
           apply_task_budget(body, task_budget, model)
           apply_system_blocks(body, system)
           apply_tool_cache(body, tools)
@@ -280,13 +290,26 @@ module RubynCode
           total = task_budget[:remaining].to_i
           return if total < TASK_BUDGET_MIN_TOKENS
 
-          body[:output_config] = { task_budget: { type: 'tokens', total: total } }
+          (body[:output_config] ||= {})[:task_budget] = { type: 'tokens', total: total }
         end
 
         def apply_thinking(body, thinking)
           return unless thinking.is_a?(Hash) && thinking[:budget_tokens].to_i.positive?
 
-          body[:thinking] = { type: 'enabled', budget_tokens: thinking[:budget_tokens].to_i }
+          body[:thinking] =
+            if body[:model].to_s.match?(ADAPTIVE_THINKING_MODELS)
+              { type: 'adaptive' }
+            else
+              { type: 'enabled', budget_tokens: thinking[:budget_tokens].to_i }
+            end
+        end
+
+        # Merges into `output_config` (rather than assigning a whole hash) so
+        # this composes with other output_config keys, e.g. task_budget.
+        def apply_effort(body, effort)
+          return unless effort
+
+          (body[:output_config] ||= {})[:effort] = effort
         end
 
         # Anthropic requires max_tokens > budget_tokens. When thinking is on,

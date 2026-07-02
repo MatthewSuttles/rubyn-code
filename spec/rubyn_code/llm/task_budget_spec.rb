@@ -21,6 +21,12 @@ RSpec.describe 'Task budget plumbing' do
         end
       end
 
+      it 'merges into an existing output_config hash (e.g. alongside effort)' do
+        body = { output_config: { effort: 'high' } }
+        adapter.send(:apply_task_budget, body, { total: 100_000, remaining: 42_000 }, 'claude-opus-4-8')
+        expect(body[:output_config]).to eq(effort: 'high', task_budget: { type: 'tokens', total: 42_000 })
+      end
+
       it 'leaves body untouched for an unsupported model (e.g. claude-haiku-4-5)' do
         body = { model: 'm' }
         adapter.send(:apply_task_budget, body, { total: 100_000, remaining: 42_000 }, 'claude-haiku-4-5')

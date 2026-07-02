@@ -27,6 +27,32 @@ RSpec.describe 'Agent::Loop per-turn overrides' do
     end
   end
 
+  describe '#filtered_tool_definitions' do
+    # Regression: PR #138 pointed build_llm_opts at this method without
+    # defining it — every real LLM call raised NoMethodError. Calling it
+    # on a real Loop (not a fake) is the point of these examples.
+    let(:defs) { [{ name: 'bash' }, { name: 'read_file' }, { name: 'write_file' }] }
+
+    before do
+      agent_loop.instance_variable_set(:@plan_mode, false)
+      allow(agent_loop).to receive_messages(tool_definitions: defs, read_only_tool_definitions: [defs[1]])
+    end
+
+    it 'returns full tool definitions with no plan mode or override' do
+      expect(agent_loop.send(:filtered_tool_definitions)).to eq(defs)
+    end
+
+    it 'returns read-only definitions in plan mode' do
+      agent_loop.instance_variable_set(:@plan_mode, true)
+      expect(agent_loop.send(:filtered_tool_definitions)).to eq([defs[1]])
+    end
+
+    it 'filters by name when an allowed-tools override is set' do
+      agent_loop.allowed_tools_override = %w[bash read_file]
+      expect(agent_loop.send(:filtered_tool_definitions)).to eq(defs[0..1])
+    end
+  end
+
   describe '#model_override=' do
     it 'strips whitespace and stores' do
       agent_loop.model_override = '  claude-opus-4-8  '
