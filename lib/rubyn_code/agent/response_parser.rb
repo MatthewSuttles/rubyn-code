@@ -61,6 +61,14 @@ module RubynCode
         end
       end
 
+      def extract_stop_details(response)
+        if response.respond_to?(:stop_details)
+          response.stop_details
+        elsif response.is_a?(Hash)
+          response[:stop_details] || response['stop_details']
+        end
+      end
+
       def recover_truncated_response(response)
         @max_tokens_override ||= Config::Defaults::ESCALATED_MAX_OUTPUT_TOKENS
         @conversation.add_assistant_message(response_content(response))

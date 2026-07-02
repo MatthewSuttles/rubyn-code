@@ -79,6 +79,7 @@ Phase 4 ships six parity features with Claude Code:
 - **Custom-command frontmatter** — `argument-hint`, `allowed-tools`, and `model:` keys in `~/.rubyn-code/commands/*.md`; the loop honors the per-prompt tool restriction and model override.
 - **`.mcp.json` auto-discovery** — project-root MCP servers flow into the REPL automatically; `/mcp` shows entries prefixed `[project]` or `[user]`. OAuth for URL transports is still deferred.
 - **`/export` transcript** — `/export <path>` writes the conversation as Markdown (default) or `--jsonl` for tooling.
+- **Fable 5 refusal handling** — a declined request (`stop_reason: "refusal"`) surfaces a clear message instead of an empty turn; `claude-fable-5` / `claude-mythos-5` requests opt into a server-side Opus 4.8 fallback by default, so most refusals are transparently re-served in the same call.
 
 See `docs/04-feature-parity/` for per-feature design + tasks docs.
 

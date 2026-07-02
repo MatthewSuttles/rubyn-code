@@ -17,6 +17,13 @@ module RubynCode
         MAX_RETRIES = 3
         RETRY_DELAYS = [2, 5, 10].freeze
 
+        # Fable/Mythos models opt into a server-side Opus 4.8 fallback by
+        # default: a declined request is transparently re-served by the
+        # fallback model in the same call. No config toggle — hardcoded for
+        # this model family only.
+        FALLBACK_ELIGIBLE_MODELS = /\Aclaude-(fable|mythos)/
+        FALLBACK_BETA = 'server-side-fallback-2026-06-01'
+
         AVAILABLE_MODELS = %w[
           claude-fable-5
           claude-opus-4-8
@@ -138,7 +145,7 @@ module RubynCode
 
         def post_request(body)
           connection.post(api_url) do |req|
-            apply_headers(req)
+            apply_headers(req, body)
             req.body = JSON.generate(body)
           end
         end
@@ -163,7 +170,7 @@ module RubynCode
           error_chunks = []
 
           response = streaming_connection.post(api_url) do |req|
-            apply_headers(req)
+            apply_headers(req, body)
             req.body = JSON.generate(body)
             req.options.on_data = on_data_proc(streamer, error_chunks)
           end
@@ -222,23 +229,26 @@ module RubynCode
 
         # -- Headers ------------------------------------------------------
 
-        def apply_headers(req)
+        def apply_headers(req, body)
           req.headers['Content-Type'] = 'application/json'
           req.headers['anthropic-version'] = ANTHROPIC_VERSION
-          oauth_token? ? apply_oauth_headers(req) : apply_api_key_headers(req)
+          oauth_token? ? apply_oauth_headers(req, body) : apply_api_key_headers(req, body)
         end
 
-        def apply_oauth_headers(req)
+        def apply_oauth_headers(req, body)
           req.headers['Authorization'] = "Bearer #{access_token}"
-          req.headers['anthropic-beta'] = 'oauth-2025-04-20'
+          betas = ['oauth-2025-04-20']
+          betas << FALLBACK_BETA if body[:fallbacks]
+          req.headers['anthropic-beta'] = betas.join(',')
           req.headers['x-app'] = 'cli'
           req.headers['User-Agent'] = 'claude-code/2.1.79'
           req.headers['X-Claude-Code-Session-Id'] = session_id
           req.headers['anthropic-dangerous-direct-browser-access'] = 'true'
         end
 
-        def apply_api_key_headers(req)
+        def apply_api_key_headers(req, body)
           req.headers['x-api-key'] = access_token
+          req.headers['anthropic-beta'] = FALLBACK_BETA if body[:fallbacks]
         end
 
         def session_id
@@ -252,9 +262,16 @@ module RubynCode
           apply_thinking(body, thinking)
           apply_system_blocks(body, system)
           apply_tool_cache(body, tools)
+          apply_fallbacks(body, model)
           body[:messages] = add_message_cache_breakpoint(messages)
           body[:stream] = true if stream
           body
+        end
+
+        def apply_fallbacks(body, model)
+          return unless model.to_s.match?(FALLBACK_ELIGIBLE_MODELS)
+
+          body[:fallbacks] = [{ model: 'claude-opus-4-8' }]
         end
 
         def apply_thinking(body, thinking)
@@ -310,7 +327,10 @@ module RubynCode
         def build_api_response(body)
           content = parse_content_blocks(body['content'])
           usage = parse_usage(body['usage'])
-          Response.new(id: body['id'], content: content, stop_reason: body['stop_reason'], usage: usage)
+          Response.new(
+            id: body['id'], content: content, stop_reason: body['stop_reason'],
+            stop_details: body['stop_details'], usage: usage
+          )
         end
 
         def parse_content_blocks(blocks)
