@@ -70,7 +70,7 @@ RSpec.describe RubynCode::LLM::ModelRouter do
 
     it 'returns first preferred when available_models is empty' do
       result = described_class.model_for(:generate_specs, available_models: [])
-      expect(result).to eq('claude-sonnet-4-6')
+      expect(result).to eq('claude-sonnet-5')
     end
 
     context 'when active provider is openai with no tier config' do
@@ -133,7 +133,7 @@ RSpec.describe RubynCode::LLM::ModelRouter do
 
     it 'returns mid-tier for unknown tasks' do
       result = described_class.resolve(:something_random)
-      expect(result).to eq({ provider: 'anthropic', model: 'claude-sonnet-4-6' })
+      expect(result).to eq({ provider: 'anthropic', model: 'claude-sonnet-5' })
     end
 
     context 'when active provider is openai with no tier config' do

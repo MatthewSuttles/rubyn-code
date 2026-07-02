@@ -22,9 +22,14 @@ RSpec.describe 'Feature parity smoke (6 gaps)' do
 
     it 'Anthropic adapter translates thinking:{budget_tokens} into the body' do
       adapter = RubynCode::LLM::Adapters::Anthropic.allocate
-      body = {}
-      adapter.send(:apply_thinking, body, budget_tokens: 1024)
-      expect(body[:thinking]).to eq(type: 'enabled', budget_tokens: 1024)
+
+      adaptive = { model: 'claude-opus-4-8' }
+      adapter.send(:apply_thinking, adaptive, budget_tokens: 1024)
+      expect(adaptive[:thinking]).to eq(type: 'adaptive')
+
+      legacy = { model: 'claude-haiku-4-5' }
+      adapter.send(:apply_thinking, legacy, budget_tokens: 1024)
+      expect(legacy[:thinking]).to eq(type: 'enabled', budget_tokens: 1024)
     end
 
     it '/think command toggles state and is registered' do

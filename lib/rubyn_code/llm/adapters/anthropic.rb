@@ -20,9 +20,17 @@ module RubynCode
         AVAILABLE_MODELS = %w[
           claude-fable-5
           claude-opus-4-8
-          claude-sonnet-4-20250514
-          claude-haiku-4-20250506
+          claude-opus-4-7
+          claude-opus-4-6
+          claude-sonnet-5
+          claude-sonnet-4-6
+          claude-haiku-4-5
         ].freeze
+
+        # Models on the adaptive-thinking API surface (Claude 4.6+).
+        # budget_tokens is removed there and returns a 400; older models
+        # (Haiku 4.5, Sonnet/Opus 4.5 and earlier) still take enabled + budget.
+        ADAPTIVE_THINKING_MODELS = /\Aclaude-(fable|mythos|opus-4-[678]|sonnet-5|sonnet-4-6)/
 
         def provider_name
           'anthropic'
@@ -260,7 +268,12 @@ module RubynCode
         def apply_thinking(body, thinking)
           return unless thinking.is_a?(Hash) && thinking[:budget_tokens].to_i.positive?
 
-          body[:thinking] = { type: 'enabled', budget_tokens: thinking[:budget_tokens].to_i }
+          body[:thinking] =
+            if body[:model].to_s.match?(ADAPTIVE_THINKING_MODELS)
+              { type: 'adaptive' }
+            else
+              { type: 'enabled', budget_tokens: thinking[:budget_tokens].to_i }
+            end
         end
 
         # Anthropic requires max_tokens > budget_tokens. When thinking is on,

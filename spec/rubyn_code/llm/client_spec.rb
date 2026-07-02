@@ -3,7 +3,7 @@
 require 'spec_helper'
 
 RSpec.describe RubynCode::LLM::Client do
-  subject(:client) { described_class.new(model: 'claude-sonnet-4-20250514') }
+  subject(:client) { described_class.new(model: 'claude-sonnet-5') }
 
   before do
     allow(RubynCode::Auth::TokenStore).to receive(:valid?).and_return(true)
@@ -22,7 +22,7 @@ RSpec.describe RubynCode::LLM::Client do
     end
 
     it 'defaults to the configured model' do
-      expect(client.model).to eq('claude-sonnet-4-20250514')
+      expect(client.model).to eq('claude-sonnet-5')
     end
 
     it 'accepts a custom adapter' do
@@ -137,20 +137,20 @@ RSpec.describe RubynCode::LLM::Client do
 
     it 'swaps back to Anthropic' do
       client.switch_provider!('openai')
-      client.switch_provider!('anthropic', model: 'claude-sonnet-4-20250514')
+      client.switch_provider!('anthropic', model: 'claude-sonnet-5')
       expect(client.provider_name).to eq('anthropic')
       expect(client.adapter).to be_a(RubynCode::LLM::Adapters::Anthropic)
     end
 
     it 'keeps existing model when no model given' do
       client.switch_provider!('openai')
-      expect(client.model).to eq('claude-sonnet-4-20250514')
+      expect(client.model).to eq('claude-sonnet-5')
     end
   end
 
   describe '#models' do
     it 'returns anthropic models by default' do
-      expect(client.models).to include('claude-sonnet-4-20250514')
+      expect(client.models).to include('claude-sonnet-5')
     end
 
     it 'returns openai models after provider switch' do

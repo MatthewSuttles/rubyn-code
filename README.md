@@ -15,7 +15,7 @@
   <a href="https://github.com/MatthewSuttles/rubyn-code/actions/workflows/ci.yml"><img src="https://github.com/MatthewSuttles/rubyn-code/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
-Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code for anti-patterns, and build entire features — all context-aware with your schema, routes, and specs. Powered by Claude Opus 4.6, running on your existing Claude subscription.
+Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code for anti-patterns, and build entire features — all context-aware with your schema, routes, and specs. Powered by Claude Opus 4.8, running on your existing Claude subscription.
 
 <img width="1230" height="280" alt="image" src="https://github.com/user-attachments/assets/14e07ce8-def0-4a8f-ac89-46661361a4eb" />
 
@@ -73,7 +73,7 @@ Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code f
 
 Phase 4 ships six parity features with Claude Code:
 
-- **Extended thinking** — `/think <budget>` toggles a per-session reasoning budget; the Anthropic adapter emits `thinking: {type: 'enabled', budget_tokens}` on the wire.
+- **Extended thinking** — `/think <budget>` toggles per-session reasoning; the Anthropic adapter emits `thinking: {type: 'adaptive'}` on Claude 4.6+ models (`{type: 'enabled', budget_tokens}` on older ones).
 - **Image / vision input** — `@chart.png` (and `.jpg` / `.jpeg` / `.gif` / `.webp`) becomes a real image content block attached to the user turn; Anthropic and OpenAI each emit their native shape.
 - **TodoWrite live checklist** — `TodoWrite` tool; the checklist refreshes above the spinner on every tool result so you see in-turn progress at a glance.
 - **Custom-command frontmatter** — `argument-hint`, `allowed-tools`, and `model:` keys in `~/.rubyn-code/commands/*.md`; the loop honors the per-prompt tool restriction and model override.

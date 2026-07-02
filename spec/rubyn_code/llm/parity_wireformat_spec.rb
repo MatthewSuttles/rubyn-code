@@ -20,21 +20,21 @@ RSpec.describe 'Parity wire-format verification', :webmock do
   end
 
   describe 'Gap 1: extended thinking wire format' do
-    it 'sends `thinking: {type: enabled, budget_tokens}` on the request body' do
+    it 'sends `thinking: {type: adaptive}` on the request body for 4.6+ models' do
       captured = nil
       stub_request(:post, api_url).to_return do |req|
         captured = JSON.parse(req.body)
         { status: 200, body: anthropic_text_response('hi').to_json }
       end
 
-      adapter.send(:execute_with_retries, {
-                     model: 'claude-opus-4-8',
-                     messages: [{ role: 'user', content: 'hi' }],
-                     max_tokens: 4096,
-                     thinking: { type: 'enabled', budget_tokens: 1024 }
-                   }, nil)
+      body = adapter.send(:build_request_body,
+                          messages: [{ role: 'user', content: 'hi' }],
+                          tools: nil, system: nil,
+                          model: 'claude-opus-4-8', max_tokens: 4096,
+                          stream: false, thinking: { budget_tokens: 1024 })
+      adapter.send(:execute_with_retries, body, nil)
 
-      expect(captured).to include('thinking' => { 'type' => 'enabled', 'budget_tokens' => 1024 })
+      expect(captured).to include('thinking' => { 'type' => 'adaptive' })
     end
 
     it 'parses a `thinking` content block from the response' do

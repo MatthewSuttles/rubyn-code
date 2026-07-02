@@ -48,8 +48,14 @@ RSpec.describe 'Extended thinking plumbing' do
     end
 
     describe '#apply_thinking' do
-      it 'sets body[:thinking] when budget_tokens > 0' do
-        body = {}
+      it 'sets adaptive thinking on Claude 4.6+ models' do
+        body = { model: 'claude-opus-4-8' }
+        adapter.send(:apply_thinking, body, { budget_tokens: 1024 })
+        expect(body[:thinking]).to eq(type: 'adaptive')
+      end
+
+      it 'sets enabled + budget_tokens on legacy models' do
+        body = { model: 'claude-haiku-4-5' }
         adapter.send(:apply_thinking, body, { budget_tokens: 1024 })
         expect(body[:thinking]).to eq(type: 'enabled', budget_tokens: 1024)
       end
