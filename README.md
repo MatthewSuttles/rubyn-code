@@ -71,10 +71,11 @@ Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code f
 
 ## Claude Code Feature Parity
 
-Phase 4 ships seven parity features with Claude Code:
+Phase 4 ships eight parity features with Claude Code:
 
 - **Extended thinking** — `/think <budget>` toggles per-session reasoning; the Anthropic adapter emits `thinking: {type: 'adaptive'}` on Claude 4.6+ models (`{type: 'enabled', budget_tokens}` on older ones).
 - **Reasoning effort** — `/effort <low|medium|high|xhigh|max>` sets the request-level reasoning depth; the Anthropic adapter emits `output_config: {effort}` on the wire. GA on Claude 4.6+ (Opus 4.6/4.7/4.8, Sonnet 4.6/5, Fable 5); `xhigh` needs Opus 4.7+ / Sonnet 5 / Fable 5. Model default is `high`.
+- **Task budgets (beta)** — the agent loop's remaining token budget is sent as `output_config: {task_budget: {type: 'tokens', total}}` on supported models (Fable 5, Sonnet 5, Opus 4.7/4.8), advisory pacing only — `max_tokens` stays the enforced per-response cap.
 - **Image / vision input** — `@chart.png` (and `.jpg` / `.jpeg` / `.gif` / `.webp`) becomes a real image content block attached to the user turn; Anthropic and OpenAI each emit their native shape.
 - **TodoWrite live checklist** — `TodoWrite` tool; the checklist refreshes above the spinner on every tool result so you see in-turn progress at a glance.
 - **Custom-command frontmatter** — `argument-hint`, `allowed-tools`, and `model:` keys in `~/.rubyn-code/commands/*.md`; the loop honors the per-prompt tool restriction and model override.
