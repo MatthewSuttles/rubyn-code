@@ -134,5 +134,19 @@ RSpec.describe 'Refusal handling and server-side fallbacks' do
 
       adapter.chat(messages: [{ role: 'user', content: 'hi' }], model: 'claude-fable-5', max_tokens: 4096)
     end
+
+    it 'combines the oauth, task-budget, and fallback betas when all apply' do
+      stub_request(:post, api_url)
+        .with(headers: {
+                'anthropic-beta' => 'oauth-2025-04-20,task-budgets-2026-03-13,server-side-fallback-2026-06-01'
+              })
+        .to_return(status: 200, body: anthropic_text_response('hi').to_json)
+
+      adapter.chat(
+        messages: [{ role: 'user', content: 'hi' }],
+        model: 'claude-fable-5', max_tokens: 4096,
+        task_budget: { total: 100_000, remaining: 42_000 }
+      )
+    end
   end
 end

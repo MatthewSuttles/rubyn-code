@@ -15,7 +15,7 @@ module RubynCode
       class PromptTooLongError < RequestError; end
 
       attr_reader :adapter
-      attr_accessor :model, :thinking_budget_tokens
+      attr_accessor :model, :thinking_budget_tokens, :effort
 
       def initialize(model: nil, provider: nil, adapter: nil)
         settings = Config::Settings.new
@@ -40,6 +40,7 @@ module RubynCode
           task_budget: opts[:task_budget]
         }
         kwargs[:thinking] = effective_thinking if effective_thinking
+        kwargs[:effort] = @effort if @effort
 
         @adapter.chat(**kwargs)
       end

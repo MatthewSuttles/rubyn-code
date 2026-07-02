@@ -212,7 +212,7 @@ module RubynCode
         tokens = extract_token_counts(cm)
         return if tokens.values.all?(&:zero?)
 
-        model = @llm_client.respond_to?(:model) ? @llm_client.model : 'claude-sonnet-4-6'
+        model = @llm_client.respond_to?(:model) ? @llm_client.model : 'claude-sonnet-5'
         @total_cost += Observability::CostCalculator.calculate(model: model, **tokens)
       rescue StandardError
         # Non-critical — cost tracking is best-effort

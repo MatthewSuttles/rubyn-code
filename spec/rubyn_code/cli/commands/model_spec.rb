@@ -7,7 +7,7 @@ RSpec.describe RubynCode::CLI::Commands::Model do
     instance_double(
       RubynCode::LLM::Client,
       provider_name: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       models: RubynCode::LLM::Adapters::Anthropic::AVAILABLE_MODELS
     )
   end
@@ -45,12 +45,12 @@ RSpec.describe RubynCode::CLI::Commands::Model do
 
     context 'with a valid model (no provider prefix)' do
       it 'returns action to switch model' do
-        result = command.execute(['claude-sonnet-4-20250514'], ctx)
-        expect(result).to eq(action: :set_model, model: 'claude-sonnet-4-20250514')
+        result = command.execute(['claude-sonnet-5'], ctx)
+        expect(result).to eq(action: :set_model, model: 'claude-sonnet-5')
       end
 
       it 'confirms the switch' do
-        command.execute(['claude-sonnet-4-20250514'], ctx)
+        command.execute(['claude-sonnet-5'], ctx)
         expect(renderer).to have_received(:info).with(/switched/i)
       end
     end

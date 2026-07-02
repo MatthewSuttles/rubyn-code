@@ -24,12 +24,24 @@ module RubynCode
         FALLBACK_ELIGIBLE_MODELS = /\Aclaude-(fable|mythos)/
         FALLBACK_BETA = 'server-side-fallback-2026-06-01'
 
+        TASK_BUDGET_BETA = 'task-budgets-2026-03-13'
+        TASK_BUDGET_MIN_TOKENS = 20_000 # API minimum; below this, task_budget is omitted entirely
+        TASK_BUDGET_MODELS = /\Aclaude-(fable|mythos|sonnet-5|opus-4-[78])/
+
         AVAILABLE_MODELS = %w[
           claude-fable-5
           claude-opus-4-8
-          claude-sonnet-4-20250514
-          claude-haiku-4-20250506
+          claude-opus-4-7
+          claude-opus-4-6
+          claude-sonnet-5
+          claude-sonnet-4-6
+          claude-haiku-4-5
         ].freeze
+
+        # Models on the adaptive-thinking API surface (Claude 4.6+).
+        # budget_tokens is removed there and returns a 400; older models
+        # (Haiku 4.5, Sonnet/Opus 4.5 and earlier) still take enabled + budget.
+        ADAPTIVE_THINKING_MODELS = /\Aclaude-(fable|mythos|opus-4-[678]|sonnet-5|sonnet-4-6)/
 
         def provider_name
           'anthropic'
@@ -39,7 +51,8 @@ module RubynCode
           AVAILABLE_MODELS
         end
 
-        def chat(messages:, model:, max_tokens:, tools: nil, system: nil, on_text: nil, task_budget: nil, thinking: nil) # rubocop:disable Metrics/ParameterLists -- mirrors LLM adapter interface
+        def chat(messages:, model:, max_tokens:, tools: nil, system: nil, on_text: nil, # rubocop:disable Metrics/ParameterLists -- mirrors LLM adapter interface
+                 task_budget: nil, thinking: nil, effort: nil)
           ensure_valid_token!
           use_streaming = on_text && oauth_token?
 
@@ -47,7 +60,7 @@ module RubynCode
             messages: messages, tools: tools, system: system,
             model: model, max_tokens: max_tokens,
             stream: use_streaming, task_budget: task_budget,
-            thinking: thinking
+            thinking: thinking, effort: effort
           )
 
           return stream_request(body, on_text) if use_streaming
@@ -229,7 +242,7 @@ module RubynCode
 
         # -- Headers ------------------------------------------------------
 
-        def apply_headers(req, body)
+        def apply_headers(req, body = {})
           req.headers['Content-Type'] = 'application/json'
           req.headers['anthropic-version'] = ANTHROPIC_VERSION
           oauth_token? ? apply_oauth_headers(req, body) : apply_api_key_headers(req, body)
@@ -237,7 +250,9 @@ module RubynCode
 
         def apply_oauth_headers(req, body)
           req.headers['Authorization'] = "Bearer #{access_token}"
+          # The subscription-auth beta must stay present, so feature betas append rather than replace.
           betas = ['oauth-2025-04-20']
+          betas << TASK_BUDGET_BETA if task_budget_on_wire?(body)
           betas << FALLBACK_BETA if body[:fallbacks]
           req.headers['anthropic-beta'] = betas.join(',')
           req.headers['x-app'] = 'cli'
@@ -248,7 +263,14 @@ module RubynCode
 
         def apply_api_key_headers(req, body)
           req.headers['x-api-key'] = access_token
-          req.headers['anthropic-beta'] = FALLBACK_BETA if body[:fallbacks]
+          betas = []
+          betas << TASK_BUDGET_BETA if task_budget_on_wire?(body)
+          betas << FALLBACK_BETA if body[:fallbacks]
+          req.headers['anthropic-beta'] = betas.join(',') unless betas.empty?
+        end
+
+        def task_budget_on_wire?(body)
+          !!body&.dig(:output_config, :task_budget)
         end
 
         def session_id
@@ -257,9 +279,12 @@ module RubynCode
 
         # -- Request body -------------------------------------------------
 
-        def build_request_body(messages:, tools:, system:, model:, max_tokens:, stream:, thinking: nil, **_opts) # rubocop:disable Metrics/ParameterLists -- API request builder mirrors Claude API params
+        def build_request_body(messages:, tools:, system:, model:, max_tokens:, stream:, # rubocop:disable Metrics/ParameterLists -- API request builder mirrors Claude API params
+                               thinking: nil, effort: nil, task_budget: nil, **_opts)
           body = { model: model, max_tokens: ensure_max_tokens_for_thinking(max_tokens, thinking) }
           apply_thinking(body, thinking)
+          apply_effort(body, effort)
+          apply_task_budget(body, task_budget, model)
           apply_system_blocks(body, system)
           apply_tool_cache(body, tools)
           apply_fallbacks(body, model)
@@ -274,10 +299,36 @@ module RubynCode
           body[:fallbacks] = [{ model: 'claude-opus-4-8' }]
         end
 
+        # Advisory pacing signal only — Claude sees a running countdown and paces
+        # itself, but max_tokens remains the enforced hard cap per response.
+        def apply_task_budget(body, task_budget, model)
+          return unless task_budget.is_a?(Hash)
+          return unless model.to_s.match?(TASK_BUDGET_MODELS)
+
+          # `remaining` is what's left for the task, matching what the model should pace against.
+          total = task_budget[:remaining].to_i
+          return if total < TASK_BUDGET_MIN_TOKENS
+
+          (body[:output_config] ||= {})[:task_budget] = { type: 'tokens', total: total }
+        end
+
         def apply_thinking(body, thinking)
           return unless thinking.is_a?(Hash) && thinking[:budget_tokens].to_i.positive?
 
-          body[:thinking] = { type: 'enabled', budget_tokens: thinking[:budget_tokens].to_i }
+          body[:thinking] =
+            if body[:model].to_s.match?(ADAPTIVE_THINKING_MODELS)
+              { type: 'adaptive' }
+            else
+              { type: 'enabled', budget_tokens: thinking[:budget_tokens].to_i }
+            end
+        end
+
+        # Merges into `output_config` (rather than assigning a whole hash) so
+        # this composes with other output_config keys, e.g. task_budget.
+        def apply_effort(body, effort)
+          return unless effort
+
+          (body[:output_config] ||= {})[:effort] = effort
         end
 
         # Anthropic requires max_tokens > budget_tokens. When thinking is on,
