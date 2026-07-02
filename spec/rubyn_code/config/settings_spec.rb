@@ -145,7 +145,7 @@ RSpec.describe RubynCode::Config::Settings do
       expect(data['model']).to eq('claude-opus-4-8')
       expect(data['providers']['anthropic']['env_key']).to eq('ANTHROPIC_API_KEY')
       expect(data['providers']['anthropic']['models']['cheap']).to eq('claude-haiku-4-5')
-      expect(data['providers']['anthropic']['models']['mid']).to eq('claude-sonnet-4-6')
+      expect(data['providers']['anthropic']['models']['mid']).to eq('claude-sonnet-5')
       expect(data['providers']['anthropic']['models']['top']).to eq('claude-opus-4-8')
       expect(data['providers']['openai']['env_key']).to eq('OPENAI_API_KEY')
       expect(data['providers']['openai']['models']['cheap']).to eq('gpt-5.4-nano')
@@ -195,7 +195,7 @@ RSpec.describe RubynCode::Config::Settings do
       settings.add_provider('proxy',
                             base_url: 'https://proxy.example.com/v1',
                             api_format: 'anthropic',
-                            models: %w[claude-sonnet-4-6])
+                            models: %w[claude-sonnet-5])
 
       reloaded = described_class.new(config_path: config_path)
       cfg = reloaded.provider_config('proxy')
