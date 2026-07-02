@@ -17,6 +17,10 @@ module RubynCode
         MAX_RETRIES = 3
         RETRY_DELAYS = [2, 5, 10].freeze
 
+        TASK_BUDGET_BETA = 'task-budgets-2026-03-13'
+        TASK_BUDGET_MIN_TOKENS = 20_000 # API minimum; below this, task_budget is omitted entirely
+        TASK_BUDGET_MODELS = /\Aclaude-(fable|mythos|sonnet-5|opus-4-[78])/
+
         AVAILABLE_MODELS = %w[
           claude-fable-5
           claude-opus-4-8
@@ -138,7 +142,7 @@ module RubynCode
 
         def post_request(body)
           connection.post(api_url) do |req|
-            apply_headers(req)
+            apply_headers(req, body)
             req.body = JSON.generate(body)
           end
         end
@@ -163,7 +167,7 @@ module RubynCode
           error_chunks = []
 
           response = streaming_connection.post(api_url) do |req|
-            apply_headers(req)
+            apply_headers(req, body)
             req.body = JSON.generate(body)
             req.options.on_data = on_data_proc(streamer, error_chunks)
           end
@@ -222,23 +226,30 @@ module RubynCode
 
         # -- Headers ------------------------------------------------------
 
-        def apply_headers(req)
+        def apply_headers(req, body = {})
           req.headers['Content-Type'] = 'application/json'
           req.headers['anthropic-version'] = ANTHROPIC_VERSION
-          oauth_token? ? apply_oauth_headers(req) : apply_api_key_headers(req)
+          oauth_token? ? apply_oauth_headers(req, body) : apply_api_key_headers(req, body)
         end
 
-        def apply_oauth_headers(req)
+        def apply_oauth_headers(req, body)
           req.headers['Authorization'] = "Bearer #{access_token}"
-          req.headers['anthropic-beta'] = 'oauth-2025-04-20'
+          # The subscription-auth beta must stay present, so a task budget is appended rather than replacing it.
+          req.headers['anthropic-beta'] =
+            task_budget_on_wire?(body) ? "oauth-2025-04-20,#{TASK_BUDGET_BETA}" : 'oauth-2025-04-20'
           req.headers['x-app'] = 'cli'
           req.headers['User-Agent'] = 'claude-code/2.1.79'
           req.headers['X-Claude-Code-Session-Id'] = session_id
           req.headers['anthropic-dangerous-direct-browser-access'] = 'true'
         end
 
-        def apply_api_key_headers(req)
+        def apply_api_key_headers(req, body)
           req.headers['x-api-key'] = access_token
+          req.headers['anthropic-beta'] = TASK_BUDGET_BETA if task_budget_on_wire?(body)
+        end
+
+        def task_budget_on_wire?(body)
+          !!body&.dig(:output_config, :task_budget)
         end
 
         def session_id
@@ -247,14 +258,29 @@ module RubynCode
 
         # -- Request body -------------------------------------------------
 
-        def build_request_body(messages:, tools:, system:, model:, max_tokens:, stream:, thinking: nil, **_opts) # rubocop:disable Metrics/ParameterLists -- API request builder mirrors Claude API params
+        def build_request_body(messages:, tools:, system:, model:, max_tokens:, stream:, # rubocop:disable Metrics/ParameterLists -- API request builder mirrors Claude API params
+                               thinking: nil, task_budget: nil, **_opts)
           body = { model: model, max_tokens: ensure_max_tokens_for_thinking(max_tokens, thinking) }
           apply_thinking(body, thinking)
+          apply_task_budget(body, task_budget, model)
           apply_system_blocks(body, system)
           apply_tool_cache(body, tools)
           body[:messages] = add_message_cache_breakpoint(messages)
           body[:stream] = true if stream
           body
+        end
+
+        # Advisory pacing signal only — Claude sees a running countdown and paces
+        # itself, but max_tokens remains the enforced hard cap per response.
+        def apply_task_budget(body, task_budget, model)
+          return unless task_budget.is_a?(Hash)
+          return unless model.to_s.match?(TASK_BUDGET_MODELS)
+
+          # `remaining` is what's left for the task, matching what the model should pace against.
+          total = task_budget[:remaining].to_i
+          return if total < TASK_BUDGET_MIN_TOKENS
+
+          body[:output_config] = { task_budget: { type: 'tokens', total: total } }
         end
 
         def apply_thinking(body, thinking)
