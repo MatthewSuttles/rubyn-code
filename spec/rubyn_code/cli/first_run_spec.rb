@@ -57,7 +57,7 @@ RSpec.describe RubynCode::CLI::FirstRun do
       expect { first_run.run }.to output.to_stdout
       data = YAML.safe_load_file(config_path)
       expect(data['provider']).to eq('anthropic')
-      expect(data['model']).to eq('claude-opus-4-8')
+      expect(data['model']).to eq('claude-opus-5')
     end
 
     it 'stores the budget from user input' do

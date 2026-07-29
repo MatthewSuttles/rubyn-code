@@ -11,6 +11,7 @@ module RubynCode
       PRICING = {
         # Anthropic — Claude 5 / 4.8 / 4.7 / 4.6
         'claude-fable-5' => [10.00, 50.00],
+        'claude-opus-5' => [5.00, 25.00],
         'claude-opus-4-8' => [5.00, 25.00],
         'claude-opus-4-7' => [5.00, 25.00],
         'claude-opus-4-6' => [5.00, 25.00],

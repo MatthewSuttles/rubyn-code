@@ -41,6 +41,12 @@ RSpec.describe 'Refusal handling and server-side fallbacks' do
         expect(body[:fallbacks]).to eq([{ model: 'claude-opus-4-8' }])
       end
 
+      it 'adds the fallbacks param for claude-opus-5' do
+        body = {}
+        adapter.send(:apply_fallbacks, body, 'claude-opus-5')
+        expect(body[:fallbacks]).to eq([{ model: 'claude-opus-4-8' }])
+      end
+
       it 'leaves body untouched for claude-opus-4-8' do
         body = { model: 'claude-opus-4-8' }
         adapter.send(:apply_fallbacks, body, 'claude-opus-4-8')

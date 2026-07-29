@@ -11,7 +11,7 @@ module RubynCode
       MEMORIES_DIR = File.join(HOME_DIR, 'memories')
 
       DEFAULT_PROVIDER = 'anthropic'
-      DEFAULT_MODEL = 'claude-opus-4-8'
+      DEFAULT_MODEL = 'claude-opus-5'
       MODEL_MODE = 'auto' # 'auto' or 'manual'
       MAX_ITERATIONS = 200
       # Hard ceiling when a Stop hook (e.g. an active /goal) keeps the agent

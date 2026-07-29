@@ -158,7 +158,7 @@ module RubynCode
       DEFAULT_PROVIDER_MODELS = {
         'anthropic' => {
           'env_key' => 'ANTHROPIC_API_KEY',
-          'models' => { 'cheap' => 'claude-haiku-4-5', 'mid' => 'claude-sonnet-5', 'top' => 'claude-opus-4-8' }
+          'models' => { 'cheap' => 'claude-haiku-4-5', 'mid' => 'claude-sonnet-5', 'top' => 'claude-opus-5' }
         },
         'openai' => {
           'env_key' => 'OPENAI_API_KEY',

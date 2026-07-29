@@ -17,19 +17,20 @@ module RubynCode
         MAX_RETRIES = 3
         RETRY_DELAYS = [2, 5, 10].freeze
 
-        # Fable/Mythos models opt into a server-side Opus 4.8 fallback by
-        # default: a declined request is transparently re-served by the
-        # fallback model in the same call. No config toggle — hardcoded for
-        # this model family only.
-        FALLBACK_ELIGIBLE_MODELS = /\Aclaude-(fable|mythos)/
+        # Fable/Mythos/Opus 5 models opt into a server-side Opus 4.8 fallback
+        # by default: a declined request (safety-classifier refusal) is
+        # transparently re-served by the fallback model in the same call.
+        # No config toggle — hardcoded for these model families only.
+        FALLBACK_ELIGIBLE_MODELS = /\Aclaude-(fable|mythos|opus-5)/
         FALLBACK_BETA = 'server-side-fallback-2026-06-01'
 
         TASK_BUDGET_BETA = 'task-budgets-2026-03-13'
         TASK_BUDGET_MIN_TOKENS = 20_000 # API minimum; below this, task_budget is omitted entirely
-        TASK_BUDGET_MODELS = /\Aclaude-(fable|mythos|sonnet-5|opus-4-[78])/
+        TASK_BUDGET_MODELS = /\Aclaude-(fable|mythos|sonnet-5|opus-5|opus-4-[78])/
 
         AVAILABLE_MODELS = %w[
           claude-fable-5
+          claude-opus-5
           claude-opus-4-8
           claude-opus-4-7
           claude-opus-4-6
@@ -41,7 +42,7 @@ module RubynCode
         # Models on the adaptive-thinking API surface (Claude 4.6+).
         # budget_tokens is removed there and returns a 400; older models
         # (Haiku 4.5, Sonnet/Opus 4.5 and earlier) still take enabled + budget.
-        ADAPTIVE_THINKING_MODELS = /\Aclaude-(fable|mythos|opus-4-[678]|sonnet-5|sonnet-4-6)/
+        ADAPTIVE_THINKING_MODELS = /\Aclaude-(fable|mythos|opus-5|opus-4-[678]|sonnet-5|sonnet-4-6)/
 
         def provider_name
           'anthropic'
