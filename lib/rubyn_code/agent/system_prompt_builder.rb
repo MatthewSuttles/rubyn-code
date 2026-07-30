@@ -101,6 +101,9 @@ module RubynCode
         return unless index&.nodes&.any?
 
         parts << "\n## #{index.to_structural_summary}"
+        parts << 'This project has a code graph. To locate or understand code, call `code_graph` FIRST — ' \
+                 'it returns matching symbols with source, callers, and callees in one call. ' \
+                 'Fall back to grep/glob only when code_graph finds nothing.'
       rescue StandardError
         nil
       end

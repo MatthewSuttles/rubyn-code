@@ -108,6 +108,21 @@ RSpec.describe RubynCode::Agent::Loop, 'system prompt caching' do
     end
   end
 
+  describe 'code graph steering' do
+    it 'tells the model to reach for code_graph first when an index exists' do
+      Dir.mktmpdir do |root|
+        File.write(File.join(root, 'thing.rb'), "class Thing\n  def run; end\nend\n")
+        RubynCode::Index::CodebaseIndex.new(project_root: root).build!
+        agent_loop = build_loop(root)
+        stub_chat(text_response('Hi.'))
+
+        agent_loop.send_message('hello')
+
+        expect(system_prompts.first).to include('call `code_graph` FIRST')
+      end
+    end
+  end
+
   describe 'per-turn caching of static sections' do
     it 'does not rebuild static sections between iterations of the same turn' do
       Dir.mktmpdir do |root|
