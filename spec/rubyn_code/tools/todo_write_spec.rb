@@ -9,6 +9,9 @@ RSpec.describe RubynCode::Tools::TodoWrite do
 
   describe 'preamble' do
     it 'is registered under the name "TodoWrite"' do
+      # Re-register: registry_spec/executor_spec reset! the registry, wiping
+      # load-time registrations when this file runs after them.
+      RubynCode::Tools::Registry.register(described_class)
       expect(RubynCode::Tools::Registry.get('TodoWrite')).to eq(described_class)
     end
 

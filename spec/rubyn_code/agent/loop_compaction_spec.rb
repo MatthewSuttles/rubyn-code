@@ -6,7 +6,7 @@ RSpec.describe RubynCode::Agent::Loop, 'compaction on end_turn' do
   let(:conversation) { RubynCode::Agent::Conversation.new }
   let(:llm_client) { instance_double(RubynCode::LLM::Client) }
   let(:tool_executor) do
-    instance_double(RubynCode::Tools::Executor, tool_definitions: [])
+    instance_double(RubynCode::Tools::Executor, tool_definitions: [], 'todo_store=': nil)
   end
   let(:context_manager) { RubynCode::Context::Manager.new(threshold: 100) }
   let(:hook_runner) do
