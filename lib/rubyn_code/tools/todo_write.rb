@@ -57,8 +57,8 @@ module RubynCode
         format(validated)
       end
 
-      def self.summarize(_output, _args)
-        count = Array(_args[:todos] || _args['todos']).size
+      def self.summarize(_output, args)
+        count = Array(args[:todos] || args['todos']).size
         if count.zero?
           'cleared checklist'
         else

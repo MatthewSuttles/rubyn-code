@@ -43,9 +43,9 @@ module RubynCode
         env = ENV.to_h.dup
 
         env.each_key do |key|
-          if Config::Defaults::SCRUB_ENV_VARS.any? { |sensitive| key.upcase.include?(sensitive) }
-            env[key] = '[SCRUBBED]'
-          end
+          # String#[] instead of #include?: Style/ArrayIntersect misfires on
+          # the any?+include? shape even though key is a String.
+          env[key] = '[SCRUBBED]' if Config::Defaults::SCRUB_ENV_VARS.any? { |sensitive| key.upcase[sensitive] }
         end
 
         env

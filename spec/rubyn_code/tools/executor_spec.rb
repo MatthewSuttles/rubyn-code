@@ -16,12 +16,15 @@ RSpec.describe RubynCode::Tools::Executor do
     end
   end
 
+  # Save/restore instead of leaving the registry empty: tools register at
+  # file-load time, so a bare reset! wipes them for every spec that runs after.
   before do
+    @saved_tools = RubynCode::Tools::Registry.instance_variable_get(:@tools)
     RubynCode::Tools::Registry.reset!
     RubynCode::Tools::Registry.register(fake_tool)
   end
 
-  after { RubynCode::Tools::Registry.reset! }
+  after { RubynCode::Tools::Registry.instance_variable_set(:@tools, @saved_tools) }
 
   describe '#execute' do
     it 'returns the tool output' do
