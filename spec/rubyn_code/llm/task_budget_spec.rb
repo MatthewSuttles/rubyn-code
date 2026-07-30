@@ -14,7 +14,7 @@ RSpec.describe 'Task budget plumbing' do
       end
 
       it 'supports claude-fable-5, claude-mythos-*, claude-sonnet-5, and claude-opus-4-7/8' do
-        %w[claude-fable-5 claude-mythos-5 claude-sonnet-5 claude-opus-4-7 claude-opus-4-8].each do |model|
+        %w[claude-fable-5 claude-mythos-5 claude-sonnet-5 claude-opus-5 claude-opus-4-7 claude-opus-4-8].each do |model|
           body = {}
           adapter.send(:apply_task_budget, body, { total: 100_000, remaining: 50_000 }, model)
           expect(body[:output_config]).to eq(task_budget: { type: 'tokens', total: 50_000 })

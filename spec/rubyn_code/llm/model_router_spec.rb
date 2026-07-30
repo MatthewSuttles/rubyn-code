@@ -55,7 +55,7 @@ RSpec.describe RubynCode::LLM::ModelRouter do
     end
 
     it 'returns a top-tier model for architecture tasks' do
-      expect(described_class.model_for(:architecture)).to eq('claude-opus-4-8')
+      expect(described_class.model_for(:architecture)).to eq('claude-opus-5')
     end
 
     it 'filters by available_models when provided' do
@@ -128,7 +128,7 @@ RSpec.describe RubynCode::LLM::ModelRouter do
 
     it 'returns top-tier provider and model for architecture' do
       result = described_class.resolve(:architecture)
-      expect(result).to eq({ provider: 'anthropic', model: 'claude-opus-4-8' })
+      expect(result).to eq({ provider: 'anthropic', model: 'claude-opus-5' })
     end
 
     it 'returns mid-tier for unknown tasks' do
@@ -207,7 +207,7 @@ RSpec.describe RubynCode::LLM::ModelRouter do
       it 'falls back to active provider defaults for tiers not configured' do
         result = described_class.resolve(:architecture)
         expect(result[:provider]).to eq('anthropic')
-        expect(result[:model]).to eq('claude-opus-4-8')
+        expect(result[:model]).to eq('claude-opus-5')
       end
     end
   end
