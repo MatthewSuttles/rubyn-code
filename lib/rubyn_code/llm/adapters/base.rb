@@ -17,7 +17,7 @@ module RubynCode
         # @param task_budget [Hash, nil] Optional task budget context
         # @param thinking [Hash, nil] Optional {budget_tokens: Integer} for extended reasoning
         # @return [LLM::Response]
-        def chat(messages:, model:, max_tokens:, tools: nil, system: nil, on_text: nil, task_budget: nil, thinking: nil) # rubocop:disable Metrics/ParameterLists, -- LLM adapter interface requires these params
+        def chat(messages:, model:, max_tokens:, tools: nil, system: nil, on_text: nil, task_budget: nil, thinking: nil) # rubocop:disable Metrics/ParameterLists -- LLM adapter interface requires these params
           raise NotImplementedError, "#{self.class}#chat must be implemented"
         end
 

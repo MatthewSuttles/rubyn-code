@@ -4,7 +4,7 @@ require 'spec_helper'
 
 RSpec.describe RubynCode::Agent::Loop do
   let(:llm_client)      { instance_double(RubynCode::LLM::Client) }
-  let(:tool_executor)   { instance_double(RubynCode::Tools::Executor, tool_definitions: []) }
+  let(:tool_executor)   { instance_double(RubynCode::Tools::Executor, tool_definitions: [], 'todo_store=': nil) }
   let(:context_manager) do
     instance_double(
       RubynCode::Context::Manager,

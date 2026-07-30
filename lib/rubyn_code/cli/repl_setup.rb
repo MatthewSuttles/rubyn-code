@@ -208,9 +208,9 @@ module RubynCode
         MCP::ToolBridge.bridge(client)
         @mcp_clients << client
         source_tag = config.respond_to?(:source) && config.source == :project ? ' [project]' : ' [user]'
-        @renderer.info("MCP server '#{config[:name]}' connected#{source_tag} (#{client.tools.size} tools)")
+        @renderer.info("MCP server '#{config.name}' connected#{source_tag} (#{client.tools.size} tools)")
       rescue StandardError => e
-        warn "[MCP] Failed to connect '#{config[:name]}': #{e.message}"
+        warn "[MCP] Failed to connect '#{config.name}': #{e.message}"
       end
 
       def disconnect_mcp_clients!
