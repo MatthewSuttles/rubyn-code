@@ -112,8 +112,7 @@ module RubynCode
           tag_set = tags.to_set(&:downcase)
 
           instincts.select do |inst|
-            inst_tags = inst.context_tags.map(&:downcase)
-            inst_tags.any? { |t| tag_set.include?(t) }
+            inst.context_tags.any? { |t| tag_set.include?(t.downcase) }
           end
         end
 

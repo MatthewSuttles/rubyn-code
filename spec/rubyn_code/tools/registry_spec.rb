@@ -19,8 +19,13 @@ RSpec.describe RubynCode::Tools::Registry do
 
   let(:fake_tool) { RubynCode::Tools::FakeTool }
 
-  before { described_class.reset! }
-  after { described_class.reset! }
+  # Save/restore instead of leaving the registry empty: tools register at
+  # file-load time, so a bare reset! wipes them for every spec that runs after.
+  before do
+    @saved_tools = described_class.instance_variable_get(:@tools)
+    described_class.reset!
+  end
+  after { described_class.instance_variable_set(:@tools, @saved_tools) }
 
   describe ".register and .get" do
     it "registers and retrieves a tool class by name" do

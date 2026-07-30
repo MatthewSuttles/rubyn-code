@@ -16,6 +16,7 @@ RSpec.describe 'REPL MCP integration' do
     obj = Object.new
     obj.define_singleton_method(:chat) { |**_| nil }
     obj.define_singleton_method(:model=) { |_m| nil }
+    obj.define_singleton_method(:thinking_budget_tokens=) { |_t| nil }
     obj
   end
   let(:session_persistence) do
@@ -158,7 +159,7 @@ RSpec.describe 'REPL MCP integration' do
       it 'creates and connects MCP clients' do
         build_repl
 
-        expect(RubynCode::MCP::Client).to have_received(:from_config).with(server_configs.first)
+        expect(RubynCode::MCP::Client).to have_received(:from_config).with(having_attributes(name: 'github'))
         expect(mcp_client).to have_received(:connect!)
       end
 
@@ -202,8 +203,8 @@ RSpec.describe 'REPL MCP integration' do
           RubynCode::MCP::Client::ClientError, 'connection refused'
         )
 
-        allow(RubynCode::MCP::Client).to receive(:from_config).with(server_configs[0]).and_return(broken_client)
-        allow(RubynCode::MCP::Client).to receive(:from_config).with(server_configs[1]).and_return(working_client)
+        allow(RubynCode::MCP::Client).to receive(:from_config).with(having_attributes(name: 'broken')).and_return(broken_client)
+        allow(RubynCode::MCP::Client).to receive(:from_config).with(having_attributes(name: 'working')).and_return(working_client)
         allow(RubynCode::MCP::ToolBridge).to receive(:bridge).and_return([])
       end
 
@@ -262,6 +263,8 @@ RSpec.describe 'REPL MCP integration' do
       allow(RubynCode::MCP::Config).to receive(:load).and_return(server_configs)
       allow(RubynCode::MCP::Client).to receive(:from_config).and_return(mcp_client)
       allow(RubynCode::MCP::ToolBridge).to receive(:bridge).and_return([])
+
+      RubynCode::CLI::REPL # force the autoload that defines ReplLifecycle
 
       unless RubynCode::CLI::ReplLifecycle.const_defined?(:GOODBYE_MESSAGES, false)
         RubynCode::CLI::ReplLifecycle.const_set(
