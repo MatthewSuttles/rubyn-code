@@ -8,7 +8,7 @@ module RubynCode
     # prompt overhead by 30-50%.
     module DynamicToolSchema
       BASE_TOOLS = %w[
-        read_file write_file edit_file glob grep bash
+        read_file write_file edit_file glob grep code_graph bash
       ].freeze
 
       TASK_TOOLS = {

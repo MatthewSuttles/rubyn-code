@@ -1,6 +1,6 @@
 # Layer 2: Tools
 
-32 built-in tools that Claude can invoke. The extensibility surface of the system.
+33 built-in tools that Claude can invoke. The extensibility surface of the system.
 
 ## Core Classes
 
@@ -20,7 +20,7 @@
 
 | Category | Tools |
 |----------|-------|
-| File I/O | `read_file`, `write_file`, `edit_file`, `glob`, `grep` |
+| File I/O | `read_file`, `write_file`, `edit_file`, `glob`, `grep`, `code_graph` |
 | Shell | `bash`, `background_run` |
 | Rails | `rails_generate`, `db_migrate`, `run_specs`, `bundle_install`, `bundle_add` |
 | Git | `git_commit`, `git_diff`, `git_log`, `git_status` |
