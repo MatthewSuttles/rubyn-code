@@ -461,6 +461,77 @@ RSpec.describe RubynCode::Index::CodebaseIndex do
     end
   end
 
+  describe 'Prism extraction' do
+    it 'records line spans and owners for methods' do
+      create_service_file('billing', <<~RUBY)
+        class Billing
+          def charge
+            :ok
+          end
+        end
+      RUBY
+
+      index.build!
+      node = index.nodes.find { |n| n['name'] == 'charge' }
+      expect(node['line']).to eq(2)
+      expect(node['end_line']).to eq(4)
+      expect(node['owner']).to eq('Billing')
+    end
+
+    it 'records call edges between project methods' do
+      create_service_file('billing', <<~RUBY)
+        class Billing
+          def charge
+            audit
+          end
+
+          def audit
+            :ok
+          end
+        end
+      RUBY
+
+      index.build!
+      edge = index.edges.find { |e| e['relationship'] == 'calls' && e['to'] == 'audit' }
+      expect(edge).not_to be_nil
+      expect(edge['from_method']).to eq('charge')
+      expect(edge['from']).to eq('app/services/billing.rb')
+    end
+
+    it 'prunes call edges to methods not defined in the project' do
+      create_service_file('billing', <<~RUBY)
+        class Billing
+          def charge
+            puts 'x'
+          end
+        end
+      RUBY
+
+      index.build!
+      expect(index.edges.none? { |e| e['relationship'] == 'calls' && e['to'] == 'puts' }).to be true
+    end
+
+    it 'falls back to regex extraction for unparseable files' do
+      create_service_file('broken', "class Broken\n  def oops(\nend\n")
+
+      index.build!
+      expect(index.nodes.map { |n| n['name'] }).to include('Broken')
+    end
+
+    it 'rebuilds indexes written in an older format' do
+      create_model_file('user', "class User\nend\n")
+      index.build!
+
+      data = JSON.parse(File.read(index.index_path))
+      data['format_version'] = 1
+      File.write(index.index_path, JSON.generate(data))
+
+      fresh = described_class.new(project_root: tmpdir)
+      expect(fresh.load).to be_nil
+      expect(fresh.load_or_build!.nodes.map { |n| n['name'] }).to include('User')
+    end
+  end
+
   describe 'git-aware file discovery' do
     it 'skips gitignored files when the project is a git repository' do
       skip 'git not available' unless system('git --version', out: File::NULL, err: File::NULL)

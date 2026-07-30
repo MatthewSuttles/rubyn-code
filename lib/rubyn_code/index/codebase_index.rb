@@ -14,6 +14,9 @@ module RubynCode
       INDEX_DIR = '.rubyn-code'
       INDEX_FILE = 'codebase_index.json'
       CHARS_PER_TOKEN = 4
+      # Bump when the stored shape changes so stale indexes rebuild instead
+      # of silently serving degraded data. 2 = Prism spans + call edges.
+      FORMAT_VERSION = 2
 
       attr_reader :nodes, :edges, :index_path
 
@@ -33,6 +36,7 @@ module RubynCode
 
         ruby_files.each { |file| index_file(file) }
         extract_rails_edges
+        prune_call_edges!
         save!
         self
       end
@@ -42,6 +46,8 @@ module RubynCode
         return nil unless File.exist?(@index_path)
 
         data = JSON.parse(File.read(@index_path))
+        return nil unless data['format_version'] == FORMAT_VERSION
+
         @nodes = data['nodes'] || []
         # uniq drops duplicate edges accumulated by older versions, which
         # appended tests edges on every update! without dedup.
@@ -68,6 +74,7 @@ module RubynCode
         end
 
         extract_rails_edges
+        prune_call_edges!
         save!
         self
       end
@@ -81,6 +88,7 @@ module RubynCode
         remove_nodes_for(absolute)
         index_file(absolute) if File.exist?(absolute)
         extract_rails_edges
+        prune_call_edges!
         save!
         self
       end
@@ -237,12 +245,64 @@ module RubynCode
         content = File.read(file)
         @file_mtimes[relative] = File.mtime(file).to_i
 
-        extract_classes(content, relative)
-        extract_methods(content, relative)
+        extract_symbols(content, relative)
         extract_associations(content, relative)
         extract_rails_patterns(content, relative)
       rescue StandardError => e
         RubynCode::Debug.warn("Index: failed to parse #{file}: #{e.message}")
+      end
+
+      # Prism gives real line spans (needed for verbatim source in code_graph)
+      # and call edges. Files that don't parse fall back to the regex pass,
+      # which produces the same node shapes minus end_line/owner/calls.
+      def extract_symbols(content, file)
+        extracted = PrismExtractor.extract(content)
+        unless extracted
+          extract_classes(content, file)
+          extract_methods(content, file)
+          return
+        end
+
+        add_class_nodes(extracted.classes, file)
+        add_method_nodes(extracted.defs, file)
+        add_call_edges(extracted.calls, file)
+      end
+
+      def add_class_nodes(classes, file)
+        classes.each do |c|
+          @nodes << {
+            'type' => classify_node(file, c[:kind]), 'name' => c[:name],
+            'file' => file, 'line' => c[:line], 'end_line' => c[:end_line]
+          }
+        end
+      end
+
+      def add_method_nodes(methods, file)
+        methods.each do |m|
+          @nodes << {
+            'type' => 'method', 'name' => m[:name], 'file' => file,
+            'line' => m[:line], 'end_line' => m[:end_line],
+            'owner' => m[:owner], 'params' => m[:params], 'visibility' => 'public'
+          }
+        end
+      end
+
+      # `from` stays the file path so remove_nodes_for's from-based cleanup
+      # applies to call edges too; the calling method rides in from_method.
+      def add_call_edges(calls, file)
+        calls.each do |c|
+          @edges << {
+            'from' => file, 'from_method' => c[:from], 'to' => c[:to],
+            'relationship' => 'calls', 'line' => c[:line]
+          }
+        end
+      end
+
+      # Drop call edges whose target isn't defined in the project — filters
+      # out stdlib/gem calls (puts, map, ...) that would swamp the graph.
+      def prune_call_edges!
+        defined_methods = @nodes.filter_map { |n| n['name'] if n['type'] == 'method' }.to_set
+        @edges.reject! { |e| e['relationship'] == 'calls' && !defined_methods.include?(e['to']) }
       end
 
       def extract_classes(content, file)
@@ -342,7 +402,8 @@ module RubynCode
 
       def save!
         FileUtils.mkdir_p(File.dirname(@index_path))
-        data = { 'nodes' => @nodes, 'edges' => @edges, 'file_mtimes' => @file_mtimes }
+        data = { 'format_version' => FORMAT_VERSION, 'nodes' => @nodes, 'edges' => @edges,
+                 'file_mtimes' => @file_mtimes }
         File.write(@index_path, JSON.generate(data))
       end
     end

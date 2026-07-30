@@ -90,6 +90,7 @@ module RubynCode
     autoload :EditFile, 'rubyn_code/tools/edit_file'
     autoload :Glob, 'rubyn_code/tools/glob'
     autoload :Grep, 'rubyn_code/tools/grep'
+    autoload :CodeGraph, 'rubyn_code/tools/code_graph'
     autoload :Bash, 'rubyn_code/tools/bash'
     autoload :RailsGenerate, 'rubyn_code/tools/rails_generate'
     autoload :DbMigrate, 'rubyn_code/tools/db_migrate'
@@ -286,6 +287,7 @@ module RubynCode
   # Codebase Index
   module Index
     autoload :CodebaseIndex, 'rubyn_code/index/codebase_index'
+    autoload :PrismExtractor, 'rubyn_code/index/prism_extractor'
   end
 
   # CLI
