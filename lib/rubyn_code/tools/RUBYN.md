@@ -1,6 +1,6 @@
 # Layer 2: Tools
 
-33 built-in tools that Claude can invoke. The extensibility surface of the system.
+34 built-in tools that Claude can invoke. The extensibility surface of the system.
 
 ## Core Classes
 
@@ -26,7 +26,7 @@
 | Git | `git_commit`, `git_diff`, `git_log`, `git_status` |
 | Web | `web_search`, `web_fetch` |
 | Memory | `memory_search`, `memory_write` |
-| Agents | `spawn_agent`, `spawn_teammate`, `send_message`, `read_inbox` |
+| Agents | `spawn_agent`, `spawn_teammate`, `send_message`, `read_inbox`, `phone_a_friend` |
 | Meta | `compact`, `load_skill`, `task`, `review_pr` |
 
 ## Adding a Tool

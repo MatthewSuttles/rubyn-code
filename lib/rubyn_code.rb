@@ -107,6 +107,7 @@ module RubynCode
     autoload :ReadInbox, 'rubyn_code/tools/read_inbox'
     autoload :ReviewPr, 'rubyn_code/tools/review_pr'
     autoload :SpawnAgent, 'rubyn_code/tools/spawn_agent'
+    autoload :PhoneAFriend, 'rubyn_code/tools/phone_a_friend'
     autoload :BackgroundRun, 'rubyn_code/tools/background_run'
     autoload :WebSearch, 'rubyn_code/tools/web_search'
     autoload :WebFetch, 'rubyn_code/tools/web_fetch'
