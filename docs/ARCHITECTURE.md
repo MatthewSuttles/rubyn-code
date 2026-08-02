@@ -62,14 +62,14 @@ of the system.
 
 | Category | Tools |
 |----------|-------|
-| File I/O | `read_file`, `write_file`, `edit_file`, `glob`, `grep` |
+| File I/O | `read_file`, `write_file`, `edit_file`, `glob`, `grep`, `code_graph` |
 | Shell | `bash`, `background_run` |
 | Rails | `rails_generate`, `db_migrate`, `run_specs`, `bundle_install`, `bundle_add` |
 | Git | `git_commit`, `git_diff`, `git_log`, `git_status` |
 | Web | `web_search`, `web_fetch` |
 | Memory | `memory_search`, `memory_write` |
-| Agents | `spawn_agent`, `spawn_teammate`, `send_message`, `read_inbox` |
-| Meta | `compact`, `load_skill`, `task`, `review_pr`, `ask_user` |
+| Agents | `spawn_agent`, `spawn_teammate`, `send_message`, `read_inbox`, `phone_a_friend` |
+| Meta | `compact`, `load_skill`, `task`, `review_pr`, `ask_user`, `todo_write` |
 
 **Interactions:** Called by `Agent::Loop` (Layer 1), gated by `Permissions::Policy`
 (Layer 3), and observable via `Hooks::Runner` (Layer 14).
