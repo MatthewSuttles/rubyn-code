@@ -1,94 +1,77 @@
-# Rubyn Code v0.7.0 — Chisel
+# Rubyn Code v0.8.0 — Claude 5
 
-**Write the minimum that works.**
+**The Claude 5 family is now the default.**
 
-This release introduces **Chisel**, an opt-in discipline that teaches the agent to stop over-engineering — and gives you commands to find and pay down over-engineering that already exists. Around it ships a wave of extensibility work that brings Rubyn to parity with the conventions you already use (external hooks, custom sub-agents, user-defined slash commands, `@path` mentions, `AGENTS.md`, MCP resources and prompts), three new session-control commands (`/goal`, `/loop`, `/rewind`), and a performance pass that removes the slow paths from session startup and scaling.
-
----
-
-## Chisel
-
-Chisel is a single idea applied everywhere: before writing code, walk the decision ladder — *does this need to exist at all? can stdlib do it? can the framework? can an installed gem? can it be one line? what is the minimum that works?* It is **off by default** and never changes the agent's behavior until you turn it on.
-
-### Always-on mode
-
-`/chisel` sets the intensity. Four levels:
-
-| Mode | Behavior |
-|------|----------|
-| `off` | Default. Nothing changes. |
-| `lite` | Gentle nudge toward the simpler option. |
-| `full` | The decision ladder is injected on every turn. |
-| `ultra` | Aggressive minimalism — justify every abstraction. |
-
-The mode persists to `~/.rubyn-code/config.yml` across sessions, and `RUBYN_CHISEL_MODE` overrides it for a single process. An unknown mode is treated as `off` rather than raising.
-
-```
-rubyn-code> /chisel full
-Chisel set to full — the decision ladder is now injected each turn.
-```
-
-### Inspection commands
-
-Two read-only audits apply the same decision ladder on demand. They report; they never edit. They work whether or not always-on mode is enabled — running the command is its own opt-in.
-
-- **`/chisel-review [base]`** — inspects the current branch's diff (against `main` by default, including uncommitted changes) and returns a ranked deletion/simplification list. Each item cites a location, the rung it skipped, and the concrete simpler form. Run it before you open a PR.
-- **`/chisel-audit [path]`** — sweeps the whole repo, or a scoped path, for accumulated over-engineering and returns the same ranked list. Run it on a codebase you inherited.
-
-### Ledger and status
-
-- **`/chisel-debt`** — harvests inline `# chisel:` markers into a ledger (file, line, note), so simplifications you consciously deferred don't get lost. Skips non-source directories and never raises on an unreadable file.
-- **`/chisel-gain`** — reports the current mode, the count of outstanding debt markers, and a clearly-attributed reference impact figure. When mode is `off`, it tells you how to turn it on.
-
-### Safety floor
-
-Chisel never tells the agent to cut input validation, error and data-loss handling, security, or accessibility. Inspection and audit exclude these categories from what they flag. "Minimum that works" never means "minimum that's safe."
+This release moves Rubyn onto Anthropic's Claude 5 generation: **Claude Opus 5 is the default model**, the model router's tiers are Haiku 4.5 / Sonnet 5 / Opus 5, and Claude Fable 5 joins the catalog with first-class handling for its refusal stop reason and server-side fallbacks. Around the model work ships a built-in **codegraph** (a Prism-powered call graph exposed as a default tool), the `/effort` and `/think` controls for the new API surfaces, and the Claude Code parity wave: image input, a live TodoWrite checklist, `.mcp.json` auto-discovery, custom-command frontmatter, and `/export`.
 
 ---
 
-## Extensibility
+## Claude 5 by default
 
-A run of features that make Rubyn extend the way the rest of your toolchain already does — drop a file in the right place and it is picked up.
+### New defaults
 
-- **External hooks via `settings.json`** — Claude Code-style hooks. Run external commands at lifecycle points without touching Rubyn's source.
-- **Custom sub-agents from markdown** — define a specialized agent in a markdown file and Rubyn loads it as a spawnable teammate.
-- **User-defined slash commands from markdown** — author your own `/commands` as markdown files; no Ruby required.
-- **`@path` file mentions** — reference a file inline in a prompt with `@path/to/file` and Rubyn expands its contents.
-- **`AGENTS.md` project instructions** — Rubyn now reads the `AGENTS.md` convention for project-level instructions.
-- **MCP resources and prompts** — MCP support extends beyond tools to resources and prompts.
-- **`ask_user` over IDE RPC** — the `ask_user` tool is wired through the IDE's bidirectional RPC, so prompts surface in the editor.
+The default model is now `claude-opus-5` (previously `claude-opus-4-8`), across first-run setup, the settings seed, and the provider tiers. The model router's three rungs are now:
+
+| Tier | Model |
+|------|-------|
+| cheap | `claude-haiku-4-5` |
+| mid | `claude-sonnet-5` |
+| top | `claude-opus-5` |
+
+Opus 5 is priced the same as Opus 4.8 ($5 / $25 per MTok), so the upgrade is a straight capability win at the top tier. `claude-opus-4-8` stays in the catalog as the previous-gen Opus.
+
+### Refreshed catalog
+
+`AVAILABLE_MODELS` was stale — one retired model and one that never existed. The catalog is now the current lineup: Fable 5, Opus 5, Opus 4.8/4.7/4.6, Sonnet 5, Sonnet 4.6, Haiku 4.5. Pricing for Opus 4.6 was also corrected (actual $5 / $25 — it was listed at 3x, over-reporting cost).
+
+### Fable 5 support
+
+`claude-fable-5` is in the catalog at $10 / $50 per MTok, with two behaviors specific to the Fable/Mythos family:
+
+- **Refusal handling.** Fable 5's safety classifiers can decline a request with HTTP 200 and `stop_reason: "refusal"`. Previously that surfaced as a silently empty assistant turn; the agent loop now detects it and reports the refusal and its category.
+- **Server-side fallbacks.** Fable/Mythos requests opt into a server-side Opus 4.8 fallback (`fallbacks:` param plus the fallback beta header), so a declined-at-the-edge request still gets answered. Applied only to this model family; every other model is untouched.
+
+### Adaptive thinking, `/effort`, and task budgets
+
+The Claude 4.6+ API surface changed, and Rubyn now speaks it correctly:
+
+- **Adaptive thinking.** `/think` now emits `thinking: {type: adaptive}` on 4.6+ models. The old `enabled + budget_tokens` shape returns a 400 on Opus 4.8/4.7, Sonnet 5, and Fable 5 — which included our own default model, so `/think` was broken on every default install. Legacy models keep the old shape.
+- **`/effort <level>`** — sets `output_config.effort` (`low` / `medium` / `high` / `xhigh` / `max`), the GA replacement for token-budget thinking on 4.6+ models. `/effort` alone shows the current value; `/effort off` returns to the model default.
+- **Task budgets on the wire.** The task budget the agent already computed now actually reaches the API as `output_config.task_budget`, sent as the *remaining* budget so the model paces against what is left. Sent only on supporting models (Fable/Mythos, Sonnet 5, Opus 5, Opus 4.7/4.8) and only above the API's 20k-token minimum.
 
 ---
 
-## Session control
+## Built-in codegraph
 
-- **`/goal`** — set a session goal and Rubyn keeps working until it is met, running past the per-turn tool-iteration cap while a goal is active.
-- **`/loop`** — repeat a prompt or slash command on an interval.
-- **`/rewind`** — checkpoint and restore both code and conversation, so you can explore a direction and roll all of it back.
-- **Portable instincts** — export and import learned instincts to carry them across machines.
+Rubyn's codebase index now builds a real call graph and exposes it as a default tool:
 
----
-
-## Performance
-
-A pass to make startup and scaling cheap:
-
-- Removed `O(n^2)` hotspots in token counting, persistence, diffing, and formatting that grew with session length.
-- Memoized system-prompt sections per turn instead of rebuilding them.
-- Cached keychain token lookups in the LLM adapter.
-- Lazy-load `pastel`, `rouge`, and `faraday`; fixed a `Config` autoload.
-- Made AutoSuggest and the version check non-blocking at REPL start.
-- Codebase index does incremental single-file updates and dedupes its edges.
+- **Prism-powered indexing** — symbols get real line spans, owning namespaces, and method-to-method call edges (regex remains the fallback for unparseable files). Edges are pruned to methods defined in the project, so stdlib and gem calls don't swamp the graph.
+- **`code_graph` tool** — one query returns matching definitions with verbatim line-numbered source, callers, callees, and affected files including specs. It replaces a grep + read_file loop and is registered in the base toolset, exposed on every turn.
+- The agent is steered to reach for `code_graph` first when an index exists, and an index `format_version` makes pre-span indexes rebuild instead of silently serving degraded data.
 
 ---
 
-## Platform and reliability
+## Claude Code parity
 
-- **Linux support for Claude Code OAuth** — authentication now works on Linux, not just macOS.
-- Fixed order-dependent spec flakiness (auth, SIGINT trap, cancel race) and eager-require `faraday` in `RegistryClient`.
-- Made the compressor and memory self-test checks deterministic.
-- Added a deterministic Chisel smoke test plus an over-engineered fixture.
-- CI honesty gate: the test job no longer silently runs a subset on a keychain-dependent exit, and the build checks for "0 failures" rather than trusting a platform-dependent exit code.
+The parity wave that motivated the 0.8.0 version bump:
+
+- **Extended thinking** with a `/think` toggle.
+- **Image / vision input** — reference an image inline with `@screenshot.png` and it is sent as an image block.
+- **TodoWrite live checklist** — the agent maintains a visible task list as it works.
+- **`.mcp.json` auto-discovery** — MCP servers are picked up from the standard project file, and `/mcp` tags each server `[project]` or `[user]`.
+- **Custom-command frontmatter** — `argument-hint`, `allowed-tools`, and `model` in user-defined slash commands, with enforcement.
+- **`/export`** — dump the conversation transcript as markdown or JSONL.
+
+---
+
+## Fixes and reliability
+
+- Session restore got a proper UX and real error surfacing instead of failing quietly.
+- Fixed `filtered_tool_definitions` being undefined in the agent (missed by the tool-filtering PR).
+- Fixed content-block autoloads and a missing `base64` require in `ImageReader`.
+- Fixed a crash in the MCP connect messages (`config[:name]` on a `Data` object).
+- Cleared all RuboCop offenses, stale spec doubles, and a registry reset leak that broke later specs.
+- Added an end-to-end integration test composing every parity feature in one turn, plus self-test smoke checks.
 
 ---
 
@@ -109,7 +92,7 @@ ruby -Ilib exe/rubyn-code
 
 ### Breaking changes
 
-None. Chisel is off by default and every new feature is additive. Existing commands, tools, and workflows behave exactly as before.
+None. Note the default model changes to `claude-opus-5` on default configs; pin `model` in `~/.rubyn-code/config.yml` if you want to stay on a previous model. Explicitly configured models are untouched.
 
 ---
 
@@ -117,51 +100,42 @@ None. Chisel is off by default and every new feature is additive. Existing comma
 
 | Metric | Value |
 |--------|-------|
-| Commits since v0.6.0 | 29 |
-| Files changed | 158 |
-| Lines added | 8,305 |
-| Test examples | 2,706 |
+| Commits since v0.7.0 | 26 |
+| Files changed | 119 |
+| Lines added | 5,346 |
+| Test examples | 2,837 |
 | Failures | 0 |
-| New Chisel commands | 5 (`/chisel`, `/chisel-review`, `/chisel-audit`, `/chisel-debt`, `/chisel-gain`) |
+| Default model | `claude-opus-5` |
 
 ---
 
 ## Full changelog
 
-### Chisel
-- Phase 1 — Core: opt-in `off`/`lite`/`full`/`ultra` modes, decision-ladder ruleset injection, `/chisel` command (#124)
-- Phase 2 — Inspection: `/chisel-review` and `/chisel-audit` (#125)
-- Phase 3 — Ledger & Gain: `/chisel-debt` and `/chisel-gain` (#127)
-- Deterministic Chisel smoke test and over-engineered fixture (#129)
+### Claude 5 models
+- Add Claude Opus 5 and make the Claude 5 family the defaults (#152)
+- Handle Fable 5 refusal stop reason and opt Fable/Mythos into server-side fallbacks (#150)
+- Refresh model catalog; adaptive thinking on 4.6+ models; fix Opus 4.6 pricing (#147)
+- `/effort` command for `output_config.effort` (#148)
+- Wire task budgets to the Anthropic adapter (#149)
 
-### Extensibility
-- Claude Code-style external hooks via `settings.json` (#123)
-- Custom sub-agent definitions from markdown files (#116)
-- User-defined slash commands from markdown files (#115)
-- Expand `@path` file mentions in prompts (#114)
-- Load `AGENTS.md` project instructions (Codex convention) (#113)
-- Support MCP resources and prompts, not just tools (#117)
-- Wire `ask_user` through IDE bidirectional RPC (#110)
+### Codegraph
+- Built-in codegraph: Prism call graph + `code_graph` tool, steered first when an index exists (#153)
 
-### Session control
-- `/goal` — keep working until a session goal is met (#111)
-- `/loop` — repeat a prompt or slash command on an interval (#112)
-- `/rewind` — checkpoint and restore code and conversation (#118)
-- Export/import instincts for portability across machines (#119)
-- Let an active goal run past the tool-iteration cap (#121, #122)
+### Claude Code parity
+- Extended thinking with `/think` toggle (phase-04)
+- Image / vision input via `@image.png` (#133)
+- TodoWrite live checklist (#134)
+- Custom-command frontmatter: `argument-hint`, `allowed-tools`, `model` (#135)
+- Auto-discover MCP servers from `.mcp.json` (#136)
+- `/export` conversation transcript, markdown or JSONL (#137)
+- `/mcp` shows `[project]` vs `[user]` source tags (#139)
+- Enforce custom-command frontmatter; wire MCP discovery into the REPL (#138)
 
-### Performance
-- Remove `O(n^2)` session-scaling hotspots in tokens, persistence, diff, formatting (#107)
-- Lazy-load pastel/rouge/faraday and fix Config autoload (#106)
-- Cache keychain token lookups in the LLM adapter (#105)
-- Memoize system-prompt sections per turn (#104)
-- Make AutoSuggest and version check non-blocking at REPL start (#103)
-- Dedup index test edges and add incremental single-file updates (#102)
-
-### Platform and fixes
-- Add Linux support for Claude Code OAuth authentication (#108)
-- Eager-require faraday in `RegistryClient` to fix order-dependent specs (#128)
-- Fix order-dependent CI flakiness (auth, SIGINT trap, cancel race) (#126)
-- Make compressor and memory self-test checks deterministic (#109)
-- Cover the new parity features in self-test plus smoke checks (#120)
-- Honest CI gate: stop silently running a spec subset on keychain-dependent exit (#130)
+### Fixes and reliability
+- Session restore: proper UX and actual error surfacing (#146)
+- Define `filtered_tool_definitions` missed by the tool-filtering PR (#151)
+- Autoload content blocks; require `base64` in `ImageReader` (#140, #141)
+- Clear lint offenses, stale spec doubles, and registry reset leak (#154)
+- Chisel out dead and reinvented code (#131)
+- End-to-end parity integration test and self-test smoke checks (#144, #145)
+- Parity docs nested under `docs/04-feature-parity/`; restore docs tree lost in a squash-merge (#142)
