@@ -31,7 +31,7 @@ Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code f
 - [Quick Start](#quick-start)
 - [What Can Rubyn Do?](#what-can-rubyn-do)
 - [VS Code Extension](#vs-code-extension)
-- [29 Built-in Tools](#29-built-in-tools)
+- [32 Built-in Tools](#32-built-in-tools)
 - [MCP — External Tool Servers](#mcp--external-tool-servers)
 - [Codebase Indexing](#codebase-indexing)
 - [112 Best Practice Skills](#112-best-practice-skills)
@@ -215,7 +215,7 @@ Rubyn Code includes a VS Code extension that provides a full IDE experience with
 - Full session management — resume, list, fork, and reset conversations
 - Structured code review feedback with severity ratings
 - IDE config get/set for persistent settings
-- All 29 tools available, including MCP tools
+- All 32 tools available, including MCP tools
 
 **Permission modes:**
 
@@ -226,19 +226,19 @@ Rubyn Code includes a VS Code extension that provides a full IDE experience with
 
 The extension communicates over 19 RPC methods: `initialize`, `prompt`, `cancel`, `review`, `approveToolUse`, `acceptEdit`, `session/*`, `config/*`, `models/list`, `plan/propose`, `plan/interview/*` (chat-resident [megaplan](#megaplan--phased-planning)), `recover_ci`, and `shutdown`.
 
-## 29 Built-in Tools
+## 32 Built-in Tools
 
 | Category | Tools |
 |----------|-------|
 | **File I/O** | `read_file`, `write_file`, `edit_file` |
-| **Search** | `glob`, `grep` |
+| **Search** | `glob`, `grep`, `code_graph` |
 | **Execution** | `bash` (sandboxed, dangerous commands blocked) |
 | **Web** | `web_search`, `web_fetch` |
 | **Git** | `git_status`, `git_diff`, `git_log`, `git_commit` |
 | **Rails** | `rails_generate`, `db_migrate`, `run_specs`, `bundle_install`, `bundle_add` |
 | **Review** | `review_pr` (diff-based best practice code review) |
-| **Agents** | `spawn_agent`, `spawn_teammate`, `background_run` |
-| **Context** | `compact`, `load_skill`, `task` |
+| **Agents** | `spawn_agent`, `spawn_teammate`, `background_run`, `phone_a_friend` |
+| **Context** | `compact`, `load_skill`, `task`, `todo_write` |
 | **Memory** | `memory_search`, `memory_write` |
 | **Teams** | `send_message`, `read_inbox` |
 | **Interactive** | `ask_user` (ask clarifying questions mid-task) |
@@ -767,7 +767,7 @@ Local providers (Ollama, LM Studio) running on `localhost`/`127.0.0.1` don't req
 │  Layer 5:  Skills (112 best practice docs, on-demand loading) │
 │  Layer 4:  Context Management (3-layer compression pipeline)  │
 │  Layer 3:  Permissions (tiered access + deny lists + hooks)   │
-│  Layer 2:  Tool System (29 tools, dispatch map registry)      │
+│  Layer 2:  Tool System (32 tools, dispatch map registry)      │
 │  Layer 1:  THE AGENT LOOP (while tool_use → execute → repeat) │
 └──────────────────────────────────────────────────────────────┘
 ```

@@ -85,6 +85,8 @@ module RubynCode
         when 'spawn_agent', 'spawn_teammate'
           inject_agent_deps(tool)
           tool.db = @db if tool_name == 'spawn_teammate' && tool.respond_to?(:db=)
+        when 'phone_a_friend'
+          tool.llm_client = @llm_client if tool.respond_to?(:llm_client=)
         when 'background_run'
           tool.background_worker = @background_worker if tool.respond_to?(:background_worker=)
         when 'ask_user'
