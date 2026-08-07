@@ -15,7 +15,7 @@
   <a href="https://github.com/MatthewSuttles/rubyn-code/actions/workflows/ci.yml"><img src="https://github.com/MatthewSuttles/rubyn-code/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
-Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code for anti-patterns, and build entire features — all context-aware with your schema, routes, and specs. Powered by Claude Opus 4.8, running on your existing Claude subscription.
+Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code for anti-patterns, and build entire features — all context-aware with your schema, routes, and specs. Powered by Claude Opus 5, running on your existing Claude subscription.
 
 <img width="1230" height="280" alt="image" src="https://github.com/user-attachments/assets/14e07ce8-def0-4a8f-ac89-46661361a4eb" />
 
@@ -74,8 +74,8 @@ Refactor controllers, generate idiomatic RSpec, catch N+1 queries, review code f
 Phase 4 ships nine parity features with Claude Code:
 
 - **Extended thinking** — `/think <budget>` toggles per-session reasoning; the Anthropic adapter emits `thinking: {type: 'adaptive'}` on Claude 4.6+ models (`{type: 'enabled', budget_tokens}` on older ones).
-- **Reasoning effort** — `/effort <low|medium|high|xhigh|max>` sets the request-level reasoning depth; the Anthropic adapter emits `output_config: {effort}` on the wire. GA on Claude 4.6+ (Opus 4.6/4.7/4.8, Sonnet 4.6/5, Fable 5); `xhigh` needs Opus 4.7+ / Sonnet 5 / Fable 5. Model default is `high`.
-- **Task budgets (beta)** — the agent loop's remaining token budget is sent as `output_config: {task_budget: {type: 'tokens', total}}` on supported models (Fable 5, Sonnet 5, Opus 4.7/4.8), advisory pacing only — `max_tokens` stays the enforced per-response cap.
+- **Reasoning effort** — `/effort <low|medium|high|xhigh|max>` sets the request-level reasoning depth; the Anthropic adapter emits `output_config: {effort}` on the wire. GA on Claude 4.6+ (Opus 4.6/4.7/4.8/5, Sonnet 4.6/5, Fable 5); `xhigh` needs Opus 4.7+ / Sonnet 5 / Fable 5. Model default is `high`.
+- **Task budgets (beta)** — the agent loop's remaining token budget is sent as `output_config: {task_budget: {type: 'tokens', total}}` on supported models (Fable 5, Sonnet 5, Opus 5, Opus 4.7/4.8), advisory pacing only — `max_tokens` stays the enforced per-response cap.
 - **Image / vision input** — `@chart.png` (and `.jpg` / `.jpeg` / `.gif` / `.webp`) becomes a real image content block attached to the user turn; Anthropic and OpenAI each emit their native shape.
 - **TodoWrite live checklist** — `TodoWrite` tool; the checklist refreshes above the spinner on every tool result so you see in-turn progress at a glance.
 - **Custom-command frontmatter** — `argument-hint`, `allowed-tools`, and `model:` keys in `~/.rubyn-code/commands/*.md`; the loop honors the per-prompt tool restriction and model override.
@@ -518,6 +518,18 @@ rubyn > Send alice a message to write specs for the User model
 
 Teammates run in background threads with their own agent loop and mailbox.
 
+### Phone a Friend (second opinion)
+
+When the agent is stuck or weighing two approaches, the `phone_a_friend` tool asks a *different* model for a one-shot second opinion. The friend is picked for perspective diversity: the top-tier model of another configured provider whose API key is present (a genuinely different model family), falling back to the active provider's top tier. The friend gets no tools and no conversation history — only the question and whatever context the agent chooses to send — and its answer comes back as plain text labeled with the provider and model that gave it.
+
+```
+rubyn > I keep going back and forth on STI vs polymorphic here...
+
+[tool] phone_a_friend
+## Second Opinion — openai/gpt-5.4
+Commit to the polymorphic association. The key reason: ...
+```
+
 ## GOLEM — Autonomous Daemon
 
 GOLEM is an always-on autonomous agent that claims tasks from a queue and works through them independently. It runs a full agent loop per task with access to all tools, MCP servers, and memory.
@@ -691,7 +703,7 @@ Rubyn snapshots a checkpoint at the start of every turn — capturing the conver
 | 2 | Token file | `~/.rubyn-code/tokens.yml` |
 | 3 | Environment | `export ANTHROPIC_API_KEY=sk-ant-...` |
 
-Works with Claude Pro, Max, Team, and Enterprise. Default model: **Claude Opus 4.6**.
+Works with Claude Pro, Max, Team, and Enterprise. Default model: **Claude Opus 5**.
 
 ### OpenAI
 
@@ -709,7 +721,7 @@ Add a provider and its API key in one command:
 /provider add groq https://api.groq.com/openai/v1 --key gsk-xxx --models llama-3.3-70b
 
 # For Anthropic-format proxies (e.g., Bedrock, custom gateways)
-/provider add my-proxy https://proxy.example.com/v1 --format anthropic --key sk-xxx --models claude-sonnet-4-6
+/provider add my-proxy https://proxy.example.com/v1 --format anthropic --key sk-xxx --models claude-sonnet-5
 
 # Update a key later
 /provider set-key groq gsk-new-key
@@ -740,7 +752,7 @@ providers:
     base_url: https://proxy.example.com/v1
     env_key: PROXY_API_KEY
     models:
-      top: claude-sonnet-4-6
+      top: claude-sonnet-5
 ```
 
 Then switch with `/model groq:llama-3.3-70b`.
@@ -780,7 +792,7 @@ These must match a provider defined in the `providers` section (or a built-in li
 ```yaml
 # ~/.rubyn-code/config.yml (global)
 provider: anthropic              # default provider on startup
-model: claude-opus-4-6           # default model on startup
+model: claude-opus-5             # default model on startup
 permission_mode: allow_read
 session_budget: 5.00
 daily_budget: 10.00
@@ -798,15 +810,15 @@ Rubyn can automatically route tasks to different AI models based on complexity. 
 ```yaml
 # ~/.rubyn-code/config.yml
 provider: anthropic
-model: claude-opus-4-6
+model: claude-opus-5
 
 providers:
   anthropic:
     env_key: ANTHROPIC_API_KEY
     models:
       cheap: claude-haiku-4-5      # file search, git ops, formatting
-      mid: claude-sonnet-4-6       # code gen, specs, refactors, reviews
-      top: claude-opus-4-6         # architecture, security, complex work
+      mid: claude-sonnet-5         # code gen, specs, refactors, reviews
+      top: claude-opus-5           # architecture, security, complex work
 
   openai:
     env_key: OPENAI_API_KEY
@@ -838,8 +850,8 @@ providers:
 | Tier | Task types | Default model |
 |------|-----------|---------------|
 | **cheap** | File search, git ops, formatting, summaries | `claude-haiku-4-5` |
-| **mid** | Code generation, specs, refactors, code review, bug fixes | `claude-sonnet-4-6` |
-| **top** | Architecture, security review, complex refactors, planning | `claude-opus-4-6` |
+| **mid** | Code generation, specs, refactors, code review, bug fixes | `claude-sonnet-5` |
+| **top** | Architecture, security review, complex refactors, planning | `claude-opus-5` |
 
 You can also set custom pricing per model so `/cost` reports accurate spending for third-party providers.
 
