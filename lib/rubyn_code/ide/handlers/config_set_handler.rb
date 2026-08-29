@@ -17,7 +17,7 @@ module RubynCode
           context_threshold_tokens session_budget_usd daily_budget_usd
         ].freeze
 
-        STRING_KEYS = %w[provider model model_mode].freeze
+        STRING_KEYS = %w[provider model model_mode chisel_mode].freeze
 
         VALID_PERMISSION_MODES = %w[default accept_edits plan_only auto dont_ask bypass].freeze
 

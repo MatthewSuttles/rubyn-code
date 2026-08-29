@@ -46,6 +46,13 @@ RSpec.describe RubynCode::IDE::Handlers::ConfigGetHandler do
       )
     end
 
+    it "exposes Chisel as off by default" do
+      result = handler.call({ "key" => "chisel_mode" })
+
+      expect(result["value"]).to eq("off")
+      expect(result["source"]).to eq("default")
+    end
+
     it "includes providers in the response" do
       result = handler.call({})
 

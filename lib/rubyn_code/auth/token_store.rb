@@ -101,7 +101,10 @@ module RubynCode
         private
 
         def resolve_env_key(provider)
-          default = Config::Defaults::PROVIDER_ENV_KEYS.fetch(provider, "#{provider.upcase}_API_KEY")
+          default = Config::Defaults::PROVIDER_ENV_KEYS.fetch(
+            provider,
+            "#{provider.upcase.tr('-', '_')}_API_KEY"
+          )
           Config::Settings.new.provider_config(provider)&.fetch('env_key', nil) || default
         rescue StandardError
           default

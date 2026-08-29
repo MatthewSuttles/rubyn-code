@@ -38,6 +38,7 @@ module RubynCode
         def call(params)
           text       = params['text'] || ''
           context    = params['context'] || {}
+          attachments = params['attachments'] || []
           session_id = params['sessionId'] || SecureRandom.uuid
 
           # Cancel any existing agent thread for this session
@@ -45,7 +46,7 @@ module RubynCode
 
           # Spawn the agent loop in a background thread
           @sessions[session_id] = Thread.new do
-            run_agent(session_id, text, context)
+            run_agent(session_id, text, context, attachments)
           end
 
           { 'accepted' => true, 'sessionId' => session_id }
@@ -71,7 +72,7 @@ module RubynCode
         private
 
         # -- orchestrates agent lifecycle with notifications
-        def run_agent(session_id, text, context)
+        def run_agent(session_id, text, context, attachments)
           @server.notify('agent/status', {
                            'sessionId' => session_id,
                            'status' => 'thinking'
@@ -86,7 +87,7 @@ module RubynCode
           ide_hook_runner.fire(:user_prompt_submit, session_id: session_id, text: text)
 
           workspace = context['workspacePath'] || @server.workspace_path || Dir.pwd
-          agent_loop = build_agent_loop(session_id, workspace)
+          agent_loop = build_agent_loop(session_id, workspace, context)
 
           enriched_input = build_enriched_input(text, context)
 
@@ -95,7 +96,7 @@ module RubynCode
                            'status' => 'streaming'
                          })
 
-          response = agent_loop.send_message(enriched_input)
+          response = agent_loop.send_message(enriched_input, blocks: build_attachment_blocks(attachments))
 
           @server.notify('agent/status', {
                            'sessionId' => session_id,
@@ -124,8 +125,24 @@ module RubynCode
           @sessions.delete(session_id)
         end
 
-        def build_agent_loop(session_id, workspace)
-          llm_client      = LLM::Client.new
+        def build_attachment_blocks(attachments)
+          attachments.filter_map do |attachment|
+            case attachment['type']
+            when 'image'
+              next unless %w[image/png image/jpeg image/gif image/webp].include?(attachment['mediaType'])
+              { type: 'image', source: { type: 'base64', media_type: attachment['mediaType'], data: attachment['data'].to_s } }
+            when 'text'
+              { type: 'text', text: "[Attached file: #{File.basename(attachment['name'].to_s)}]\n#{attachment['text']}" }
+            end
+          end
+        end
+
+        def build_agent_loop(session_id, workspace, context = {})
+          llm_client      = LLM::Client.new(
+            provider: context['provider'],
+            model: context['model'],
+            provider_config: context['providerConfig']
+          )
           # Reuse the conversation across prompts in the same session so the
           # model has multi-turn memory — same model the CLI REPL uses. A
           # fresh Agent::Loop is built per prompt (cheap, bundle of refs),
@@ -181,7 +198,17 @@ module RubynCode
         end
 
         def build_text_callback(session_id)
-          lambda { |text|
+          reasoning_item_id = SecureRandom.uuid
+          lambda { |text, kind = :text|
+            if kind == :thinking
+              @server.notify('reasoning/delta', {
+                               'sessionId' => session_id,
+                               'itemId' => reasoning_item_id,
+                               'text' => text,
+                               'summary' => false
+                             })
+              next
+            end
             @server.notify('agent/status', {
                              'sessionId' => session_id,
                              'status' => 'streaming'

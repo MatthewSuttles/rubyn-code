@@ -46,7 +46,8 @@ module RubynCode
         # -- Auth ---------------------------------------------------------
 
         def resolve_api_key
-          @api_key || ENV.fetch('OPENAI_API_KEY') { raise Client::AuthExpiredError, 'No OpenAI API key configured' }
+          @api_key || Auth::TokenStore.load_provider_key('openai') ||
+            ENV.fetch('OPENAI_API_KEY') { raise Client::AuthExpiredError, 'No OpenAI API key configured' }
         end
 
         # -- Execution ----------------------------------------------------

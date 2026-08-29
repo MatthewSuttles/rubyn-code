@@ -1,15 +1,20 @@
 # LLM Layer
 
-Faraday-based Claude API client with streaming support.
+Provider-neutral LLM facade with Anthropic and OpenAI-compatible adapters.
 
 ## Classes
 
-- **`Client`** — Sends messages to the Claude API. Handles auth headers (OAuth bearer or API key),
-  model selection, system prompts, and tool definitions. Returns parsed response or streams.
+- **`Client`** — Resolves a provider-specific adapter and exposes one chat/stream contract to
+  the agent loop. Built-in Anthropic and OpenAI providers coexist with configured compatible
+  endpoints such as MiniMax, Groq, Ollama, or vLLM.
 
-- **`Streaming`** — SSE stream parser for Claude's streaming API. Buffers partial events,
-  emits content blocks and tool_use blocks as they arrive. Feeds into `CLI::StreamFormatter`.
+- **`AnthropicStreaming` / `OpenAIStreaming`** — Provider-specific SSE parsers that normalize
+  text, tool use, stop reasons, and usage into the shared response objects.
 
 - **`MessageBuilder`** — Constructs the messages array for the API. Handles system prompt
   injection, tool result formatting, and context window limits. Knows about Claude's
-  message format (role/content pairs, tool_use/tool_result blocks).
+  internal message format. Wire-format translation belongs to each adapter.
+
+Codex subscription execution is intentionally not an LLM adapter. Hosts embed the official
+Codex app server so ChatGPT OAuth, token refresh, model discovery, and the Codex agent lifecycle
+remain owned by Codex.

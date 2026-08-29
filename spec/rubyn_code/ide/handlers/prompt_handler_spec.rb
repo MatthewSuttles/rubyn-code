@@ -52,6 +52,21 @@ RSpec.describe RubynCode::IDE::Handlers::PromptHandler do
       expect(final_text).not_to be_nil
       expect(final_text["params"]["text"]).to include("Mock response")
     end
+
+    it "publishes provider thinking as a reasoning trace" do
+      notifications = []
+      allow(server).to receive(:notify) do |method, params|
+        notifications << { "method" => method, "params" => params }
+      end
+
+      callback = handler.send(:build_text_callback, "thinking-session")
+      callback.call("Checking the dependency graph", :thinking)
+
+      reasoning = notifications.find { |notification| notification["method"] == "reasoning/delta" }
+      expect(reasoning["params"]["sessionId"]).to eq("thinking-session")
+      expect(reasoning["params"]["text"]).to eq("Checking the dependency graph")
+      expect(reasoning["params"]["itemId"]).not_to be_empty
+    end
   end
 
   describe "emits agent/status notifications" do
@@ -75,6 +90,24 @@ RSpec.describe RubynCode::IDE::Handlers::PromptHandler do
   end
 
   describe "context included" do
+    it "passes image and text attachments as multimodal blocks" do
+      allow(server).to receive(:notify)
+      handler.call({
+        "text" => "review these",
+        "sessionId" => "attachments",
+        "attachments" => [
+          { "type" => "image", "name" => "screen.png", "mediaType" => "image/png", "data" => "cG5n" },
+          { "type" => "text", "name" => "../../query.rb", "text" => "User.limit(1)" }
+        ]
+      })
+      sleep 0.3
+
+      expect(mock_agent.blocks_sent.first).to eq([
+        { type: "image", source: { type: "base64", media_type: "image/png", data: "cG5n" } },
+        { type: "text", text: "[Attached file: query.rb]\nUser.limit(1)" }
+      ])
+    end
+
     it "passes activeFile in the enriched input" do
       allow(server).to receive(:notify)
 

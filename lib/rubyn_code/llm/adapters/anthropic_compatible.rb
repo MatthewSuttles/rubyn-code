@@ -45,14 +45,11 @@ module RubynCode
         def resolve_api_key
           return @api_key if @api_key
 
-          stored = Auth::TokenStore.load_provider_key(@provider)
-          return stored if stored
+          token = Auth::TokenStore.load_for_provider(@provider)
+          return token[:access_token] if token && !token[:access_token].to_s.empty?
 
-          env_key = "#{@provider.upcase.tr('-', '_')}_API_KEY"
-          ENV.fetch(env_key) do
-            raise Client::AuthExpiredError,
-                  "No #{@provider} API key configured. Set with: /provider set-key #{@provider} <key>"
-          end
+          raise Client::AuthExpiredError,
+                "No #{@provider} API key configured. Set with: /provider set-key #{@provider} <key>"
         end
       end
     end

@@ -87,6 +87,24 @@ RSpec.describe RubynCode::LLM::Adapters::OpenAICompatible do
       expect(response.text).to eq('Hello from Groq!')
     end
 
+    it 'uses the provider token resolution shared with the model catalog' do
+      allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider)
+        .with('groq').and_return(access_token: 'gsk-configured-env-key', type: :api_key, source: :env)
+
+      keyless = described_class.new(
+        provider: 'groq',
+        base_url: 'https://api.groq.com/openai/v1',
+        available_models: %w[llama-3.3-70b]
+      )
+
+      stub_request(:post, 'https://api.groq.com/openai/v1/chat/completions')
+        .with(headers: { 'Authorization' => 'Bearer gsk-configured-env-key' })
+        .to_return(status: 200, body: success_body)
+
+      expect(keyless.chat(messages: [{ role: 'user', content: 'Hi' }], model: 'llama-3.3-70b', max_tokens: 100).text)
+        .to eq('Hello from Groq!')
+    end
+
     it 'falls back to PROVIDER_API_KEY env var' do
       original = ENV.delete('GROQ_API_KEY')
       ENV['GROQ_API_KEY'] = 'gsk-env-key'

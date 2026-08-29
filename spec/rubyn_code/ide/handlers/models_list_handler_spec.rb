@@ -12,6 +12,7 @@ RSpec.describe RubynCode::IDE::Handlers::ModelsListHandler do
   let(:config_path) { File.join(tmp_dir, "config.yml") }
 
   before do
+    allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).and_return(nil)
     allow(RubynCode::Config::Settings).to receive(:new).and_wrap_original do |_orig, **kwargs|
       _orig.call(config_path: config_path, **kwargs.except(:config_path))
     end
@@ -63,6 +64,15 @@ RSpec.describe RubynCode::IDE::Handlers::ModelsListHandler do
       expect(result["modelMode"]).to eq("auto")
     end
 
+    it "reports which providers already have credentials" do
+      allow(RubynCode::Auth::TokenStore).to receive(:load_for_provider).with("anthropic")
+        .and_return(access_token: "stored", type: :api_key)
+
+      result = handler.call({})
+
+      expect(result["connectedProviders"]).to eq(["anthropic"])
+    end
+
     it "reflects a manually set model_mode" do
       File.write(config_path, YAML.dump(
         "provider" => "anthropic",
@@ -93,6 +103,26 @@ RSpec.describe RubynCode::IDE::Handlers::ModelsListHandler do
       providers = result["models"].map { |m| m["provider"] }.uniq
       expect(providers).not_to include("custom_provider")
       expect(providers).to include("openai")
+    end
+
+    it "includes array-based models from custom providers" do
+      File.write(config_path, YAML.dump(
+        "provider" => "minimax",
+        "model" => "MiniMax-M2.5",
+        "providers" => {
+          "minimax" => {
+            "base_url" => "https://api.minimax.io/v1",
+            "api_format" => "openai",
+            "models" => ["MiniMax-M2.5", "MiniMax-M2.5-highspeed"]
+          }
+        }
+      ))
+
+      result = handler.call({})
+
+      minimax = result["models"].select { |model| model["provider"] == "minimax" }
+      expect(minimax.map { |model| model["model"] }).to eq(["MiniMax-M2.5", "MiniMax-M2.5-highspeed"])
+      expect(minimax.map { |model| model["tier"] }.uniq).to eq(["custom"])
     end
   end
 end

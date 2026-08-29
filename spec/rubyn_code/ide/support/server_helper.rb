@@ -99,14 +99,16 @@ module IDEServerHelper
 
   # A mock agent loop that emits predictable notifications.
   class MockAgentLoop
-    attr_reader :messages_sent
+    attr_reader :messages_sent, :blocks_sent
 
     def initialize
       @messages_sent = []
+      @blocks_sent = []
     end
 
-    def send_message(input)
+    def send_message(input, blocks: nil)
       @messages_sent << input
+      @blocks_sent << blocks
       "Mock response to: #{input}"
     end
   end

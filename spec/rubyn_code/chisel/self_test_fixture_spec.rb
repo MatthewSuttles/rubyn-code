@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
+require 'open3'
 
 # Guards the committed Chisel self-test fixture so its result stays consistent.
 # If someone edits skills/self_test/fixtures/chisel_sample.rb, this spec (and
@@ -27,8 +28,9 @@ RSpec.describe 'Chisel self-test fixture' do
 
   it 'runs the standalone smoke script green' do
     script = File.expand_path('../../../skills/self_test/chisel_smoke.rb', __dir__)
-    output = `bundle exec ruby #{script} 2>&1`
-    expect($?).to be_success, "smoke script failed:\n#{output}" # rubocop:disable Style/SpecialGlobalVars
+    output, error, status = Open3.capture3('bundle', 'exec', 'ruby', script)
+    output = "#{output}#{error}"
+    expect(status).to be_success, "smoke script failed:\n#{output}"
     expect(output).to include('CHISEL: PASS')
   end
 end

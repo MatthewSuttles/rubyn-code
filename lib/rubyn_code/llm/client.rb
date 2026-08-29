@@ -17,11 +17,11 @@ module RubynCode
       attr_reader :adapter
       attr_accessor :model, :thinking_budget_tokens, :effort
 
-      def initialize(model: nil, provider: nil, adapter: nil)
+      def initialize(model: nil, provider: nil, adapter: nil, provider_config: nil)
         settings = Config::Settings.new
         @model = model || settings.model
         @provider = provider || settings.provider
-        @adapter = adapter || resolve_adapter(@provider)
+        @adapter = adapter || resolve_adapter(@provider, provider_config)
         @thinking_budget_tokens = 0
       end
 
@@ -96,12 +96,12 @@ module RubynCode
       end
 
       # Builds the appropriate adapter for a given provider name.
-      def resolve_adapter(provider)
+      def resolve_adapter(provider, supplied_config = nil)
         case provider
         when 'anthropic' then Adapters::Anthropic.new
         when 'openai' then Adapters::OpenAI.new
         else
-          config = Config::Settings.new.provider_config(provider)
+          config = supplied_config || Config::Settings.new.provider_config(provider)
           base_url = config&.fetch('base_url', nil)
 
           if config.nil?

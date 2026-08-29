@@ -29,6 +29,23 @@ RSpec.describe 'Extended thinking plumbing' do
   describe RubynCode::LLM::Adapters::Anthropic do
     let(:adapter) { described_class.new }
 
+    it 'forwards thinking deltas separately from response text' do
+      received = []
+      streamer = adapter.send(:build_streamer, ->(*args) { received << args })
+      streamer.feed <<~SSE
+        event: content_block_start
+        data: {"index":0,"content_block":{"type":"thinking","thinking":""}}
+
+      SSE
+      streamer.feed <<~SSE
+        event: content_block_delta
+        data: {"index":0,"delta":{"type":"thinking_delta","thinking":"inspect dependencies"}}
+
+      SSE
+
+      expect(received).to include(['inspect dependencies', :thinking])
+    end
+
     describe '#ensure_max_tokens_for_thinking' do
       it 'returns max_tokens untouched when thinking is nil' do
         expect(adapter.send(:ensure_max_tokens_for_thinking, 8000, nil)).to eq(8000)

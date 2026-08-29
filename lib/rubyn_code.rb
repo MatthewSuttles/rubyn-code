@@ -101,6 +101,8 @@ module RubynCode
     autoload :TodoWrite, 'rubyn_code/tools/todo_write'
     autoload :LoadSkill, 'rubyn_code/tools/load_skill'
     autoload :Task, 'rubyn_code/tools/task'
+    autoload :HarnessTask, 'rubyn_code/tools/harness_task'
+    autoload :Wayfinder, 'rubyn_code/tools/wayfinder'
     autoload :MemorySearch, 'rubyn_code/tools/memory_search'
     autoload :MemoryWrite, 'rubyn_code/tools/memory_write'
     autoload :SendMessage, 'rubyn_code/tools/send_message'

@@ -113,7 +113,8 @@ module RubynCode
 
         # @return [String, nil] the API key (ANTHROPIC_API_KEY), or nil
         def api_key
-          ENV.fetch('ANTHROPIC_API_KEY', nil)
+          ENV.fetch('ANTHROPIC_API_KEY', nil) ||
+            (Auth::TokenStore.load_provider_key('anthropic') if defined?(Auth::TokenStore))
         end
 
         # @return [Boolean] true if the token store says the active
@@ -129,7 +130,9 @@ module RubynCode
           return @raw_access_token if defined?(@raw_access_token)
 
           @raw_access_token =
-            (Auth::TokenStore.load if defined?(Auth::TokenStore) && Auth::TokenStore.respond_to?(:load))
+            if defined?(Auth::TokenStore) && Auth::TokenStore.respond_to?(:load)
+              Auth::TokenStore.load || (api_key && { access_token: api_key, type: :api_key, source: :stored })
+            end
         end
 
         private
@@ -195,7 +198,12 @@ module RubynCode
 
         def build_streamer(on_text)
           AnthropicStreaming.new do |event|
-            on_text&.call(event.data[:text]) if event.type == :text_delta
+            case event.type
+            when :text_delta
+              on_text&.call(event.data[:text])
+            when :thinking_delta
+              on_text&.call(event.data[:text], :thinking)
+            end
           end
         end
 

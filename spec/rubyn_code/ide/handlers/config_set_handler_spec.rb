@@ -35,6 +35,21 @@ RSpec.describe RubynCode::IDE::Handlers::ConfigSetHandler do
       expect(persisted["model"]).to eq("gpt-5.4")
     end
 
+    it "turns Chisel full or off and persists the mode" do
+      expect(handler.call({ "key" => "chisel_mode", "value" => "full" })["updated"]).to eq(true)
+      expect(handler.call({ "key" => "chisel_mode", "value" => "off" })["updated"]).to eq(true)
+
+      persisted = YAML.safe_load(File.read(config_path))
+      expect(persisted["chisel_mode"]).to eq("off")
+    end
+
+    it "rejects an unknown Chisel mode" do
+      result = handler.call({ "key" => "chisel_mode", "value" => "maximum" })
+
+      expect(result["updated"]).to eq(false)
+      expect(result["error"]).to include("off, lite, full, ultra")
+    end
+
     it "updates a numeric key and persists" do
       result = handler.call({ "key" => "max_iterations", "value" => 50 })
 

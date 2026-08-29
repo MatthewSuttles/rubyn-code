@@ -37,6 +37,24 @@ RSpec.describe RubynCode::Tools::AskUser do
 
         expect(tool.execute(question: 'Anything?')).to eq('[no response]')
       end
+
+      it 'rounds at most three structured Wayfinder questions and returns structured answers' do
+        ide_client = instance_double(RubynCode::IDE::Client)
+        questions = [
+          { prompt: 'Boundary?', cardinality: 'single', options: [{ label: 'Policy', recommended: true }] },
+          { prompt: 'Rollout?', cardinality: 'multiple', options: [{ label: 'Canary' }] },
+          { prompt: 'Evidence?', cardinality: 'single', options: [{ label: 'Request specs' }] },
+          { prompt: 'Ignored fourth question' }
+        ]
+        allow(ide_client).to receive(:request)
+          .with('ide/askUser', { question: 'Settle the frontier', questions: questions.first(3) }, timeout: described_class::IDE_ASK_TIMEOUT)
+          .and_return({ 'answer' => { 'questions' => [{ 'id' => 'boundary', 'selected' => ['policy'] }] } })
+
+        tool = described_class.new(project_root: project_root, ide_client: ide_client)
+
+        expect(JSON.parse(tool.execute(question: 'Settle the frontier', questions: questions)))
+          .to eq('questions' => [{ 'id' => 'boundary', 'selected' => ['policy'] }])
+      end
     end
 
     context 'with a prompt_callback injected' do
