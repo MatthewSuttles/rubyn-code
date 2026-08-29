@@ -204,6 +204,32 @@ RSpec.describe RubynCode::Config::Settings do
     end
   end
 
+  describe '#remove_provider' do
+    it 'removes only the named provider and selects a remaining model' do
+      settings = described_class.new(config_path: config_path)
+      settings.add_provider('first', base_url: 'https://first.example/v1', models: %w[first-model])
+      settings.add_provider('second', base_url: 'https://second.example/v1', models: %w[second-model])
+      settings.provider = 'first'
+      settings.model = 'first-model'
+      settings.save!
+
+      expect(settings.remove_provider('first')).to be(true)
+
+      reloaded = described_class.new(config_path: config_path)
+      expect(reloaded.provider_config('first')).to be_nil
+      expect(reloaded.provider_config('second')).not_to be_nil
+      expect(reloaded.provider).not_to eq('first')
+      expect(reloaded.model).not_to eq('first-model')
+    end
+
+    it 'does not rewrite config for an unknown provider' do
+      settings = described_class.new(config_path: config_path)
+      before = File.read(config_path)
+      expect(settings.remove_provider('missing')).to be(false)
+      expect(File.read(config_path)).to eq(before)
+    end
+  end
+
   describe '#provider_config' do
     it 'returns nil for unconfigured providers' do
       settings = described_class.new(config_path: config_path)

@@ -181,6 +181,23 @@ RSpec.describe RubynCode::Auth::TokenStore do
       raw = YAML.safe_load_file(tokens_file)
       expect(raw.dig('provider_keys', 'groq')).to start_with('enc:v1:')
     end
+
+    it 'deletes only the named provider key' do
+      described_class.save(access_token: 'oauth', refresh_token: 'refresh', expires_at: Time.now + 3600)
+      described_class.save_provider_key('groq', 'gsk-key')
+      described_class.save_provider_key('together', 'tog-key')
+
+      expect(described_class.delete_provider_key('groq')).to be(true)
+      expect(described_class.load_provider_key('groq')).to be_nil
+      expect(described_class.load_provider_key('together')).to eq('tog-key')
+      expect(described_class.load[:access_token]).to eq('oauth')
+    end
+
+    it 'reports false without creating a token file for an unknown provider' do
+      FileUtils.rm_f(tokens_file)
+      expect(described_class.delete_provider_key('missing')).to be(false)
+      expect(File).not_to exist(tokens_file)
+    end
   end
 
   describe '.load_from_credentials_file' do

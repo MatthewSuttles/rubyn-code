@@ -143,6 +143,18 @@ module RubynCode
         save!
       end
 
+      # Remove one provider without exposing or touching any other provider's
+      # configuration. Returns false when the provider was not configured.
+      def remove_provider(name) # rubocop:disable Naming/PredicateMethod -- destructive action, not a predicate
+        providers = @data['providers']
+        return false unless providers.is_a?(Hash) && providers.key?(name.to_s)
+
+        providers.delete(name.to_s)
+        select_remaining_provider! if @data['provider'].to_s == name.to_s
+        save!
+        true
+      end
+
       # Returns all user-configured pricing as { model => [input, output] }
       def custom_pricing
         providers = @data['providers']
@@ -167,6 +179,17 @@ module RubynCode
       }.freeze
 
       private
+
+      def select_remaining_provider!
+        name, config = @data.fetch('providers', {}).find { |_, value| value.is_a?(Hash) }
+        @data['provider'] = name.to_s
+        models = config.is_a?(Hash) ? config['models'] : nil
+        @data['model'] = if models.is_a?(Hash)
+                           models.values.first.to_s
+                         else
+                           Array(models).first.to_s
+                         end
+      end
 
       def seed_config!
         @data = {

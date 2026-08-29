@@ -66,6 +66,19 @@ module RubynCode
           KeyEncryption.decrypt(value)
         end
 
+        # Delete only one provider key while preserving OAuth tokens and keys
+        # for every other configured provider.
+        def delete_provider_key(provider) # rubocop:disable Naming/PredicateMethod -- destructive action, not a predicate
+          data = load_tokens_file
+          keys = data&.fetch('provider_keys', nil)
+          return false unless keys.is_a?(Hash) && keys.key?(provider.to_s)
+
+          keys.delete(provider.to_s)
+          data.delete('provider_keys') if keys.empty?
+          write_tokens_file(data)
+          true
+        end
+
         def save(access_token:, refresh_token:, expires_at:)
           ensure_directory!
           data = load_tokens_file || {}
