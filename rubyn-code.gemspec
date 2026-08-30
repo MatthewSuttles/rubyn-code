@@ -34,6 +34,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'reline', '>= 0.5'
 
   # Auth
+  spec.add_dependency 'fiddle', '>= 1.1'
   spec.add_dependency 'webrick', '~> 1.8'
 
   spec.post_install_message = <<~MSG

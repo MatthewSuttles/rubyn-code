@@ -10,7 +10,6 @@ module RubynCode
     module TokenStore # rubocop:disable Metrics/ModuleLength -- single-responsibility credential store
       EXPIRY_BUFFER_SECONDS = 300 # 5 minutes
       KEYCHAIN_SERVICE = 'Claude Code-credentials'
-
       # Strategy chain: each method returns a token hash or nil.
       # First non-nil result wins. Adding a new auth source is a one-line entry.
       LOAD_STRATEGIES = %i[
@@ -34,21 +33,58 @@ module RubynCode
           nil
         end
 
-        # Load API key for a given provider. Anthropic uses the full fallback chain.
-        # Other providers: stored key → env var.
+        # Load API key for a given provider. A provider-specific credential wins;
+        # Anthropic then falls back to Claude OAuth and ANTHROPIC_API_KEY.
         def load_for_provider(provider)
-          return load if provider == 'anthropic'
-
           stored = load_provider_key(provider)
           return { access_token: stored, type: :api_key, source: :stored } if stored
+          return load if provider == 'anthropic'
 
           env_key = resolve_env_key(provider)
           api_key = ENV.fetch(env_key, nil)
           api_key&.empty? == false ? { access_token: api_key, type: :api_key, source: :env } : nil
         end
 
-        # Store an API key for a provider in tokens.yml (encrypted at rest).
+        # Store an API key in macOS Keychain. Non-macOS installations retain
+        # the encrypted mode-0600 tokens.yml fallback.
         def save_provider_key(provider, key)
+          if ProviderKeychain.available?
+            ProviderKeychain.save(provider, key)
+            delete_provider_key_from_file(provider)
+          else
+            save_provider_key_to_file(provider, key)
+          end
+          nil
+        end
+
+        # Retrieve a stored API key for a provider (decrypted transparently).
+        def load_provider_key(provider)
+          return load_provider_key_from_file(provider) unless ProviderKeychain.available?
+
+          key = ProviderKeychain.load(provider)
+          return key if key
+
+          legacy = load_provider_key_from_file(provider)
+          return nil unless legacy
+
+          begin
+            ProviderKeychain.save(provider, legacy)
+            delete_provider_key_from_file(provider)
+          rescue ProviderKeychain::CredentialStoreError
+            # Keep the legacy encrypted key available until Keychain accepts it.
+          end
+          legacy
+        end
+
+        # Delete only one provider key while preserving OAuth tokens and keys
+        # for every other configured provider.
+        def delete_provider_key(provider)
+          keychain_deleted = ProviderKeychain.available? && ProviderKeychain.delete(provider)
+          file_deleted = delete_provider_key_from_file(provider)
+          keychain_deleted || file_deleted
+        end
+
+        def save_provider_key_to_file(provider, key)
           ensure_directory!
           data = load_tokens_file || {}
           data['provider_keys'] ||= {}
@@ -56,8 +92,7 @@ module RubynCode
           write_tokens_file(data)
         end
 
-        # Retrieve a stored API key for a provider (decrypted transparently).
-        def load_provider_key(provider)
+        def load_provider_key_from_file(provider)
           data = load_tokens_file
           value = data&.dig('provider_keys', provider.to_s)
           return nil unless value
@@ -66,9 +101,7 @@ module RubynCode
           KeyEncryption.decrypt(value)
         end
 
-        # Delete only one provider key while preserving OAuth tokens and keys
-        # for every other configured provider.
-        def delete_provider_key(provider) # rubocop:disable Naming/PredicateMethod -- destructive action, not a predicate
+        def delete_provider_key_from_file(provider) # rubocop:disable Naming/PredicateMethod -- destructive action
           data = load_tokens_file
           keys = data&.fetch('provider_keys', nil)
           return false unless keys.is_a?(Hash) && keys.key?(provider.to_s)
@@ -78,6 +111,7 @@ module RubynCode
           write_tokens_file(data)
           true
         end
+        private :save_provider_key_to_file, :load_provider_key_from_file, :delete_provider_key_from_file
 
         def save(access_token:, refresh_token:, expires_at:)
           ensure_directory!

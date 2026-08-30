@@ -17,13 +17,15 @@ module RubynCode
           end
 
           settings = Config::Settings.new
+          return { 'removed' => false, 'error' => 'Provider is not configured' } unless settings.provider_config(name)
+
+          Auth::TokenStore.delete_provider_key(name)
           removed = settings.remove_provider(name)
           return { 'removed' => false, 'error' => 'Provider is not configured' } unless removed
 
-          Auth::TokenStore.delete_provider_key(name)
           @server.notify('config/changed', { 'key' => 'providers', 'provider' => name })
           { 'removed' => true, 'provider' => name }
-        rescue Config::Settings::LoadError => e
+        rescue Config::Settings::LoadError, Auth::ProviderKeychain::CredentialStoreError => e
           { 'removed' => false, 'error' => e.message }
         end
       end

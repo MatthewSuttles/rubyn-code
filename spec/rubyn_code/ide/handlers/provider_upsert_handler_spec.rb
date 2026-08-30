@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "spec_helper"
-require "rubyn_code/ide/server"
+require 'spec_helper'
+require 'rubyn_code/ide/server'
 
 RSpec.describe RubynCode::IDE::Handlers::ProviderUpsertHandler do
   let(:server) { instance_double(RubynCode::IDE::Server, notify: nil) }
@@ -13,36 +13,52 @@ RSpec.describe RubynCode::IDE::Handlers::ProviderUpsertHandler do
     allow(RubynCode::Auth::TokenStore).to receive(:save_provider_key)
   end
 
-  it "persists a compatible provider and stores its key without returning it" do
+  it 'persists a compatible provider and stores its key without returning it' do
     result = handler.call(
-      "name" => "MiniMax",
-      "baseUrl" => "https://api.minimax.io/v1/",
-      "apiFormat" => "openai",
-      "models" => ["MiniMax-M2.5", "MiniMax-M2.5"],
-      "apiKey" => "secret"
+      'name' => 'MiniMax',
+      'baseUrl' => 'https://api.minimax.io/v1/',
+      'apiFormat' => 'openai',
+      'models' => ['MiniMax-M2.5', 'MiniMax-M2.5'],
+      'apiKey' => 'secret'
     )
 
     expect(settings).to have_received(:add_provider).with(
-      "minimax",
-      base_url: "https://api.minimax.io/v1",
+      'minimax',
+      base_url: 'https://api.minimax.io/v1',
       env_key: nil,
-      models: ["MiniMax-M2.5"],
-      api_format: "openai"
+      models: ['MiniMax-M2.5'],
+      api_format: 'openai'
     )
-    expect(RubynCode::Auth::TokenStore).to have_received(:save_provider_key).with("minimax", "secret")
-    expect(result.dig("provider", "apiKey")).to be_nil
-    expect(result["updated"]).to be(true)
+    expect(RubynCode::Auth::TokenStore).to have_received(:save_provider_key).with('minimax', 'secret')
+    expect(result.dig('provider', 'apiKey')).to be_nil
+    expect(result['updated']).to be(true)
   end
 
-  it "rejects invalid formats and URLs before writing" do
+  it 'rejects invalid formats and URLs before writing' do
     result = handler.call(
-      "name" => "minimax",
-      "baseUrl" => "file:///tmp/socket",
-      "apiFormat" => "custom",
-      "models" => []
+      'name' => 'minimax',
+      'baseUrl' => 'file:///tmp/socket',
+      'apiFormat' => 'custom',
+      'models' => []
     )
 
-    expect(result["updated"]).to be(false)
+    expect(result['updated']).to be(false)
     expect(settings).not_to have_received(:add_provider)
+  end
+
+  it 'reports a Keychain failure without claiming the provider was connected' do
+    allow(RubynCode::Auth::TokenStore).to receive(:save_provider_key)
+      .and_raise(RubynCode::Auth::ProviderKeychain::CredentialStoreError, 'macOS Keychain refused the credential')
+
+    result = handler.call(
+      'name' => 'minimax',
+      'baseUrl' => 'https://api.minimax.io/v1',
+      'apiFormat' => 'openai',
+      'models' => ['MiniMax-M3'],
+      'apiKey' => 'secret'
+    )
+
+    expect(result).to eq('updated' => false, 'error' => 'macOS Keychain refused the credential')
+    expect(server).not_to have_received(:notify)
   end
 end

@@ -15,6 +15,7 @@ RSpec.describe RubynCode::Auth::TokenStore do
     # Bypass macOS Keychain — without this, .load finds real Claude tokens
     # and the TOKENS_FILE stub becomes meaningless
     allow(described_class).to receive(:load_from_keychain).and_return(nil)
+    allow(RubynCode::Auth::ProviderKeychain).to receive(:available?).and_return(false)
     # Ensure ANTHROPIC_API_KEY doesn't leak from the test environment
     allow(ENV).to receive(:fetch).and_call_original
     allow(ENV).to receive(:fetch).with('ANTHROPIC_API_KEY', nil).and_return(nil)
@@ -58,23 +59,23 @@ RSpec.describe RubynCode::Auth::TokenStore do
     end
   end
 
-  describe ".valid_tokens?" do
-    it "returns true for a fresh oauth token" do
-      tokens = { access_token: "a", expires_at: Time.now + 3600, type: :oauth }
+  describe '.valid_tokens?' do
+    it 'returns true for a fresh oauth token' do
+      tokens = { access_token: 'a', expires_at: Time.now + 3600, type: :oauth }
       expect(described_class.valid_tokens?(tokens)).to be true
     end
 
-    it "returns false for a token inside the expiry buffer" do
-      tokens = { access_token: "a", expires_at: Time.now + 60, type: :oauth }
+    it 'returns false for a token inside the expiry buffer' do
+      tokens = { access_token: 'a', expires_at: Time.now + 60, type: :oauth }
       expect(described_class.valid_tokens?(tokens)).to be false
     end
 
-    it "returns true for an api key regardless of expiry" do
-      tokens = { access_token: "a", expires_at: nil, type: :api_key }
+    it 'returns true for an api key regardless of expiry' do
+      tokens = { access_token: 'a', expires_at: nil, type: :api_key }
       expect(described_class.valid_tokens?(tokens)).to be true
     end
 
-    it "returns false for nil tokens" do
+    it 'returns false for nil tokens' do
       expect(described_class.valid_tokens?(nil)).to be false
     end
   end
@@ -92,6 +93,15 @@ RSpec.describe RubynCode::Auth::TokenStore do
       described_class.save(access_token: 'abc', refresh_token: 'xyz', expires_at: Time.now + 3600)
       tokens = described_class.load_for_provider('anthropic')
       expect(tokens[:access_token]).to eq('abc')
+    end
+
+    it 'prefers a stored Anthropic API key over the generic OAuth fallback' do
+      described_class.save(access_token: 'oauth', refresh_token: 'refresh', expires_at: Time.now + 3600)
+      described_class.save_provider_key('anthropic', 'sk-ant-provider')
+
+      tokens = described_class.load_for_provider('anthropic')
+
+      expect(tokens).to eq(access_token: 'sk-ant-provider', type: :api_key, source: :stored)
     end
 
     it 'reads OPENAI_API_KEY for openai provider' do
@@ -200,6 +210,54 @@ RSpec.describe RubynCode::Auth::TokenStore do
     end
   end
 
+  describe 'macOS provider Keychain storage' do
+    before do
+      allow(RubynCode::Auth::ProviderKeychain).to receive(:available?).and_return(true)
+    end
+
+    it 'stores a new key outside the fallback file' do
+      expect(RubynCode::Auth::ProviderKeychain).to receive(:save).with('groq', 'gsk-secret')
+
+      expect(described_class.save_provider_key('groq', 'gsk-secret')).to be_nil
+      expect(File).not_to exist(tokens_file)
+    end
+
+    it 'loads a named provider key from Keychain' do
+      expect(RubynCode::Auth::ProviderKeychain).to receive(:load).with('groq').and_return('gsk-secret')
+
+      expect(described_class.load_provider_key('groq')).to eq('gsk-secret')
+    end
+
+    it 'migrates a legacy encrypted key only after Keychain accepts it' do
+      described_class.send(:save_provider_key_to_file, 'groq', 'legacy-secret')
+      allow(RubynCode::Auth::ProviderKeychain).to receive(:load).with('groq').and_return(nil)
+      expect(RubynCode::Auth::ProviderKeychain).to receive(:save).with('groq', 'legacy-secret')
+
+      expect(described_class.load_provider_key('groq')).to eq('legacy-secret')
+      raw = YAML.safe_load_file(tokens_file)
+      expect(raw.fetch('provider_keys', {})).not_to have_key('groq')
+    end
+
+    it 'keeps the encrypted fallback when Keychain migration fails' do
+      described_class.send(:save_provider_key_to_file, 'groq', 'legacy-secret')
+      allow(RubynCode::Auth::ProviderKeychain).to receive(:load).with('groq').and_return(nil)
+      allow(RubynCode::Auth::ProviderKeychain).to receive(:save)
+        .and_raise(RubynCode::Auth::ProviderKeychain::CredentialStoreError)
+
+      expect(described_class.load_provider_key('groq')).to eq('legacy-secret')
+      raw = YAML.safe_load_file(tokens_file)
+      expect(raw.dig('provider_keys', 'groq')).to start_with('enc:v1:')
+    end
+
+    it 'fails closed when Keychain cannot revoke a credential' do
+      allow(RubynCode::Auth::ProviderKeychain).to receive(:delete)
+        .and_raise(RubynCode::Auth::ProviderKeychain::CredentialStoreError, 'macOS Keychain did not revoke')
+
+      expect { described_class.delete_provider_key('groq') }
+        .to raise_error(RubynCode::Auth::ProviderKeychain::CredentialStoreError, /did not revoke/)
+    end
+  end
+
   describe '.load_from_credentials_file' do
     before do
       # Let the real method run
@@ -211,7 +269,7 @@ RSpec.describe RubynCode::Auth::TokenStore do
         'claudeAiOauth' => {
           'accessToken' => 'sk-ant-oat01-linux-test-token',
           'refreshToken' => 'sk-ant-ort01-linux-refresh',
-          'expiresAt' => (Time.now.to_f * 1000 + 3_600_000).to_i
+          'expiresAt' => ((Time.now.to_f * 1000) + 3_600_000).to_i
         }
       }
     end
@@ -285,11 +343,11 @@ RSpec.describe RubynCode::Auth::TokenStore do
   describe 'LOAD_STRATEGIES order' do
     it 'defines a scannable fallback chain' do
       expect(described_class::LOAD_STRATEGIES).to eq(%i[
-        load_from_keychain
-        load_from_credentials_file
-        load_from_file
-        load_from_env
-      ])
+                                                       load_from_keychain
+                                                       load_from_credentials_file
+                                                       load_from_file
+                                                       load_from_env
+                                                     ])
     end
   end
 end
