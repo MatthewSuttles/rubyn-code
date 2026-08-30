@@ -12,6 +12,20 @@ RSpec.describe RubynCode::Context::Manager do
       expect(manager.total_input_tokens).to eq(200)
       expect(manager.total_output_tokens).to eq(100)
     end
+
+    it 'accumulates provider cache usage when available' do
+      usage_class = Struct.new(
+        :input_tokens, :output_tokens, :cache_read_input_tokens, :cache_creation_input_tokens,
+        keyword_init: true
+      )
+      usage = usage_class.new(input_tokens: 100, output_tokens: 50,
+                              cache_read_input_tokens: 80, cache_creation_input_tokens: 20)
+
+      manager.track_usage(usage)
+
+      expect(manager.cache_read_tokens).to eq(80)
+      expect(manager.cache_write_tokens).to eq(20)
+    end
   end
 
   describe '#estimated_tokens' do
@@ -87,6 +101,9 @@ RSpec.describe RubynCode::Context::Manager do
 
       expect(manager.total_input_tokens).to eq(0)
       expect(manager.total_output_tokens).to eq(0)
+      expect(manager.cache_read_tokens).to eq(0)
+      expect(manager.cache_write_tokens).to eq(0)
+      expect(manager.compaction_tokens_saved).to eq(0)
     end
 
     it 'resets the turn counter' do
@@ -210,10 +227,18 @@ RSpec.describe RubynCode::Context::Manager do
         collapsed = [{ role: 'user', content: 'compacted' }]
         allow(RubynCode::Context::ContextCollapse).to receive(:call).and_return(collapsed)
 
-        # NOTE: Conversation doesn't respond to replace_messages or messages=,
-        # so apply_compacted_messages is currently a no-op. This tests that
-        # the compaction logic runs without error, not that messages are replaced.
         expect { manager.check_compaction!(conversation) }.not_to raise_error
+      end
+
+      it 'records the estimated context tokens removed by compaction' do
+        conversation.add_user_message('x' * 2_000)
+        allow(RubynCode::Context::MicroCompact).to receive(:call).and_return(0)
+        allow(RubynCode::Context::ContextCollapse).to receive(:call)
+          .and_return([{ role: 'user', content: 'compacted' }])
+
+        manager.check_compaction!(conversation)
+
+        expect(manager.compaction_tokens_saved).to be_positive
       end
     end
 

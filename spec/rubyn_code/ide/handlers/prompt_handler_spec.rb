@@ -69,6 +69,41 @@ RSpec.describe RubynCode::IDE::Handlers::PromptHandler do
     end
   end
 
+  describe "emits token usage" do
+    it "accumulates provider usage and measured Rubyn savings for a chat" do
+      usage_agent = instance_double("UsageAgent")
+      allow(usage_agent).to receive(:send_message).and_return("done")
+      allow(usage_agent).to receive(:usage_snapshot).and_return(
+        input_tokens: 1_000,
+        output_tokens: 100,
+        cache_read_tokens: 700,
+        cache_write_tokens: 50,
+        efficiency_saved_tokens: 240,
+        savings: { tool_output_compression: 200, context_compaction: 40 }
+      )
+      allow(handler).to receive(:build_agent_loop).and_return(usage_agent)
+      notifications = []
+      allow(server).to receive(:notify) { |method, params| notifications << { "method" => method, "params" => params } }
+
+      2.times do
+        handler.call({ "text" => "continue", "sessionId" => "usage-chat" })
+        sleep 0.2
+      end
+
+      usage = notifications.select { |notification| notification["method"] == "token/usage" }.last["params"]
+      expect(usage).to include(
+        "inputTokens" => 2_000,
+        "cachedInputTokens" => 1_400,
+        "cacheWriteTokens" => 100,
+        "outputTokens" => 200,
+        "totalTokens" => 3_700,
+        "efficiencySavedTokens" => 480,
+        "source" => "rubyn"
+      )
+      expect(usage["savings"]).to eq("tool_output_compression" => 400, "context_compaction" => 80)
+    end
+  end
+
   describe "emits agent/status notifications" do
     it "sends thinking, streaming, and done status notifications" do
       notifications = []

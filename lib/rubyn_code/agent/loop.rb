@@ -97,6 +97,25 @@ module RubynCode
       # @return [Tools::TodoStore] shared checklist store, exposed for the REPL renderer
       attr_reader :todo_store
 
+      # Provider-reported usage plus measured Rubyn context reductions for the
+      # current prompt. The IDE transport aggregates these snapshots per chat.
+      def usage_snapshot
+        compressor = @tool_executor.output_compressor.stats
+        tool_tokens_saved = compressor[:tokens_saved].to_i
+        compaction_tokens_saved = @context_manager.compaction_tokens_saved.to_i
+        {
+          input_tokens: @context_manager.total_input_tokens.to_i,
+          output_tokens: @context_manager.total_output_tokens.to_i,
+          cache_read_tokens: @context_manager.cache_read_tokens.to_i,
+          cache_write_tokens: @context_manager.cache_write_tokens.to_i,
+          efficiency_saved_tokens: tool_tokens_saved + compaction_tokens_saved,
+          savings: {
+            tool_output_compression: tool_tokens_saved,
+            context_compaction: compaction_tokens_saved
+          }
+        }
+      end
+
       # Apply a one-shot model override for the duration of the next LLM call.
       # Used by `Context#with_optional_model` for custom-command frontmatter.
       def model_override=(model_name)

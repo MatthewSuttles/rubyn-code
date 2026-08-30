@@ -11,12 +11,13 @@ module RubynCode
       # background thread that runs the agent loop. As the agent works,
       # it emits stream/text, tool/use, tool/result, and agent/status
       # notifications over the JSON-RPC transport.
-      class PromptHandler
+      class PromptHandler # rubocop:disable Metrics/ClassLength -- owns one IDE chat's lifecycle and telemetry
         def initialize(server)
           @server = server
           @sessions = {}       # sessionId => Thread
           @conversations = {}  # sessionId => Agent::Conversation (persists across prompts)
           @started_sessions = Set.new # tracks which sessions have fired session_start
+          @usage_totals = {} # sessionId => cumulative provider usage and measured Rubyn savings
         end
 
         # Called by SessionResumeHandler to inject a restored conversation
@@ -33,6 +34,7 @@ module RubynCode
           cancel_session(session_id)
           @conversations.delete(session_id)
           @started_sessions.delete(session_id)
+          @usage_totals.delete(session_id)
         end
 
         def call(params)
@@ -97,6 +99,7 @@ module RubynCode
                          })
 
           response = agent_loop.send_message(enriched_input, blocks: build_attachment_blocks(attachments))
+          publish_usage(session_id, agent_loop)
 
           @server.notify('agent/status', {
                            'sessionId' => session_id,
@@ -130,15 +133,45 @@ module RubynCode
             case attachment['type']
             when 'image'
               next unless %w[image/png image/jpeg image/gif image/webp].include?(attachment['mediaType'])
-              { type: 'image', source: { type: 'base64', media_type: attachment['mediaType'], data: attachment['data'].to_s } }
+
+              source = { type: 'base64', media_type: attachment['mediaType'], data: attachment['data'].to_s }
+              { type: 'image', source: source }
             when 'text'
-              { type: 'text', text: "[Attached file: #{File.basename(attachment['name'].to_s)}]\n#{attachment['text']}" }
+              name = File.basename(attachment['name'].to_s)
+              { type: 'text', text: "[Attached file: #{name}]\n#{attachment['text']}" }
             end
           end
         end
 
+        def publish_usage(session_id, agent_loop) # rubocop:disable Metrics/AbcSize -- maps a cumulative wire payload
+          return unless agent_loop.respond_to?(:usage_snapshot)
+
+          snapshot = agent_loop.usage_snapshot
+          totals = (@usage_totals[session_id] ||= Hash.new(0))
+          %i[input_tokens output_tokens cache_read_tokens cache_write_tokens efficiency_saved_tokens].each do |key|
+            totals[key] += snapshot.fetch(key, 0).to_i
+          end
+          savings = totals[:savings]
+          savings = totals[:savings] = Hash.new(0) unless savings.is_a?(Hash)
+          snapshot.fetch(:savings, {}).each { |feature, tokens| savings[feature.to_sym] += tokens.to_i }
+
+          @server.notify('token/usage', {
+                           'sessionId' => session_id,
+                           'inputTokens' => totals[:input_tokens],
+                           'cachedInputTokens' => totals[:cache_read_tokens],
+                           'cacheWriteTokens' => totals[:cache_write_tokens],
+                           'outputTokens' => totals[:output_tokens],
+                           'reasoningOutputTokens' => 0,
+                           'totalTokens' => totals[:input_tokens] + totals[:cache_read_tokens] +
+                             totals[:cache_write_tokens] + totals[:output_tokens],
+                           'efficiencySavedTokens' => totals[:efficiency_saved_tokens],
+                           'savings' => savings.transform_keys(&:to_s),
+                           'source' => 'rubyn'
+                         })
+        end
+
         def build_agent_loop(session_id, workspace, context = {})
-          llm_client      = LLM::Client.new(
+          llm_client = LLM::Client.new(
             provider: context['provider'],
             model: context['model'],
             provider_config: context['providerConfig']
@@ -148,7 +181,7 @@ module RubynCode
           # fresh Agent::Loop is built per prompt (cheap, bundle of refs),
           # but the conversation (messages array) persists. `session/reset`
           # drops the cached entry; the next prompt starts a fresh one.
-          conversation    = @conversations[session_id] ||= Agent::Conversation.new
+          conversation = @conversations[session_id] ||= Agent::Conversation.new
 
           # Register IDE-only tools (diagnostics, symbols) when running in IDE mode.
           Tools::Registry.load_ide_tools! if @server.ide_client

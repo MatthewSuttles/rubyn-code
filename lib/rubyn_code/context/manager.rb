@@ -10,7 +10,8 @@ module RubynCode
     class Manager
       CHARS_PER_TOKEN = 4
 
-      attr_reader :total_input_tokens, :total_output_tokens, :current_turn
+      attr_reader :total_input_tokens, :total_output_tokens, :cache_read_tokens,
+                  :cache_write_tokens, :compaction_tokens_saved, :current_turn
 
       # @param threshold [Integer] estimated token count that triggers auto-compaction
       # @param llm_client [LLM::Client, nil] needed for LLM-driven compaction
@@ -19,6 +20,9 @@ module RubynCode
         @llm_client = llm_client
         @total_input_tokens = 0
         @total_output_tokens = 0
+        @cache_read_tokens = 0
+        @cache_write_tokens = 0
+        @compaction_tokens_saved = 0
         @last_compaction_turn = -1
         @current_turn = 0
       end
@@ -37,6 +41,8 @@ module RubynCode
       def track_usage(usage)
         @total_input_tokens += usage.input_tokens.to_i
         @total_output_tokens += usage.output_tokens.to_i
+        @cache_read_tokens += usage_value(usage, :cache_read_input_tokens)
+        @cache_write_tokens += usage_value(usage, :cache_creation_input_tokens)
       end
 
       # Rough estimate of token count based on JSON-serialized character
@@ -92,6 +98,7 @@ module RubynCode
         est = estimated_tokens(estimate_source)
         if est > (@threshold * micro_compact_ratio) && MicroCompact.call(messages).to_i.positive?
           refresh_conversation_estimate(conversation)
+          record_compaction_savings(est, conversation)
         end
 
         return unless needs_compaction?(estimate_source)
@@ -99,7 +106,7 @@ module RubynCode
         # Step 2: Try context collapse (snip old messages, no LLM call)
         collapsed = ContextCollapse.call(messages, threshold: @threshold)
         if collapsed
-          apply_compacted_messages(conversation, collapsed)
+          apply_compacted_messages(conversation, collapsed, tokens_before: estimated_tokens(estimate_source))
           @last_compaction_turn = @current_turn
           return
         end
@@ -109,7 +116,7 @@ module RubynCode
 
         compactor = Compactor.new(llm_client: @llm_client, threshold: @threshold)
         new_messages = compactor.auto_compact!(messages)
-        apply_compacted_messages(conversation, new_messages)
+        apply_compacted_messages(conversation, new_messages, tokens_before: estimated_tokens(estimate_source))
         @last_compaction_turn = @current_turn
       end
 
@@ -119,6 +126,9 @@ module RubynCode
       def reset!
         @total_input_tokens = 0
         @total_output_tokens = 0
+        @cache_read_tokens = 0
+        @cache_write_tokens = 0
+        @compaction_tokens_saved = 0
         @last_compaction_turn = -1
         @current_turn = 0
       end
@@ -141,13 +151,32 @@ module RubynCode
         %w[openai openai_compatible].include?(provider)
       end
 
-      def apply_compacted_messages(conversation, new_messages)
+      def apply_compacted_messages(conversation, new_messages, tokens_before:)
         if conversation.respond_to?(:replace_messages)
           conversation.replace_messages(new_messages)
+        elsif conversation.respond_to?(:replace!)
+          conversation.replace!(new_messages)
         elsif conversation.respond_to?(:messages=)
           conversation.messages = new_messages
         end
         refresh_conversation_estimate(conversation)
+        record_compaction_savings(tokens_before, conversation)
+      end
+
+      def record_compaction_savings(tokens_before, conversation)
+        source = conversation.respond_to?(:estimated_json_chars) ? conversation : conversation.messages
+        saved = tokens_before.to_i - estimated_tokens(source)
+        @compaction_tokens_saved += saved if saved.positive?
+      end
+
+      def usage_value(usage, name)
+        if usage.respond_to?(name)
+          usage.public_send(name).to_i
+        elsif usage.respond_to?(:[])
+          (usage[name] || usage[name.to_s]).to_i
+        else
+          0
+        end
       end
 
       # MicroCompact and the compaction strategies mutate or replace messages
