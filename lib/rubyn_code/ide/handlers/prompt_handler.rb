@@ -157,7 +157,8 @@ module RubynCode
 
           @server.notify('token/usage', {
                            'sessionId' => session_id,
-                           'inputTokens' => totals[:input_tokens],
+                           'inputTokens' => totals[:input_tokens] + totals[:cache_read_tokens] +
+                             totals[:cache_write_tokens],
                            'cachedInputTokens' => totals[:cache_read_tokens],
                            'cacheWriteTokens' => totals[:cache_write_tokens],
                            'outputTokens' => totals[:output_tokens],

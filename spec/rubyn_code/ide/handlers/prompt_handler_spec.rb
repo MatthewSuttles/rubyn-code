@@ -92,7 +92,7 @@ RSpec.describe RubynCode::IDE::Handlers::PromptHandler do
 
       usage = notifications.select { |notification| notification["method"] == "token/usage" }.last["params"]
       expect(usage).to include(
-        "inputTokens" => 2_000,
+        "inputTokens" => 3_500,
         "cachedInputTokens" => 1_400,
         "cacheWriteTokens" => 100,
         "outputTokens" => 200,
