@@ -4,7 +4,6 @@
 
 # Bundle
 /.bundle/
-Gemfile.lock
 
 # Test & coverage
 /coverage/
